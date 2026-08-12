@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Finanshels UI"
+version = "1.0.0"
+id = "artifacts/finanshels-ui"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18749
+
+[services.development]
+run = "pnpm --filter @pms-revamp/finanshels-ui run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@pms-revamp/finanshels-ui", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/finanshels-ui/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18749"
+BASE_PATH = "/"

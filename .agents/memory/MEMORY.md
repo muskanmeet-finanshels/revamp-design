@@ -1,0 +1,9 @@
+- [Next.js 14 artifact notes](next14-artifact-notes.md) — Next 14 in vite-shell; React 18 + Tailwind 3 pinned; dev-server timeout quirk; AppShell + screen pattern.
+- [Radix menu scroll lock](radix-menu-scroll-lock.md) — disable modal scroll locking for app-shell filters so fixed headers do not shift when menus open.
+- [Expo Google Fonts useFonts quirk](expo-google-fonts-usefonts.md) — import useFonts from expo-font, not from freshly added @expo-google-fonts/* packages, or React duplicates and hooks crash.
+- [Workspace package repair](workspace-package-repair.md) — preserve pnpm metadata; environment package installs can rewrite root manifests and break artifact links.
+- [Client storage hydration](client-storage-hydration.md) — localStorage-backed UI state must hydrate after the deterministic server/client first render.
+- [Static export dynamic routes](static-export-dynamic-routes.md) — output:'export' needs generateStaticParams + client-side useEffect for URL params; no server searchParams.
+- [React Day Picker navigation](react-day-picker-navigation.md) — use v9's built-in around layout to place month controls on opposite sides of the caption.
+- [Timesheet delete dialog](timesheet-delete-dialog.md) — keep entry deletion confirmations compact and consistent with the app-wide delete modal.
+- [React 18 web build isolation](react18-web-build-isolation.md) — map web TypeScript resolution to local React 18 types in the mixed React 18/19 workspace.

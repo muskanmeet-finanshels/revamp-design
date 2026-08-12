@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Finanshels semantic tokens (Tier 2) mapped onto shadcn/ui CSS variables.
+ * Primitives (Tier 1) are defined in tailwind.config.ts — never reference
+ * them directly in components; alias through these semantic roles.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* white surface */
+    --foreground: 206 72% 11%; /* navy-900 #082032 — text-primary */
+
+    --card: 0 0% 100%;
+    --card-foreground: 206 72% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 206 72% 11%;
+
+    --primary: 23 89% 51%; /* orange-500 #F16611 — brand-primary */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 204 11% 91%; /* navy-50 #E6E9EB */
+    --secondary-foreground: 206 72% 11%;
+
+    --muted: 0 0% 96%; /* gray-100 #F4F4F4 */
+    --muted-foreground: 206 26% 27%; /* navy-600 #334756 */
+
+    --accent: 23 92% 95%; /* orange-100 #FEF0E7 */
+    --accent-foreground: 23 86% 41%; /* orange-700 #C1520E */
+
+    --destructive: 0 84% 60%; /* error #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 87%; /* gray-300 #DDDDDD */
+    --input: 0 0% 87%;
+    --ring: 23 89% 51%; /* brand-primary focus ring */
+
+    --radius: 0.5rem;
+
+  }
+
+  .dark {
+    --background: 206 72% 11%; /* navy-900 — bg-dark */
+    --foreground: 0 0% 100%;
+
+    --card: 203 71% 14%; /* navy-800 #0A2B3B */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 203 71% 14%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 23 89% 51%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 206 26% 27%; /* navy-600 */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 206 26% 27%;
+    --muted-foreground: 203 9% 72%; /* navy-200 #B2BABF */
+
+    --accent: 206 26% 27%;
+    --accent-foreground: 30 100% 60%; /* orange-300 */
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 206 26% 27%;
+    --input: 206 26% 27%;
+    --ring: 23 89% 51%;
+  }
+}
+
+@layer base {
+  /*
+   * Keep the vertical scrollbar gutter reserved even while a modal drawer
+   * locks body scrolling. This prevents the app shell from shifting sideways
+   * when Filter, Hold, or Reassign drawers open and close.
+   */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Keep toast dismissal unobtrusive until the toast is hovered. */
+[data-sonner-toast][data-styled='true'] [data-close-button] {
+  left: auto !important;
+  right: 0 !important;
+  transform: translate(35%, -35%) !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, background 200ms ease, border-color 200ms ease;
+}
+
+[data-sonner-toast][data-styled='true']:hover [data-close-button],
+[data-sonner-toast][data-styled='true'] [data-close-button]:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
