@@ -1090,11 +1090,12 @@ function AddTimesheetDrawer({ open, onClose }: { open: boolean; onClose: () => v
                   />
                 </DrawerField>
 
-                <DrawerField label="Quantity">
+                <DrawerField label="Quantity" required>
                   <DrawerInput
                     type="number"
                     min="0"
                     step="0.01"
+                    required
                     placeholder="Enter quantity"
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
@@ -1357,9 +1358,9 @@ function AddTimesheetDrawer({ open, onClose }: { open: boolean; onClose: () => v
                   />
                 </DrawerField>
 
-                <DrawerField label="Quantity">
+                <DrawerField label="Quantity" required>
                   <DrawerInput
-                    type="number" min="0" step="0.01" placeholder="Enter quantity"
+                    type="number" min="0" step="0.01" required placeholder="Enter quantity"
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
                   />
@@ -2013,9 +2014,9 @@ function EditTimesheetDrawer({
                   />
                 </DrawerField>
 
-                <DrawerField label="Quantity">
+                <DrawerField label="Quantity" required>
                   <DrawerInput
-                    type="number" min="0" step="0.01" placeholder="Enter quantity"
+                    type="number" min="0" step="0.01" required placeholder="Enter quantity"
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
                   />
@@ -2314,9 +2315,9 @@ function EditTimesheetDrawer({
                       />
                     </DrawerField>
 
-                    <DrawerField label="Quantity">
+                    <DrawerField label="Quantity" required>
                       <DrawerInput
-                        type="number" min="0" step="0.01" placeholder="Enter quantity"
+                        type="number" min="0" step="0.01" required placeholder="Enter quantity"
                         value={quantity}
                         onChange={e => setQuantity(e.target.value)}
                       />
