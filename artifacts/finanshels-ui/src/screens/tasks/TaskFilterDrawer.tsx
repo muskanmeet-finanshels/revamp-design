@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle, ArrowLeft, Bookmark, Briefcase, CalendarRange, Check, ChevronDown, ChevronUp, CircleAlert,
-  Pencil, RotateCcw, Search, Star, Trash2, X,
+  Pencil, RotateCcw, Search, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -48,7 +48,6 @@ export interface SavedTaskFilter {
   name:         string;
   filters:      TaskFilterState;
   createdAt:    number;
-  isFavourite?: boolean;
   isDefault?:   boolean;
 }
 
@@ -60,20 +59,7 @@ function useSavedFilters(storageKey: string) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as SavedTaskFilter[];
-        let favouriteFound = false;
-        const normalized = parsed.map(filter => {
-          if (!filter.isFavourite) return filter;
-          if (favouriteFound) return { ...filter, isFavourite: false };
-          favouriteFound = true;
-          return filter;
-        });
-        setSaved(normalized);
-        if (JSON.stringify(normalized) !== raw) {
-          localStorage.setItem(storageKey, JSON.stringify(normalized));
-        }
-      }
+      if (raw) setSaved(JSON.parse(raw) as SavedTaskFilter[]);
     } catch { /* ignore */ }
     setHydrated(true);
   }, [storageKey]);
@@ -92,7 +78,6 @@ function useSavedFilters(storageKey: string) {
       name: name.trim() || 'Untitled filter',
       filters,
       createdAt: Date.now(),
-      isFavourite: false,
       isDefault,
     };
     const base = isDefault ? saved.map(f => ({ ...f, isDefault: false })) : saved;
@@ -102,11 +87,6 @@ function useSavedFilters(storageKey: string) {
 
   function deleteFilter(id: string) {
     persist(saved.filter(f => f.id !== id));
-  }
-
-  function toggleFavourite(id: string) {
-    const nextValue = !saved.find(f => f.id === id)?.isFavourite;
-    persist(saved.map(f => ({ ...f, isFavourite: f.id === id ? nextValue : false })));
   }
 
   function setAsDefault(id: string | null) {
@@ -119,7 +99,7 @@ function useSavedFilters(storageKey: string) {
 
   const atCap = hydrated && saved.length >= MAX_SAVED_VAL;
 
-  return { saved: hydrated ? saved : [], saveFilter, deleteFilter, toggleFavourite, setAsDefault, renameFilter, atCap, MAX_SAVED };
+  return { saved: hydrated ? saved : [], saveFilter, deleteFilter, setAsDefault, renameFilter, atCap, MAX_SAVED };
 }
 
 /* ─────────────────────────────── filter state ───────────────────────────── */
@@ -552,7 +532,7 @@ export function TaskFilterDrawer({
   }
 
   /* saved-filter state */
-  const { saved, saveFilter, deleteFilter, toggleFavourite, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
+  const { saved, saveFilter, deleteFilter, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
   const [savePanelOpen, setSavePanelOpen]   = useState(false);
   const [saveName, setSaveName]             = useState('');
   const [saveCapWarning, setSaveCapWarning] = useState(false);
@@ -707,9 +687,7 @@ export function TaskFilterDrawer({
                   {dropdownOpen && (
                     <div className="absolute right-0 top-full z-50 mt-1.5 w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                       <div className="max-h-[220px] overflow-y-auto p-1.5 space-y-0.5">
-                        {[...saved]
-                          .sort((a, b) => (b.isFavourite ? 1 : 0) - (a.isFavourite ? 1 : 0))
-                          .map(sf => {
+                        {saved.map(sf => {
                             const count     = countActiveTaskFilters(sf.filters);
                             const isEditing = editingId === sf.id;
                             return (
@@ -720,28 +698,6 @@ export function TaskFilterDrawer({
                                   sf.isDefault ? 'bg-orange-50/70' : 'hover:bg-gray-50',
                                 )}
                               >
-                                {/* Favourite star */}
-                                <TooltipProvider delayDuration={150}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleFavourite(sf.id)}
-                                        aria-label={sf.isFavourite ? 'Remove from favourites' : 'Mark as favourite'}
-                                        className="flex-shrink-0 p-0.5 text-gray-300 hover:text-amber-400 transition-colors"
-                                      >
-                                        <Star size={13} className={sf.isFavourite ? 'fill-amber-400 text-amber-400' : ''} />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                      side="bottom"
-                                      className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
-                                    >
-                                      {sf.isFavourite ? 'Remove from favourites' : 'Mark as favourite'}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-
                                 {/* Name / edit input */}
                                 <div className="min-w-0 flex-1">
                                   {isEditing ? (
@@ -845,12 +801,7 @@ export function TaskFilterDrawer({
                             );
                           })}
                       </div>
-                       <div className="flex items-center gap-2 border-t border-gray-100 px-3 py-2 text-[11px] text-gray-400">
-                         <span className="inline-flex items-center gap-1">
-                           <Star size={11} aria-hidden="true" />
-                           Favourite
-                         </span>
-                         <span aria-hidden="true">·</span>
+                        <div className="flex items-center gap-2 border-t border-gray-100 px-3 py-2 text-[11px] text-gray-400">
                          <span className="inline-flex items-center gap-1">
                            <Pencil size={11} aria-hidden="true" />
                            Rename
