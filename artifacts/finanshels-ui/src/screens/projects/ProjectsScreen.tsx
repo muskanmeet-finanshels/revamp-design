@@ -249,6 +249,9 @@ export function ProjectsScreen() {
   const [visibleColumns, setVisibleColumns] = useState<Set<ProjectColumnKey>>(
     () => new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key)),
   );
+  const [columnOrder, setColumnOrder] = useState<ProjectColumnKey[]>(
+    () => PROJECT_COLUMN_OPTIONS.map(({ key }) => key),
+  );
 
   /* restore grid/list view from URL ?view= after mount */
   useEffect(() => {
@@ -799,7 +802,8 @@ export function ProjectsScreen() {
                   Project
                   <span className="ml-auto text-[10px] text-gray-400">Required</span>
                 </button>
-                {PROJECT_COLUMN_OPTIONS.map(({ key, label }) => {
+                {columnOrder.map(key => {
+                  const col     = PROJECT_COLUMN_OPTIONS.find(c => c.key === key)!;
                   const checked = visibleColumns.has(key);
                   return (
                     <button
@@ -814,7 +818,7 @@ export function ProjectsScreen() {
                       )}>
                         {checked && <Check size={11} strokeWidth={3} />}
                       </span>
-                      {label}
+                      {col.label}
                     </button>
                   );
                 })}
@@ -952,7 +956,9 @@ export function ProjectsScreen() {
         <ProjectsTable
           projects={pageProjects}
           selectedIds={selectedIds}
-           visibleColumns={visibleColumns}
+          visibleColumns={visibleColumns}
+          columnOrder={columnOrder}
+          onColumnReorder={setColumnOrder}
           onToggle={toggleSelect}
           sortKey={appliedSortBy}
           sortDir={appliedSortOrder}
