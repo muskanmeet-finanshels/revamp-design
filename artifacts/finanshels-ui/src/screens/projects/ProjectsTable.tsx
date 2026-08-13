@@ -133,13 +133,13 @@ function SortableHead({
       type="button"
       onClick={() => onSort(sortKey)}
       className={cn(
-        'flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
+        'flex items-center gap-1 whitespace-nowrap text-left text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
         active ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
         className,
       )}
       aria-label={`Sort by ${label}`}
     >
-      <span className="min-w-0 truncate">{label}</span>
+      <span className="whitespace-nowrap">{label}</span>
       {active
         ? currentDir === 'asc'
           ? <ArrowUp size={11} className="text-brand" />
@@ -226,15 +226,15 @@ export function ProjectsTable({
         onDrop={() => handleDrop(key)}
         onDragEnd={handleDragEnd}
         className={cn(
-          'group overflow-hidden select-none transition-colors',
+          'group select-none transition-colors',
           isDrop && 'border-l-2 border-brand bg-orange-50/60',
         )}
       >
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-max items-center gap-1.5">
           {sortable ? (
             <SortableHead label={label} sortKey={sortable} {...sortProps} />
           ) : (
-            <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[10px] font-semibold uppercase leading-tight tracking-widest text-gray-500">
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase leading-tight tracking-widest text-gray-500">
               {label}
             </span>
           )}
@@ -417,7 +417,7 @@ export function ProjectsTable({
   return (
     <div className="mt-3 min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
-        <Table className="w-full min-w-[1500px] table-fixed">
+        <Table className="w-max min-w-[1500px] table-auto">
           <colgroup>
             <col style={{ width: colW(selectColumnWeight) }} />
             <col style={{ width: colW(projectColumnWeight) }} />
