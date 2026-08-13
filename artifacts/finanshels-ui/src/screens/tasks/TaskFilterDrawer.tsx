@@ -703,7 +703,6 @@ export function TaskFilterDrawer({
                     <div className="absolute right-0 top-full z-50 mt-1.5 w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                       <div className="max-h-[220px] overflow-y-auto p-1.5 space-y-0.5">
                         {saved.map(sf => {
-                            const count     = countActiveTaskFilters(sf.filters);
                             const isEditing = editingId === sf.id;
                             return (
                               <div
@@ -735,7 +734,6 @@ export function TaskFilterDrawer({
                                           default
                                         </span>
                                       )}
-                                      <span className="flex-shrink-0 text-[11px] text-gray-400">{count} filter{count !== 1 ? 's' : ''}</span>
                                     </div>
                                   )}
                                 </div>
