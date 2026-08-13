@@ -56,6 +56,7 @@ export type ProjectSortKey =
 export type ProjectColumnKey =
   | 'client'
   | 'department'
+  | 'revenue'
   | 'accountManager'
   | 'teamLead'
   | 'assignees'
@@ -69,6 +70,7 @@ export type ProjectColumnKey =
 export const PROJECT_COLUMN_OPTIONS: Array<{ key: ProjectColumnKey; label: string }> = [
   { key: 'client',     label: 'Client' },
   { key: 'department', label: 'Department' },
+  { key: 'revenue',    label: 'Revenue' },
   { key: 'accountManager', label: 'Account Manager' },
   { key: 'teamLead',   label: 'Team Lead' },
   { key: 'assignees',  label: 'Assignees' },
@@ -85,6 +87,7 @@ export const PROJECT_COLUMN_OPTIONS: Array<{ key: ProjectColumnKey; label: strin
 const PROJECT_COLUMN_WEIGHTS: Record<ProjectColumnKey, number> = {
   client: 10,
   department: 11,
+  revenue: 11,
   accountManager: 12,
   teamLead: 9,
   assignees: 10,
@@ -239,6 +242,9 @@ export function ProjectsTable({
               {visibleColumns.has('department') && (
                 <TableHead className="w-[10%]"><SortableHead label="Department" sortKey="department" {...sortProps} /></TableHead>
               )}
+              {visibleColumns.has('revenue') && (
+                <TableHead className="w-[9%] text-[10px] font-semibold uppercase tracking-widest text-gray-700">Revenue</TableHead>
+              )}
               {visibleColumns.has('accountManager') && (
                 <TableHead className="w-[11%] whitespace-nowrap text-[10px] font-semibold leading-tight tracking-widest text-gray-700">Account Manager</TableHead>
               )}
@@ -336,6 +342,15 @@ export function ProjectsTable({
                         <Users2 size={12} className="flex-shrink-0 text-gray-400" />
                         <span className="block min-w-0 truncate text-[12.5px] text-gray-700">{p.serviceType.label}</span>
                       </div>
+                    </TableCell>
+                  )}
+
+                  {/* Revenue */}
+                  {visibleColumns.has('revenue') && (
+                    <TableCell className="py-3">
+                      <span className="text-[12.5px] font-medium text-gray-700">
+                        {p.revenue != null ? `AED ${p.revenue.toLocaleString()}` : '—'}
+                      </span>
                     </TableCell>
                   )}
 
