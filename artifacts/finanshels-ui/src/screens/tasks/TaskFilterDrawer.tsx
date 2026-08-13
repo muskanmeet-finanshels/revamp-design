@@ -60,7 +60,20 @@ function useSavedFilters(storageKey: string) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) setSaved(JSON.parse(raw) as SavedTaskFilter[]);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedTaskFilter[];
+        let favouriteFound = false;
+        const normalized = parsed.map(filter => {
+          if (!filter.isFavourite) return filter;
+          if (favouriteFound) return { ...filter, isFavourite: false };
+          favouriteFound = true;
+          return filter;
+        });
+        setSaved(normalized);
+        if (JSON.stringify(normalized) !== raw) {
+          localStorage.setItem(storageKey, JSON.stringify(normalized));
+        }
+      }
     } catch { /* ignore */ }
     setHydrated(true);
   }, [storageKey]);
@@ -92,7 +105,8 @@ function useSavedFilters(storageKey: string) {
   }
 
   function toggleFavourite(id: string) {
-    persist(saved.map(f => f.id === id ? { ...f, isFavourite: !f.isFavourite } : f));
+    const nextValue = !saved.find(f => f.id === id)?.isFavourite;
+    persist(saved.map(f => ({ ...f, isFavourite: f.id === id ? nextValue : false })));
   }
 
   function setAsDefault(id: string | null) {
