@@ -1341,9 +1341,21 @@ export function TasksTable({
                 {/* Reassignment note */}
                 {activeColumns.has('reassignmentNote') && <TableCell className="py-3">
                   {task.reassignmentNote ? (
-                    <span className="text-[12px] text-gray-600">
-                      {task.reassignmentNote}
-                    </span>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="block max-w-[160px] cursor-default truncate whitespace-nowrap text-[12px] text-gray-600">
+                            {task.reassignmentNote}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-[320px] whitespace-normal break-words rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                        >
+                          {task.reassignmentNote}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   ) : (
                     <span className="text-[12px] text-gray-300">—</span>
                   )}

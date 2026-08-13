@@ -523,11 +523,13 @@ export interface TaskFilterDrawerProps {
   /** Apply a filter set directly — used by saved-filter rows to bypass pending state lag */
   onApplyDirect?: (f: TaskFilterState) => void;
   storageKey?:    string;
+  /** Hide filters that are redundant when the task list is already project-scoped. */
+  hideProjectContextFilters?: boolean;
 }
 
 export function TaskFilterDrawer({
   open, onClose, pending, onChange, onApply, onReset, onApplyDirect,
-  storageKey = 'finanshels-tasks-filters',
+  storageKey = 'finanshels-tasks-filters', hideProjectContextFilters = false,
 }: TaskFilterDrawerProps) {
   const hasPending = countActiveTaskFilters(pending) > 0;
 
@@ -981,24 +983,28 @@ export function TaskFilterDrawer({
                 searchPlaceholder="Search frequencies..."
                 drawerOpen={open}
               />
-              <MultiSelectDropdown
-                label="Client Name"
-                placeholder="Select clients..."
-                options={TASK_FILTER_OPTIONS.clients}
-                selected={pending.clients}
-                onChange={v => set('clients', v)}
-                searchPlaceholder="Search clients..."
-                drawerOpen={open}
-              />
-              <MultiSelectDropdown
-                label="Project Name"
-                placeholder="Select projects..."
-                options={TASK_FILTER_OPTIONS.projectNames}
-                selected={pending.projectNames}
-                onChange={v => set('projectNames', v)}
-                searchPlaceholder="Search projects..."
-                drawerOpen={open}
-              />
+              {!hideProjectContextFilters && (
+                <>
+                  <MultiSelectDropdown
+                    label="Client Name"
+                    placeholder="Select clients..."
+                    options={TASK_FILTER_OPTIONS.clients}
+                    selected={pending.clients}
+                    onChange={v => set('clients', v)}
+                    searchPlaceholder="Search clients..."
+                    drawerOpen={open}
+                  />
+                  <MultiSelectDropdown
+                    label="Project Name"
+                    placeholder="Select projects..."
+                    options={TASK_FILTER_OPTIONS.projectNames}
+                    selected={pending.projectNames}
+                    onChange={v => set('projectNames', v)}
+                    searchPlaceholder="Search projects..."
+                    drawerOpen={open}
+                  />
+                </>
+              )}
               <MultiSelectDropdown
                 label="Service"
                 placeholder="Select services..."

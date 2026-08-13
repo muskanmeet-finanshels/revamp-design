@@ -132,7 +132,7 @@ function SingleTaskReassignFields({
         />
       </DrawerField>
 
-      <DrawerField label="Note (optional)">
+      <DrawerField label="Note">
         <DrawerTextarea
           value={note}
           onChange={event => onNoteChange(event.target.value)}

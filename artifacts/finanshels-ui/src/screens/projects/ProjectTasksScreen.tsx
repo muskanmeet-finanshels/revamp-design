@@ -925,10 +925,17 @@ export function ProjectTasksScreen() {
         onClose={() => setFilterDrawerOpen(false)}
         pending={pendingFilters}
         onChange={setPendingFilters}
-        onApply={() => { setAppliedFilters(pendingFilters); }}
+        onApply={() => {
+          setAppliedFilters({ ...pendingFilters, clients: [], projectNames: [] });
+        }}
         onReset={() => { setPendingFilters(EMPTY_TASK_FILTERS); setAppliedFilters(EMPTY_TASK_FILTERS); }}
         storageKey="finanshels-project-tasks-filters"
-        onApplyDirect={f => { setAppliedFilters(f); setPendingFilters(f); }}
+        hideProjectContextFilters
+        onApplyDirect={f => {
+          const projectScopedFilters = { ...f, clients: [], projectNames: [] };
+          setAppliedFilters(projectScopedFilters);
+          setPendingFilters(projectScopedFilters);
+        }}
       />
 
       {/* ── Task selection action bar ── */}
