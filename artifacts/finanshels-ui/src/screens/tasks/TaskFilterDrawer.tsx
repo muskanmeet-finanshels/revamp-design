@@ -532,7 +532,7 @@ export function TaskFilterDrawer({
   }
 
   /* saved-filter state */
-  const { saved, saveFilter, deleteFilter, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
+  const { saved, saveFilter, deleteFilter, setAsDefault, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
   const [savePanelOpen, setSavePanelOpen]   = useState(false);
   const [saveName, setSaveName]             = useState('');
   const [saveCapWarning, setSaveCapWarning] = useState(false);
@@ -758,6 +758,24 @@ export function TaskFilterDrawer({
                                       Apply
                                     </button>
                                      <TooltipProvider delayDuration={150}>
+                                       <Tooltip>
+                                         <TooltipTrigger asChild>
+                                           <button
+                                             type="button"
+                                             onClick={() => setAsDefault(sf.isDefault ? null : sf.id)}
+                                             aria-label={sf.isDefault ? 'Remove as default' : 'Set as default'}
+                                             className={cn(
+                                               'flex h-7 w-7 items-center justify-center rounded-lg transition-colors',
+                                               sf.isDefault ? 'bg-orange-100 text-brand' : 'text-gray-400 hover:bg-gray-100 hover:text-brand',
+                                             )}
+                                           >
+                                             <Bookmark size={12} className={sf.isDefault ? 'fill-brand' : ''} />
+                                           </button>
+                                         </TooltipTrigger>
+                                         <TooltipContent side="bottom" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+                                           {sf.isDefault ? 'Remove as default' : 'Set as default'}
+                                         </TooltipContent>
+                                       </Tooltip>
                                        <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
