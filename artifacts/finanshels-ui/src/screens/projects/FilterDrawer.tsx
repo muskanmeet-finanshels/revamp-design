@@ -560,10 +560,9 @@ export function FilterDrawer({
   }
 
   /* saved-filter state */
-  const { saved, saveFilter, deleteFilter, toggleFavourite, setAsDefault, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
+  const { saved, saveFilter, deleteFilter, toggleFavourite, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
   const [savePanelOpen, setSavePanelOpen]   = useState(false);
   const [saveName, setSaveName]             = useState('');
-  const [saveIsDefault, setSaveIsDefault]   = useState(false);
   const [saveCapWarning, setSaveCapWarning] = useState(false);
   const [deleteTarget, setDeleteTarget]     = useState<string | null>(null);
   const saveInputRef  = useRef<HTMLInputElement>(null);
@@ -584,7 +583,6 @@ export function FilterDrawer({
     if (!open) {
       setSavePanelOpen(false);
       setSaveName('');
-      setSaveIsDefault(false);
       setSaveCapWarning(false);
       setDropdownOpen(false);
       setEditingId(null);
@@ -607,9 +605,8 @@ export function FilterDrawer({
   function handleSave() {
     if (!hasPendingFilters) return;
     if (atCap) { setSaveCapWarning(true); return; }
-    saveFilter(saveName, pending, saveIsDefault);
+    saveFilter(saveName, pending);
     setSaveName('');
-    setSaveIsDefault(false);
     setSavePanelOpen(false);
     setSaveCapWarning(false);
   }
@@ -973,27 +970,12 @@ export function FilterDrawer({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setSavePanelOpen(false); setSaveName(''); setSaveIsDefault(false); }}
+                  onClick={() => { setSavePanelOpen(false); setSaveName(''); }}
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
                 >
                   <X size={13} />
                 </button>
               </div>
-              {!atCap && (
-                <button
-                  type="button"
-                  onClick={() => setSaveIsDefault(v => !v)}
-                  className="flex items-center gap-2 pl-[22px] w-fit"
-                >
-                  <div className={cn(
-                    'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-                    saveIsDefault ? 'border-brand bg-brand' : 'border-gray-300 bg-white hover:border-brand/60',
-                  )}>
-                    {saveIsDefault && <Check size={10} className="text-white" strokeWidth={3} />}
-                  </div>
-                  <span className="text-[12px] text-gray-600">Set as default filter</span>
-                </button>
-              )}
             </div>
           )}
         </div>
