@@ -404,8 +404,9 @@ export function ProjectsScreen() {
 
     const deptMatch   = af.departments.length === 0 || af.departments.includes(p.serviceType.label);
     const svcMatch    = af.services.length === 0    || af.services.includes(p.serviceType.label);
-    const revenueMatch = af.revenueRanges.length === 0 || (
-      p.revenue != null && af.revenueRanges.some(range => {
+    const revenueRanges = Array.isArray(af.revenueRanges) ? af.revenueRanges : [];
+    const revenueMatch = revenueRanges.length === 0 || (
+      p.revenue != null && revenueRanges.some(range => {
         if (range === 'AED 0–5,000')      return p.revenue >= 0 && p.revenue <= 5000;
         if (range === 'AED 5,001–10,000') return p.revenue >= 5001 && p.revenue <= 10000;
         if (range === 'AED 10,001–15,000')return p.revenue >= 10001 && p.revenue <= 15000;

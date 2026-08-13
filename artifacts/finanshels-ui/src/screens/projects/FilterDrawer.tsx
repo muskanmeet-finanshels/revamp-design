@@ -128,10 +128,12 @@ export const EMPTY_FILTERS: FilterState = {
 };
 
 export function countActiveFilters(f: FilterState): number {
+  const revenueRanges = Array.isArray(f.revenueRanges) ? f.revenueRanges : [];
+
   return (
     (f.departments.length > 0 ? 1 : 0) +
     (f.services.length > 0 ? 1 : 0) +
-    (f.revenueRanges.length > 0 ? 1 : 0) +
+    (revenueRanges.length > 0 ? 1 : 0) +
     (f.dueDays.length > 0 ? 1 : 0) +
     (f.overdueDays.length > 0 ? 1 : 0) +
     (f.clients.length > 0 ? 1 : 0) +
@@ -1147,7 +1149,7 @@ export function sanitizeSavedFilter(filters: FilterState): {
   const removedByField: Record<string, number> = {};
 
   for (const { key, options, label } of FILTER_OPTION_KEYS) {
-    const stored = filters[key] as string[];
+    const stored = Array.isArray(filters[key]) ? filters[key] as string[] : [];
     const valid  = stored.filter(v => (options as readonly string[]).includes(v));
     const diff   = stored.length - valid.length;
     if (diff > 0) {
