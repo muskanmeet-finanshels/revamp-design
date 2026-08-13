@@ -97,9 +97,13 @@ function useSavedFilters(storageKey: string) {
     persist(saved.map(f => f.id === id ? { ...f, name: name.trim() || f.name } : f));
   }
 
+  function updateFilter(id: string, filters: TaskFilterState) {
+    persist(saved.map(f => f.id === id ? { ...f, filters } : f));
+  }
+
   const atCap = hydrated && saved.length >= MAX_SAVED_VAL;
 
-  return { saved: hydrated ? saved : [], saveFilter, deleteFilter, setAsDefault, renameFilter, atCap, MAX_SAVED };
+  return { saved: hydrated ? saved : [], saveFilter, deleteFilter, setAsDefault, renameFilter, updateFilter, atCap, MAX_SAVED };
 }
 
 /* ─────────────────────────────── filter state ───────────────────────────── */
@@ -532,11 +536,12 @@ export function TaskFilterDrawer({
   }
 
   /* saved-filter state */
-  const { saved, saveFilter, deleteFilter, setAsDefault, renameFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
+  const { saved, saveFilter, deleteFilter, setAsDefault, renameFilter, updateFilter, atCap, MAX_SAVED } = useSavedFilters(storageKey);
   const [savePanelOpen, setSavePanelOpen]   = useState(false);
   const [saveName, setSaveName]             = useState('');
   const [saveCapWarning, setSaveCapWarning] = useState(false);
   const [deleteTarget, setDeleteTarget]     = useState<string | null>(null);
+  const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
   const saveInputRef  = useRef<HTMLInputElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
   const [dropdownOpen, setDropdownOpen]     = useState(false);
@@ -578,9 +583,19 @@ export function TaskFilterDrawer({
     if (!hasPending) return;
     if (atCap) { setSaveCapWarning(true); return; }
     saveFilter(saveName, pending);
+    setActiveSavedFilterId(null);
     setSaveName('');
     setSavePanelOpen(false);
     setSaveCapWarning(false);
+  }
+
+  function handleUpdate(sf: SavedTaskFilter) {
+    updateFilter(sf.id, pending);
+    if (onApplyDirect) { onApplyDirect(pending); }
+    else { onChange(pending); onApply(); }
+    setDropdownOpen(false);
+    onClose();
+    toast.success(`"${sf.name}" updated`);
   }
 
   useEffect(() => {
@@ -745,9 +760,20 @@ export function TaskFilterDrawer({
                                   </div>
                                 ) : (
                                   <div className="flex flex-shrink-0 items-center gap-0.5">
+                                    {activeSavedFilterId === sf.id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdate(sf)}
+                                        className="rounded-lg border border-brand/30 bg-orange-50 px-2 py-1 text-[11.5px] font-semibold text-brand hover:bg-orange-100 transition-colors"
+                                        aria-label={`Update ${sf.name}`}
+                                      >
+                                        Update
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        setActiveSavedFilterId(sf.id);
                                         if (onApplyDirect) { onApplyDirect(sf.filters); }
                                         else { onChange(sf.filters); onApply(); }
                                         setDropdownOpen(false);
@@ -1044,7 +1070,7 @@ export function TaskFilterDrawer({
         <div className="flex-shrink-0 border-t border-gray-100 px-5 py-4">
           <button
             type="button"
-            onClick={onReset}
+            onClick={() => { setActiveSavedFilterId(null); onReset(); }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <RotateCcw size={13} />
