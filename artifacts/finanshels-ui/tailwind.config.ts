@@ -37,6 +37,9 @@ const config: Config = {
           100: '#F4F4F4',
           200: '#EEEEEE',
           300: '#DDDDDD',
+          // Use a readable secondary-text neutral instead of Tailwind's
+          // low-contrast default gray-400 (#9CA3AF).
+          400: '#6B7280',
         },
         /* ---- Tier 2: semantic roles ---- */
         brand: {
