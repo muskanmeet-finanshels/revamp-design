@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Check,
+  ArrowDown, ArrowUp, ArrowUpDown, Check, GripVertical,
   Play, PlayCircle, Square, MessageSquare, MoreHorizontal,
   UserRound, Tag, Pencil, X, Circle, CircleAlert, Timer,
 } from 'lucide-react';
@@ -964,6 +964,8 @@ interface Props {
   onSort:         (k: SortKey) => void;
   showProject?:   boolean;
   visibleColumns?: Set<TaskColumnKey>;
+  columnOrder?:     TaskColumnKey[];
+  onColumnReorder?: (order: TaskColumnKey[]) => void;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
 }
 
@@ -979,10 +981,285 @@ export function TasksTable({
   onSort,
   showProject = true,
   visibleColumns,
+  columnOrder,
+  onColumnReorder,
   onStatusChange,
 }: Props) {
   const sortProps = { currentKey: sortKey, currentDir: sortDir, onSort };
   const activeColumns = visibleColumns ?? DEFAULT_VISIBLE_TASK_COLUMNS;
+
+  /* ── Drag-and-drop column order ── */
+  const activeColumnOrder = columnOrder ?? TASK_COLUMN_OPTIONS.map(({ key }) => key);
+  const orderedVisible = activeColumnOrder.filter(k =>
+    activeColumns.has(k) && (k !== 'project' || showProject),
+  );
+  const dragKey = useRef<TaskColumnKey | null>(null);
+  const [dropTarget, setDropTarget] = useState<TaskColumnKey | null>(null);
+
+  function handleDragStart(key: TaskColumnKey) { dragKey.current = key; }
+  function handleDragOver(e: React.DragEvent, key: TaskColumnKey) {
+    e.preventDefault();
+    if (dragKey.current && dragKey.current !== key) setDropTarget(key);
+  }
+  function handleDrop(key: TaskColumnKey) {
+    if (!dragKey.current || dragKey.current === key) { setDropTarget(null); return; }
+    const from = dragKey.current;
+    const next = [...activeColumnOrder];
+    const fromIdx = next.indexOf(from);
+    const toIdx   = next.indexOf(key);
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, from);
+    onColumnReorder?.(next);
+    dragKey.current = null;
+    setDropTarget(null);
+  }
+  function handleDragEnd() { dragKey.current = null; setDropTarget(null); }
+
+  const TASK_SORT_MAP: Partial<Record<TaskColumnKey, SortKey>> = {
+    project: 'project', assignee: 'assignee', dueDate: 'dueDate', status: 'status',
+  };
+  const TASK_COL_LABEL: Record<TaskColumnKey, string> = Object.fromEntries(
+    TASK_COLUMN_OPTIONS.map(({ key: k, label }) => [k, label]),
+  ) as Record<TaskColumnKey, string>;
+
+  function renderTaskHeader(key: TaskColumnKey) {
+    const isDrop   = dropTarget === key;
+    const sortable = TASK_SORT_MAP[key];
+    const label    = key === 'tags' ? '' : TASK_COL_LABEL[key];
+    return (
+      <TableHead
+        key={key}
+        draggable
+        onDragStart={() => handleDragStart(key)}
+        onDragOver={e => handleDragOver(e, key)}
+        onDrop={() => handleDrop(key)}
+        onDragEnd={handleDragEnd}
+        className={cn('group select-none transition-colors', isDrop && 'border-l-2 border-brand bg-orange-50/60')}
+      >
+        <div className="flex min-w-max items-center gap-1.5">
+          {sortable ? (
+            <button
+              type="button"
+              onClick={() => onSort(sortable)}
+              className={cn(
+                'flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
+                sortKey === sortable ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              <span className="whitespace-nowrap">{label}</span>
+              {sortKey === sortable
+                ? sortDir === 'asc'
+                  ? <ArrowUp size={11} className="text-brand" />
+                  : <ArrowDown size={11} className="text-brand" />
+                : <ArrowUpDown size={11} className="opacity-40" />}
+            </button>
+          ) : (
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+              {label}
+            </span>
+          )}
+          <GripVertical size={13} aria-hidden="true"
+            className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing" />
+        </div>
+      </TableHead>
+    );
+  }
+
+  function renderTaskCell(key: TaskColumnKey, task: TaskItem) {
+    const dueFmt       = new Date(task.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const dueIndicator = getDueDateIndicator(task.dueDate, task.status);
+    const projectLabel = task.projects.map(p => p.title).join(', ');
+    const tag          = getTag(task.id);
+    const hasTags      = Boolean(tag.priority);
+    switch (key) {
+      case 'project': return (
+        <TableCell key={key} className="py-3">
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block max-w-[220px] cursor-default truncate whitespace-nowrap text-[12px] leading-snug text-gray-700">{projectLabel}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">{projectLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </TableCell>
+      );
+      case 'assignee': return (
+        <TableCell key={key} className="py-3">
+          <TooltipProvider delayDuration={150}>
+            <div className="flex items-center gap-2">
+              {task.assignee ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block max-w-[100px] cursor-default truncate text-[12px] text-gray-700">{task.assignee.name}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">{task.assignee.name}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex cursor-default items-center gap-2">
+                      <div className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 ring-[1.5px] ring-white">
+                        <UserRound size={11} className="text-gray-400" />
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Unassigned</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </TooltipProvider>
+        </TableCell>
+      );
+      case 'reassignmentNote': return (
+        <TableCell key={key} className="py-3">
+          {task.reassignmentNote ? (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="block max-w-[160px] cursor-default truncate whitespace-nowrap text-[12px] text-gray-600">{task.reassignmentNote}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[320px] whitespace-normal break-words rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">{task.reassignmentNote}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <span className="text-[12px] text-gray-300">—</span>
+          )}
+        </TableCell>
+      );
+      case 'dueDate': return (
+        <TableCell key={key} className="py-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12px] text-gray-700">{dueFmt}</span>
+            {dueIndicator && (
+              <span className={cn('w-fit rounded-full px-2 py-[2px] text-[10.5px] font-medium whitespace-nowrap', dueIndicator.cls)}>{dueIndicator.text}</span>
+            )}
+          </div>
+        </TableCell>
+      );
+      case 'status': return (
+        <TableCell key={key} className="py-3">
+          <span className={cn('inline-flex items-center rounded-full px-2.5 py-[3px] text-[11.5px] font-medium leading-tight whitespace-nowrap', STATUS_CHIP[task.status])}>
+            {task.status}
+          </span>
+        </TableCell>
+      );
+      case 'timeSpent': return (
+        <TableCell key={key} className="py-3">
+          <span className="text-[12px] font-medium text-gray-600">{fmtTime(task.timeSpentSeconds)}</span>
+        </TableCell>
+      );
+      case 'timer': return (
+        <TableCell key={key} className="py-3">
+          <RowTimer
+            taskId={task.id}
+            taskName={task.name}
+            taskStatus={task.status}
+            baseSeconds={task.timeSpentSeconds}
+            projectName={task.projects[0]?.title ?? ''}
+            onStatusAdvance={() => onStatusChange?.(task.id, 'In Progress')}
+            onStatusSet={(status) => onStatusChange?.(task.id, status)}
+          />
+        </TableCell>
+      );
+      case 'comments': return (
+        <TableCell key={key} className="py-3">
+          {(() => {
+            const count    = (commentsMap[task.id] ?? []).length;
+            const lastSeen = lastSeenMap[task.id] ?? 0;
+            const hasNew   = count > lastSeen;
+            return (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => openDrawerFor(task.id)}
+                      className="relative flex items-center gap-1 text-gray-500 hover:text-brand transition-colors"
+                    >
+                      {hasNew && (
+                        <span className="absolute -top-1 -right-1.5 flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                        </span>
+                      )}
+                      <MessageSquare size={13} className="flex-shrink-0" />
+                      <span className="text-[12px] font-medium">{count}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+                    {hasNew
+                      ? `${count - lastSeen} new comment${count - lastSeen !== 1 ? 's' : ''}`
+                      : count === 0 ? 'Add a comment' : `View ${count} comment${count !== 1 ? 's' : ''}`
+                    }
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })()}
+        </TableCell>
+      );
+      case 'tags': return (
+        <TableCell key={key} className="py-3">
+          <div className="flex items-center gap-1.5">
+            {tag.priority && (
+              <span className={cn('rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight uppercase', TAG_BADGE[tag.priority])}>
+                {tag.priority.toUpperCase()}
+              </span>
+            )}
+            <button
+              onClick={() => setOpenTagId(task.id)}
+              className="group flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-[11.5px] font-medium text-gray-600 transition-colors hover:border-brand hover:text-brand whitespace-nowrap"
+            >
+              {hasTags
+                ? <Pencil size={10} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
+                : <Tag    size={10} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
+              }
+              {hasTags ? 'Edit Tags' : 'Add Tags'}
+            </button>
+          </div>
+        </TableCell>
+      );
+      case 'action': return (
+        <TableCell key={key} className="py-3 pr-3">
+          {task.status === 'On Hold' ? (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={() => setResumeTask({ id: task.id, name: task.name })} aria-label="Resume task"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-brand hover:text-brand">
+                    <PlayCircle size={15} strokeWidth={1.8} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6} className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Resume</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : task.status === 'Done' ? (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={() => setIncompleteTask({ id: task.id, name: task.name })} aria-label="Mark as Incomplete"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-brand hover:text-brand">
+                    <Circle size={15} strokeWidth={1.8} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6} className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Mark as Incomplete</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : task.status === 'Archived' ? null : (
+            <ActionMenu
+              taskName={task.name}
+              onDelete={() => setDeleteTask({ id: task.id, name: task.name })}
+              onChangeAssignee={() => onChangeAssignee?.(task)}
+              onMarkComplete={() => setCompleteTask({ id: task.id, name: task.name })}
+            />
+          )}
+        </TableCell>
+      );
+      default: return null;
+    }
+  }
+
   const selectColumnWeight = 4;
   const taskColumnWeight = 18;
   const visibleColumnWeight = TASK_COLUMN_OPTIONS.reduce(
@@ -1105,19 +1382,7 @@ export function TasksTable({
   return (
     <>
     <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-      <Table className={cn(
-        'w-full table-fixed',
-        showProject ? 'min-w-[1400px]' : 'min-w-[1220px]',
-      )}>
-        <colgroup>
-          <col style={{ width: columnWidth(selectColumnWeight) }} />
-          <col style={{ width: columnWidth(taskColumnWeight) }} />
-          {TASK_COLUMN_OPTIONS
-            .filter(({ key }) => activeColumns.has(key) && (key !== 'project' || showProject))
-            .map(({ key }) => (
-              <col key={key} style={{ width: columnWidth(TASK_COLUMN_WEIGHTS[key]) }} />
-            ))}
-        </colgroup>
+      <Table className="w-max min-w-[1220px] table-auto">
 
         <TableHeader className="whitespace-nowrap">
           <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
@@ -1158,91 +1423,14 @@ export function TasksTable({
               <SortableHead label="Task" sortKey="name" {...sortProps} />
             </TableHead>
 
-            {/* Project */}
-            {showProject && activeColumns.has('project') && (
-              <TableHead className="min-w-[180px]">
-                <SortableHead label="Project" sortKey="project" {...sortProps} />
-              </TableHead>
-            )}
-
-            {/* Assignee */}
-            {activeColumns.has('assignee') && (
-              <TableHead className="min-w-[140px]">
-                <SortableHead label="Assignee" sortKey="assignee" {...sortProps} />
-              </TableHead>
-            )}
-
-            {/* Reassignment note */}
-            {activeColumns.has('reassignmentNote') && (
-              <TableHead className="min-w-[160px]">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Reassignment Note
-                </span>
-              </TableHead>
-            )}
-
-            {/* Due date */}
-            {activeColumns.has('dueDate') && (
-              <TableHead className="min-w-[130px]">
-                <SortableHead label="Due Date" sortKey="dueDate" {...sortProps} />
-              </TableHead>
-            )}
-
-            {/* Status */}
-            {activeColumns.has('status') && (
-              <TableHead className="min-w-[120px]">
-                <SortableHead label="Status" sortKey="status" {...sortProps} />
-              </TableHead>
-            )}
-
-            {/* Time spent */}
-            {activeColumns.has('timeSpent') && (
-              <TableHead className="min-w-[90px]">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Time Spent
-                </span>
-              </TableHead>
-            )}
-
-            {/* Timer */}
-            {activeColumns.has('timer') && (
-              <TableHead className="min-w-[100px]">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Timer
-                </span>
-              </TableHead>
-            )}
-
-            {/* Comments */}
-            {activeColumns.has('comments') && (
-              <TableHead className="w-[80px]">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Comments
-                </span>
-              </TableHead>
-            )}
-
-            {/* Tags — no header */}
-            {activeColumns.has('tags') && <TableHead className="min-w-[140px]" />}
-
-            {/* Action */}
-            {activeColumns.has('action') && (
-              <TableHead className="w-16 pr-4">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                  Action
-                </span>
-              </TableHead>
-            )}
+            {orderedVisible.map(k => renderTaskHeader(k))}
 
           </TableRow>
         </TableHeader>
 
         <TableBody>
           {tasks.map(task => {
-            const isSelected   = selectedIds.has(task.id);
-            const dueFmt       = new Date(task.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-            const dueIndicator = getDueDateIndicator(task.dueDate, task.status);
-            const projectLabel = task.projects.map(project => project.title).join(', ');
+            const isSelected = selectedIds.has(task.id);
 
             return (
               <TableRow
@@ -1287,247 +1475,8 @@ export function TasksTable({
                   </TooltipProvider>
                 </TableCell>
 
-                {/* Project — single-line label for one or multiple projects */}
-                {showProject && activeColumns.has('project') && (
-                  <TableCell className="py-3">
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="block max-w-[220px] cursor-default truncate whitespace-nowrap text-[12px] leading-snug text-gray-700">
-                            {projectLabel}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                          {projectLabel}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-                )}
+                {orderedVisible.map(k => renderTaskCell(k, task))}
 
-                {/* Assignee */}
-                {activeColumns.has('assignee') && <TableCell className="py-3">
-                  <TooltipProvider delayDuration={150}>
-                    <div className="flex items-center gap-2">
-                      {task.assignee ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="block max-w-[100px] cursor-default truncate text-[12px] text-gray-700">
-                              {task.assignee.name}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            {task.assignee.name}
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex cursor-default items-center gap-2">
-                              <div className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 ring-[1.5px] ring-white">
-                                <UserRound size={11} className="text-gray-400" />
-                              </div>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            Unassigned
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </TooltipProvider>
-                </TableCell>}
-
-                {/* Reassignment note */}
-                {activeColumns.has('reassignmentNote') && <TableCell className="py-3">
-                  {task.reassignmentNote ? (
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="block max-w-[160px] cursor-default truncate whitespace-nowrap text-[12px] text-gray-600">
-                            {task.reassignmentNote}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          className="max-w-[320px] whitespace-normal break-words rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
-                        >
-                          {task.reassignmentNote}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : (
-                    <span className="text-[12px] text-gray-300">—</span>
-                  )}
-                </TableCell>}
-
-                {/* Due date */}
-                {activeColumns.has('dueDate') && <TableCell className="py-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[12px] text-gray-700">{dueFmt}</span>
-                    {dueIndicator && (
-                      <span className={cn(
-                        'w-fit rounded-full px-2 py-[2px] text-[10.5px] font-medium whitespace-nowrap',
-                        dueIndicator.cls,
-                      )}>
-                        {dueIndicator.text}
-                      </span>
-                    )}
-                  </div>
-                </TableCell>}
-
-                {/* Status */}
-                {activeColumns.has('status') && <TableCell className="py-3">
-                  <span className={cn(
-                    'inline-flex items-center rounded-full px-2.5 py-[3px] text-[11.5px] font-medium leading-tight whitespace-nowrap',
-                    STATUS_CHIP[task.status],
-                  )}>
-                    {task.status}
-                  </span>
-                </TableCell>}
-
-                {/* Time spent */}
-                {activeColumns.has('timeSpent') && <TableCell className="py-3">
-                  <span className="text-[12px] text-gray-600 font-medium">
-                    {fmtTime(task.timeSpentSeconds)}
-                  </span>
-                </TableCell>}
-
-                {/* Timer */}
-                {activeColumns.has('timer') && <TableCell className="py-3">
-                  <RowTimer
-                    taskId={task.id}
-                    taskName={task.name}
-                    taskStatus={task.status}
-                    baseSeconds={task.timeSpentSeconds}
-                    projectName={task.projects[0]?.title ?? ''}
-                    onStatusAdvance={() => onStatusChange?.(task.id, 'In Progress')}
-                    onStatusSet={(status) => onStatusChange?.(task.id, status)}
-                  />
-                </TableCell>}
-
-                {/* Comments */}
-                {activeColumns.has('comments') && <TableCell className="py-3">
-                  {(() => {
-                    const count    = (commentsMap[task.id] ?? []).length;
-                    const lastSeen = lastSeenMap[task.id] ?? 0;
-                    const hasNew   = count > lastSeen;
-                    return (
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() => openDrawerFor(task.id)}
-                              className="relative flex items-center gap-1 text-gray-500 hover:text-brand transition-colors"
-                            >
-                              {hasNew && (
-                                <span className="absolute -top-1 -right-1.5 flex h-2 w-2">
-                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-                                </span>
-                              )}
-                              <MessageSquare size={13} className="flex-shrink-0" />
-                              <span className="text-[12px] font-medium">{count}</span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            {hasNew
-                              ? `${count - lastSeen} new comment${count - lastSeen !== 1 ? 's' : ''}`
-                              : count === 0 ? 'Add a comment' : `View ${count} comment${count !== 1 ? 's' : ''}`
-                            }
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    );
-                  })()}
-                </TableCell>}
-
-                {/* Tags */}
-                {activeColumns.has('tags') && <TableCell className="py-3">
-                  {(() => {
-                    const tag     = getTag(task.id);
-                    const hasTags = Boolean(tag.priority);
-                    return (
-                      <div className="flex items-center gap-1.5">
-                        {tag.priority && (
-                          <span className={cn(
-                            'rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight uppercase',
-                            TAG_BADGE[tag.priority],
-                          )}>
-                            {tag.priority.toUpperCase()}
-                          </span>
-                        )}
-                        <button
-                          onClick={() => setOpenTagId(task.id)}
-                          className="group flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-[11.5px] font-medium text-gray-600 transition-colors hover:border-brand hover:text-brand whitespace-nowrap"
-                        >
-                          {hasTags
-                            ? <Pencil size={10} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
-                            : <Tag    size={10} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
-                          }
-                          {hasTags ? 'Edit Tags' : 'Add Tags'}
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </TableCell>}
-
-                {/* Action */}
-                {activeColumns.has('action') && <TableCell className="py-3 pr-3">
-                  {task.status === 'On Hold' ? (
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setResumeTask({ id: task.id, name: task.name })}
-                            aria-label="Resume task"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-brand hover:text-brand"
-                          >
-                            <PlayCircle size={15} strokeWidth={1.8} />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          sideOffset={6}
-                          className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
-                        >
-                          Resume
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : task.status === 'Done' ? (
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setIncompleteTask({ id: task.id, name: task.name })}
-                            aria-label="Mark as Incomplete"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-brand hover:text-brand"
-                          >
-                            <Circle size={15} strokeWidth={1.8} />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          sideOffset={6}
-                          className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
-                        >
-                          Mark as Incomplete
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : task.status === 'Archived' ? null : (
-                      <ActionMenu
-                        taskName={task.name}
-                        onDelete={() => setDeleteTask({ id: task.id, name: task.name })}
-                        onChangeAssignee={() => onChangeAssignee?.(task)}
-                        onMarkComplete={() => setCompleteTask({ id: task.id, name: task.name })}
-                      />
-                  )}
-                </TableCell>}
 
               </TableRow>
             );

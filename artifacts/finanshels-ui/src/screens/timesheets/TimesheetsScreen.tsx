@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search, X, ChevronDown, ChevronUp, Plus,
-  Clock, SearchX, ArrowLeft, Pencil, Check,
+  Clock, SearchX, ArrowLeft, Pencil, Check, GripVertical,
   ArrowDown, ArrowUp, ArrowUpDown, Trash2,
   MessageSquare,
 } from 'lucide-react';
@@ -101,6 +101,65 @@ type TimesheetSortKey =
   | 'status';
 
 type SortDirection = 'asc' | 'desc';
+
+/* ── Timesheet drag-and-drop column order ── */
+export type TimesheetColumnKey =
+  | 'filingPeriod' | 'submittedOn' | 'totalHours' | 'approvedBy' | 'status' | 'action';
+
+const TIMESHEET_COLUMN_OPTIONS: Array<{ key: TimesheetColumnKey; label: string; sortKey?: TimesheetSortKey }> = [
+  { key: 'filingPeriod', label: 'Filing Period', sortKey: 'filingPeriod' },
+  { key: 'submittedOn',  label: 'Submitted On',  sortKey: 'submittedOn' },
+  { key: 'totalHours',   label: 'Total Hours',   sortKey: 'totalHours' },
+  { key: 'approvedBy',   label: 'Approved By',   sortKey: 'approvedBy' },
+  { key: 'status',       label: 'Status',         sortKey: 'status' },
+  { key: 'action',       label: 'Action' },
+];
+const TS_COL_ORDER_KEY = 'fh_timesheets_column_order';
+
+function normalizeTimesheetColumnOrder(value: unknown): TimesheetColumnKey[] | null {
+  if (!Array.isArray(value)) return null;
+  const available = new Set<TimesheetColumnKey>(TIMESHEET_COLUMN_OPTIONS.map(c => c.key));
+  const valid = [...new Set((value as unknown[]).filter((k): k is TimesheetColumnKey =>
+    typeof k === 'string' && available.has(k as TimesheetColumnKey),
+  ))];
+  const missing = TIMESHEET_COLUMN_OPTIONS.map(c => c.key).filter(k => !valid.includes(k));
+  return valid.length ? [...valid, ...missing] : null;
+}
+
+function useTimesheetColumnOrder() {
+  const [order, setOrder] = useState<TimesheetColumnKey[]>(
+    () => TIMESHEET_COLUMN_OPTIONS.map(c => c.key),
+  );
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(TS_COL_ORDER_KEY);
+      if (stored) {
+        const saved = normalizeTimesheetColumnOrder(JSON.parse(stored));
+        if (saved) setOrder(saved);
+      }
+    } catch { /* ignore */ }
+    setHydrated(true);
+
+    function onStorage(e: StorageEvent) {
+      if (e.key !== TS_COL_ORDER_KEY || !e.newValue) return;
+      try {
+        const saved = normalizeTimesheetColumnOrder(JSON.parse(e.newValue));
+        if (saved) setOrder(saved);
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem(TS_COL_ORDER_KEY, JSON.stringify(order)); } catch { /* ignore */ }
+  }, [order, hydrated]);
+
+  return [order, setOrder] as const;
+}
 
 function SortableHead({
   label,
@@ -2998,6 +3057,23 @@ function AllTimesheets() {
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<TimesheetSortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [columnOrder, setColumnOrder] = useTimesheetColumnOrder();
+  const tsDragKey = useRef<TimesheetColumnKey | null>(null);
+  const [tsDropTarget, setTsDropTarget] = useState<TimesheetColumnKey | null>(null);
+  function tsDragStart(key: TimesheetColumnKey) { tsDragKey.current = key; }
+  function tsDragOver(e: React.DragEvent, key: TimesheetColumnKey) {
+    e.preventDefault();
+    if (tsDragKey.current && tsDragKey.current !== key) setTsDropTarget(key);
+  }
+  function tsDrop(key: TimesheetColumnKey) {
+    if (!tsDragKey.current || tsDragKey.current === key) { setTsDropTarget(null); return; }
+    const from = tsDragKey.current;
+    const next = [...columnOrder];
+    const fromIdx = next.indexOf(from); const toIdx = next.indexOf(key);
+    next.splice(fromIdx, 1); next.splice(toIdx, 0, from);
+    setColumnOrder(next); tsDragKey.current = null; setTsDropTarget(null);
+  }
+  function tsDragEnd() { tsDragKey.current = null; setTsDropTarget(null); }
 
   /* local mutations (mock — no real API) */
   const [deletedIds, setDeletedIds]         = useState<Set<string>>(new Set());
@@ -3137,25 +3213,43 @@ function AllTimesheets() {
 
       {/* Table */}
       <div className="mt-3 min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table className="w-full min-w-[900px] table-fixed">
-          <colgroup>
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '21%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '15%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '8%' }} />
-          </colgroup>
+        <Table className="w-max min-w-[900px] table-auto">
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5"><SortableHead label="Name" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Filing Period" sortKey="filingPeriod" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Submitted On" sortKey="submittedOn" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Total Hours" sortKey="totalHours" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Approved By" sortKey="approvedBy" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead className="pr-4 text-right text-[10px] font-semibold uppercase tracking-widest text-gray-500">Action</TableHead>
+              <TableHead className="pl-5 select-none">
+                <div className="flex min-w-max items-center"><SortableHead label="Name" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></div>
+              </TableHead>
+              {columnOrder.map(key => {
+                const col = TIMESHEET_COLUMN_OPTIONS.find(c => c.key === key)!;
+                const isDrop = tsDropTarget === key;
+                return (
+                  <TableHead key={key} draggable
+                    onDragStart={() => tsDragStart(key)}
+                    onDragOver={e => tsDragOver(e, key)}
+                    onDrop={() => tsDrop(key)}
+                    onDragEnd={tsDragEnd}
+                    className={cn('group select-none transition-colors', isDrop && 'border-l-2 border-brand bg-orange-50/60')}
+                  >
+                    <div className="flex min-w-max items-center gap-1.5">
+                      {col.sortKey ? (
+                        <button type="button" onClick={() => handleSort(col.sortKey!)}
+                          className={cn('flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
+                            sortKey === col.sortKey ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
+                          )}>
+                          <span className="whitespace-nowrap">{col.label}</span>
+                          {sortKey === col.sortKey
+                            ? sortDirection === 'asc' ? <ArrowUp size={11} className="text-brand" /> : <ArrowDown size={11} className="text-brand" />
+                            : <ArrowUpDown size={11} className="opacity-40" />}
+                        </button>
+                      ) : (
+                        <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest text-gray-500">{col.label}</span>
+                      )}
+                      <GripVertical size={13} aria-hidden="true"
+                        className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing" />
+                    </div>
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -3179,54 +3273,38 @@ function AllTimesheets() {
               return (
                 <TableRow key={ts.id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
                   <TableCell className="pl-5 py-3.5"><PersonName name={ts.name} /></TableCell>
-                  <TableCell className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{ts.filingPeriod}</span></TableCell>
-                  <TableCell className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{submittedLabel}</span></TableCell>
-                  <TableCell className="py-3.5">
-                    <span className="text-[13px] font-medium text-gray-900">{ts.totalHours > 0 ? `${ts.totalHours}h` : '—'}</span>
-                  </TableCell>
-                  <TableCell className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{ts.approvedBy ?? '—'}</span></TableCell>
-                  <TableCell className="py-3.5">
-                    <span className={cn('inline-flex rounded-full px-2.5 py-[3px] text-[11.5px] font-medium whitespace-nowrap', chip.cls)}>
-                      {chip.label}
-                    </span>
-                  </TableCell>
-                  {/* Actions */}
-                  <TableCell className="py-3.5 pr-4">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Edit"
-                              onClick={() => { setEditTarget(ts); setEditDrawerOpen(true); }}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            Edit
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Delete"
-                              onClick={() => setDeleteTarget(ts)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            Delete
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </TableCell>
+                  {columnOrder.map(key => {
+                    switch (key) {
+                      case 'filingPeriod': return <TableCell key={key} className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{ts.filingPeriod}</span></TableCell>;
+                      case 'submittedOn':  return <TableCell key={key} className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{submittedLabel}</span></TableCell>;
+                      case 'totalHours':  return <TableCell key={key} className="py-3.5"><span className="text-[13px] font-medium text-gray-900">{ts.totalHours > 0 ? `${ts.totalHours}h` : '—'}</span></TableCell>;
+                      case 'approvedBy':  return <TableCell key={key} className="min-w-0 py-3.5"><span className="block truncate text-[13px] text-gray-700">{ts.approvedBy ?? '—'}</span></TableCell>;
+                      case 'status':      return <TableCell key={key} className="py-3.5"><span className={cn('inline-flex rounded-full px-2.5 py-[3px] text-[11.5px] font-medium whitespace-nowrap', chip.cls)}>{chip.label}</span></TableCell>;
+                      case 'action':      return (
+                        <TableCell key={key} className="py-3.5 pr-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button type="button" aria-label="Edit" onClick={() => { setEditTarget(ts); setEditDrawerOpen(true); }}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"><Pencil size={13} /></button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Edit</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button type="button" aria-label="Delete" onClick={() => setDeleteTarget(ts)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"><Trash2 size={13} /></button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Delete</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
+                      );
+                      default: return null;
+                    }
+                  })}
                 </TableRow>
               );
             })}
@@ -3314,6 +3392,23 @@ function PendingActions() {
   const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
   const [mounted, setMounted]             = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  const [columnOrder, setColumnOrder] = useTimesheetColumnOrder();
+  const tsDragKey = useRef<TimesheetColumnKey | null>(null);
+  const [tsDropTarget, setTsDropTarget] = useState<TimesheetColumnKey | null>(null);
+  function tsDragStart(key: TimesheetColumnKey) { tsDragKey.current = key; }
+  function tsDragOver(e: React.DragEvent, key: TimesheetColumnKey) {
+    e.preventDefault();
+    if (tsDragKey.current && tsDragKey.current !== key) setTsDropTarget(key);
+  }
+  function tsDrop(key: TimesheetColumnKey) {
+    if (!tsDragKey.current || tsDragKey.current === key) { setTsDropTarget(null); return; }
+    const from = tsDragKey.current;
+    const next = [...columnOrder];
+    const fromIdx = next.indexOf(from); const toIdx = next.indexOf(key);
+    next.splice(fromIdx, 1); next.splice(toIdx, 0, from);
+    setColumnOrder(next); tsDragKey.current = null; setTsDropTarget(null);
+  }
+  function tsDragEnd() { tsDragKey.current = null; setTsDropTarget(null); }
 
   function openView(ts: TimesheetRecord) {
     setViewTarget(ts);
@@ -3380,16 +3475,43 @@ function PendingActions() {
 
       {/* Table */}
       <div className="mt-3 min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table className="w-full min-w-[900px]">
+        <Table className="w-max min-w-[900px] table-auto">
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5"><SortableHead label="Name" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Filing Period" sortKey="filingPeriod" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Submitted On" sortKey="submittedOn" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Total Hours" sortKey="totalHours" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Approved By" sortKey="approvedBy" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead><SortableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></TableHead>
-              <TableHead className="pr-4 text-right text-[10px] font-semibold uppercase tracking-widest text-gray-500">Action</TableHead>
+              <TableHead className="pl-5 select-none">
+                <div className="flex min-w-max items-center"><SortableHead label="Name" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} /></div>
+              </TableHead>
+              {columnOrder.map(key => {
+                const col = TIMESHEET_COLUMN_OPTIONS.find(c => c.key === key)!;
+                const isDrop = tsDropTarget === key;
+                return (
+                  <TableHead key={key} draggable
+                    onDragStart={() => tsDragStart(key)}
+                    onDragOver={e => tsDragOver(e, key)}
+                    onDrop={() => tsDrop(key)}
+                    onDragEnd={tsDragEnd}
+                    className={cn('group select-none transition-colors', isDrop && 'border-l-2 border-brand bg-orange-50/60')}
+                  >
+                    <div className="flex min-w-max items-center gap-1.5">
+                      {col.sortKey ? (
+                        <button type="button" onClick={() => handleSort(col.sortKey!)}
+                          className={cn('flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
+                            sortKey === col.sortKey ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
+                          )}>
+                          <span className="whitespace-nowrap">{col.label}</span>
+                          {sortKey === col.sortKey
+                            ? sortDirection === 'asc' ? <ArrowUp size={11} className="text-brand" /> : <ArrowDown size={11} className="text-brand" />
+                            : <ArrowUpDown size={11} className="opacity-40" />}
+                        </button>
+                      ) : (
+                        <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest text-gray-500">{col.label}</span>
+                      )}
+                      <GripVertical size={13} aria-hidden="true"
+                        className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing" />
+                    </div>
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -3415,51 +3537,34 @@ function PendingActions() {
                   onClick={() => openView(ts)}
                   className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors cursor-pointer"
                 >
-                  <TableCell className="pl-5 py-3.5">
-                    <PersonName name={ts.name} />
-                  </TableCell>
-                  <TableCell className="py-3.5"><span className="text-[13px] text-gray-700">{ts.filingPeriod}</span></TableCell>
-                  <TableCell className="py-3.5"><span className="text-[13px] text-gray-700">{submittedLabel}</span></TableCell>
-                  <TableCell className="py-3.5"><span className="text-[13px] font-medium text-gray-900">{ts.totalHours > 0 ? `${ts.totalHours}h` : '—'}</span></TableCell>
-                  <TableCell className="py-3.5"><span className="text-[13px] text-gray-700">{ts.approvedBy ?? '—'}</span></TableCell>
-                  <TableCell className="py-3.5">
-                    <span className={cn('inline-flex rounded-full px-2.5 py-[3px] text-[11.5px] font-medium whitespace-nowrap', chip.cls)}>
-                      {chip.label}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-3.5 pr-4">
-                    <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleApprove(ts)}
-                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(ts)}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-semibold text-red-600 hover:bg-red-100 transition-colors"
-                      >
-                        Reject
-                      </button>
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Delete"
-                              onClick={() => setDeleteTarget(ts)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                            Delete
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </TableCell>
+                  <TableCell className="pl-5 py-3.5"><PersonName name={ts.name} /></TableCell>
+                  {columnOrder.map(key => {
+                    switch (key) {
+                      case 'filingPeriod': return <TableCell key={key} className="py-3.5"><span className="text-[13px] text-gray-700">{ts.filingPeriod}</span></TableCell>;
+                      case 'submittedOn':  return <TableCell key={key} className="py-3.5"><span className="text-[13px] text-gray-700">{submittedLabel}</span></TableCell>;
+                      case 'totalHours':  return <TableCell key={key} className="py-3.5"><span className="text-[13px] font-medium text-gray-900">{ts.totalHours > 0 ? `${ts.totalHours}h` : '—'}</span></TableCell>;
+                      case 'approvedBy':  return <TableCell key={key} className="py-3.5"><span className="text-[13px] text-gray-700">{ts.approvedBy ?? '—'}</span></TableCell>;
+                      case 'status':      return <TableCell key={key} className="py-3.5"><span className={cn('inline-flex rounded-full px-2.5 py-[3px] text-[11.5px] font-medium whitespace-nowrap', chip.cls)}>{chip.label}</span></TableCell>;
+                      case 'action':      return (
+                        <TableCell key={key} className="py-3.5 pr-4">
+                          <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => handleApprove(ts)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">Approve</button>
+                            <button onClick={() => handleReject(ts)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-semibold text-red-600 hover:bg-red-100 transition-colors">Reject</button>
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button type="button" aria-label="Delete" onClick={() => setDeleteTarget(ts)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"><Trash2 size={13} /></button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Delete</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
+                      );
+                      default: return null;
+                    }
+                  })}
                 </TableRow>
               );
             })}

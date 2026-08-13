@@ -343,6 +343,49 @@ export function TasksScreen() {
   const [visibleColumns, setVisibleColumns] = useState<Set<TaskColumnKey>>(
     () => new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key)),
   );
+  const [taskColumnOrder, setTaskColumnOrder] = useState<TaskColumnKey[]>(
+    () => TASK_COLUMN_OPTIONS.map(({ key }) => key),
+  );
+  const [taskColumnOrderHydrated, setTaskColumnOrderHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('fh_tasks_column_order');
+      if (stored) {
+        const parsed = JSON.parse(stored) as unknown[];
+        if (Array.isArray(parsed)) {
+          const available = new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key));
+          const valid = [...new Set(parsed.filter((k): k is TaskColumnKey =>
+            typeof k === 'string' && available.has(k as TaskColumnKey),
+          ))];
+          const missing = TASK_COLUMN_OPTIONS.map(({ key }) => key).filter(k => !valid.includes(k));
+          if (valid.length) setTaskColumnOrder([...valid, ...missing]);
+        }
+      }
+    } catch { /* ignore */ }
+    setTaskColumnOrderHydrated(true);
+
+    function onStorage(e: StorageEvent) {
+      if (e.key !== 'fh_tasks_column_order' || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue) as unknown[];
+        if (!Array.isArray(parsed)) return;
+        const available = new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key));
+        const valid = [...new Set(parsed.filter((k): k is TaskColumnKey =>
+          typeof k === 'string' && available.has(k as TaskColumnKey),
+        ))];
+        const missing = TASK_COLUMN_OPTIONS.map(({ key }) => key).filter(k => !valid.includes(k));
+        if (valid.length) setTaskColumnOrder([...valid, ...missing]);
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!taskColumnOrderHydrated) return;
+    try { localStorage.setItem('fh_tasks_column_order', JSON.stringify(taskColumnOrder)); } catch { /* ignore */ }
+  }, [taskColumnOrder, taskColumnOrderHydrated]);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -714,7 +757,10 @@ export function TasksScreen() {
                   Task
                   <span className="ml-auto text-[10px] text-gray-400">Required</span>
                 </button>
-                {TASK_COLUMN_OPTIONS.map(({ key, label }) => {
+                {taskColumnOrder.map(key => {
+                  const option = TASK_COLUMN_OPTIONS.find(o => o.key === key);
+                  if (!option) return null;
+                  const { label } = option;
                   const checked = visibleColumns.has(key);
                   return (
                     <button
@@ -832,6 +878,8 @@ export function TasksScreen() {
               sortDir={sortDir}
               onSort={handleSort}
               visibleColumns={visibleColumns}
+              columnOrder={taskColumnOrder}
+              onColumnReorder={setTaskColumnOrder}
               onStatusChange={(id, status) =>
                 setStatusOverrides(prev => ({ ...prev, [id]: status }))
               }
