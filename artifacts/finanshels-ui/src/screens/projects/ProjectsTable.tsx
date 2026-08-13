@@ -417,7 +417,7 @@ export function ProjectsTable({
   return (
     <div className="mt-3 min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
-        <Table className="w-max min-w-[1500px] table-auto">
+        <Table className="w-full min-w-[1500px] table-auto">
           <colgroup>
             <col style={{ width: colW(selectColumnWeight) }} />
             <col style={{ width: colW(projectColumnWeight) }} />

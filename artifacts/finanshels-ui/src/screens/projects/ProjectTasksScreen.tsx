@@ -660,6 +660,44 @@ export function ProjectTasksScreen() {
       {/* ── Project detail card ── */}
       {project && <ProjectDetailCard project={project} />}
 
+      {/* ── Hold / Delete reason banner ── */}
+      {project && (project.status === 'On Hold' || project.status === 'Archived') && (() => {
+        const stored =
+          project.status === 'On Hold'
+            ? (typeof window !== 'undefined' ? localStorage.getItem(`fh_hold_reason_${project.id}`) ?? '' : '')
+            : (typeof window !== 'undefined' ? localStorage.getItem(`fh_delete_reason_${project.id}`) ?? '' : '');
+        const note =
+          stored ||
+          (project.status === 'On Hold' ? (project.holdReason ?? '') : (project.deleteReason ?? ''));
+        if (!note) return null;
+        const isHold = project.status === 'On Hold';
+        return (
+          <div className={cn(
+            'mb-5 flex items-start gap-3 rounded-xl border px-4 py-3.5',
+            isHold ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-100',
+          )}>
+            <div className={cn(
+              'mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg',
+              isHold ? 'bg-amber-100' : 'bg-gray-200',
+            )}>
+              {isHold
+                ? <CirclePause size={15} className="text-amber-600" />
+                : <Trash2       size={15} className="text-gray-500" />
+              }
+            </div>
+            <div className="min-w-0">
+              <p className={cn(
+                'mb-1 text-[11px] font-semibold uppercase tracking-widest',
+                isHold ? 'text-amber-600' : 'text-gray-500',
+              )}>
+                {isHold ? 'Reason for Hold' : 'Reason for Deletion'}
+              </p>
+              <p className="text-[13px] leading-snug text-gray-700">{note}</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Page header ── */}
       <div className="mb-5">
         <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">

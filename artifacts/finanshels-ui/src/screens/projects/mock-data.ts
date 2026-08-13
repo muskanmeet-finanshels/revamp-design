@@ -33,6 +33,10 @@ export interface Project {
   invoiceType?: InvoiceType;
   /** Revenue amount in AED */
   revenue?: number;
+  /** Reason provided when the project was placed on hold */
+  holdReason?: string;
+  /** Reason provided when the project was deleted / archived */
+  deleteReason?: string;
 }
 
 export const MOCK_PROJECTS: Project[] = [
@@ -96,6 +100,7 @@ export const MOCK_PROJECTS: Project[] = [
     tasksCompleted: 0,
     tasksTotal: 12,
     dueDate: 'Due 25 May 2026',
+    holdReason: 'Client requested a temporary pause while they gather outstanding trade licence documents. Expected to resume within 3–4 weeks.',
     holdDate: '2026-07-28',
     badge: 1,
     invoiceType: 'individual' as const,
@@ -245,6 +250,7 @@ export const MOCK_PROJECTS: Project[] = [
     tasksTotal: 13,
     dueDate: 'Due 15 Jun 2026',
     holdDate: '2026-07-20',
+    holdReason: 'Awaiting updated VAT registration certificate from the client before proceeding. Finance team flagged a discrepancy in the submitted documents.',
     badge: 2,
     invoiceType: 'individual' as const,
     revenue: 11000,
@@ -300,6 +306,7 @@ export const MOCK_PROJECTS: Project[] = [
     tasksCompleted: 12,
     tasksTotal: 12,
     dueDate: 'Due 31 Dec 2025',
+    deleteReason: 'Audit scope was merged into the FY2024 Combined Audit – Nexora project at the client\'s request. All tasks and documents transferred accordingly.',
     badge: 0,
     invoiceType: 'bundled' as const,
     revenue: 3200,
@@ -366,6 +373,7 @@ export const MOCK_PROJECTS: Project[] = [
     tasksTotal: 10,
     dueDate: 'Due 05 Oct 2026',
     holdDate: '2026-08-05',
+    holdReason: 'Management has requested a strategic review of Q3 figures before the accounts are finalised. Project will resume once internal sign-off is received.',
     badge: 3,
     invoiceType: 'bundled' as const,
     revenue: 4800,

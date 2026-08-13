@@ -1382,7 +1382,7 @@ export function TasksTable({
   return (
     <>
     <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-      <Table className="w-max min-w-[1220px] table-auto">
+      <Table className="w-full min-w-[1220px] table-auto">
 
         <TableHeader className="whitespace-nowrap">
           <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">

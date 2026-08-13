@@ -1127,8 +1127,13 @@ export function ProjectsScreen() {
           clientName:   p.client.name,
           serviceOpted: p.serviceType.label,
         }))}
-        onConfirm={(_reason, _deleteAll) => {
+        onConfirm={(reason, _deleteAll) => {
           const count = selectedIds.size;
+          if (reason.trim()) {
+            [...selectedIds].forEach(id => {
+              localStorage.setItem(`fh_delete_reason_${id}`, reason.trim());
+            });
+          }
           setDeletedIds(prev => new Set([...prev, ...selectedIds]));
           clearSelection();
           toast.success(`${count} ${count === 1 ? 'project' : 'projects'} deleted`, {
@@ -1220,8 +1225,13 @@ export function ProjectsScreen() {
         open={holdDrawerOpen}
         onClose={() => setHoldDrawerOpen(false)}
         count={selectedIds.size}
-        onConfirm={(_reason, _includeRecurring) => {
+        onConfirm={(reason, _includeRecurring) => {
           const n = selectedIds.size;
+          if (reason.trim()) {
+            [...selectedIds].forEach(id => {
+              localStorage.setItem(`fh_hold_reason_${id}`, reason.trim());
+            });
+          }
           setHoldDrawerOpen(false);
           clearSelection();
           toast.success(`${n} ${n === 1 ? 'project' : 'projects'} put on hold`, {

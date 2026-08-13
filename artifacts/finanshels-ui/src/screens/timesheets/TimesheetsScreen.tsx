@@ -3213,7 +3213,7 @@ function AllTimesheets() {
 
       {/* Table */}
       <div className="mt-3 min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table className="w-max min-w-[900px] table-auto">
+        <Table className="w-full min-w-[900px] table-auto">
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
               <TableHead className="pl-5 select-none">
@@ -3475,7 +3475,7 @@ function PendingActions() {
 
       {/* Table */}
       <div className="mt-3 min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table className="w-max min-w-[900px] table-auto">
+        <Table className="w-full min-w-[900px] table-auto">
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
               <TableHead className="pl-5 select-none">
