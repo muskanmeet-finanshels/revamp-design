@@ -133,13 +133,13 @@ function SortableHead({
       type="button"
       onClick={() => onSort(sortKey)}
       className={cn(
-        'flex items-center gap-1 text-left text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
+        'flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left text-[10px] font-semibold uppercase tracking-widest select-none transition-colors',
         active ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
         className,
       )}
       aria-label={`Sort by ${label}`}
     >
-      {label}
+      <span className="min-w-0 truncate">{label}</span>
       {active
         ? currentDir === 'asc'
           ? <ArrowUp size={11} className="text-brand" />
@@ -226,23 +226,24 @@ export function ProjectsTable({
         onDrop={() => handleDrop(key)}
         onDragEnd={handleDragEnd}
         className={cn(
-          'group select-none transition-colors',
+          'group overflow-hidden select-none transition-colors',
           isDrop && 'border-l-2 border-brand bg-orange-50/60',
         )}
       >
-        <div className="flex items-center gap-1.5">
-          {/* drag handle — visible on hover */}
-          <GripVertical
-            size={13}
-            className="flex-shrink-0 cursor-grab text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
-          />
+        <div className="flex min-w-0 items-center gap-1.5">
           {sortable ? (
             <SortableHead label={label} sortKey={sortable} {...sortProps} />
           ) : (
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">
+            <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[10px] font-semibold uppercase leading-tight tracking-widest text-gray-500">
               {label}
             </span>
           )}
+          {/* Keep the handle after the label so it does not compete with sorting. */}
+          <GripVertical
+            size={13}
+            aria-hidden="true"
+            className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing"
+          />
         </div>
       </TableHead>
     );
