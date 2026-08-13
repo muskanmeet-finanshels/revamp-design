@@ -35,6 +35,24 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 
+const PROJECT_COLUMN_ORDER_STORAGE_KEY = 'fh_projects_column_order';
+
+function normalizeProjectColumnOrder(value: unknown): ProjectColumnKey[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const availableKeys = new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key));
+  const storedKeys = value.filter(
+    (key): key is ProjectColumnKey =>
+      typeof key === 'string' && availableKeys.has(key as ProjectColumnKey),
+  );
+  const uniqueKeys = [...new Set(storedKeys)];
+  const missingKeys = PROJECT_COLUMN_OPTIONS
+    .map(({ key }) => key)
+    .filter(key => !uniqueKeys.includes(key));
+
+  return [...uniqueKeys, ...missingKeys];
+}
+
 /* ─────────────────────────────── constants ──────────────────────────────── */
 
 /* ── Status color schemes (urgency cards only — never used in the dropdown) ── */
@@ -252,6 +270,53 @@ export function ProjectsScreen() {
   const [columnOrder, setColumnOrder] = useState<ProjectColumnKey[]>(
     () => PROJECT_COLUMN_OPTIONS.map(({ key }) => key),
   );
+  const [columnOrderHydrated, setColumnOrderHydrated] = useState(false);
+
+  /* Persist the user's drag-and-drop order across refreshes and open tabs. */
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PROJECT_COLUMN_ORDER_STORAGE_KEY);
+      if (stored) {
+        const savedOrder = normalizeProjectColumnOrder(JSON.parse(stored));
+        if (savedOrder) setColumnOrder(savedOrder);
+      }
+    } catch {
+      /* Ignore malformed or unavailable browser storage. */
+    }
+
+    setColumnOrderHydrated(true);
+
+    function handleColumnOrderStorage(event: StorageEvent) {
+      if (event.key !== PROJECT_COLUMN_ORDER_STORAGE_KEY) return;
+
+      if (!event.newValue) {
+        setColumnOrder(PROJECT_COLUMN_OPTIONS.map(({ key }) => key));
+        return;
+      }
+
+      try {
+        const savedOrder = normalizeProjectColumnOrder(JSON.parse(event.newValue));
+        if (savedOrder) setColumnOrder(savedOrder);
+      } catch {
+        /* Ignore malformed cross-tab updates. */
+      }
+    }
+
+    window.addEventListener('storage', handleColumnOrderStorage);
+    return () => window.removeEventListener('storage', handleColumnOrderStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!columnOrderHydrated) return;
+    try {
+      localStorage.setItem(
+        PROJECT_COLUMN_ORDER_STORAGE_KEY,
+        JSON.stringify(columnOrder),
+      );
+    } catch {
+      /* Ignore unavailable browser storage. */
+    }
+  }, [columnOrder, columnOrderHydrated]);
 
   /* restore grid/list view from URL ?view= after mount */
   useEffect(() => {
