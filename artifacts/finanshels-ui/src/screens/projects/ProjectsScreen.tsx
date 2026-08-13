@@ -404,6 +404,15 @@ export function ProjectsScreen() {
 
     const deptMatch   = af.departments.length === 0 || af.departments.includes(p.serviceType.label);
     const svcMatch    = af.services.length === 0    || af.services.includes(p.serviceType.label);
+    const revenueMatch = af.revenueRanges.length === 0 || (
+      p.revenue != null && af.revenueRanges.some(range => {
+        if (range === 'AED 0–5,000')      return p.revenue >= 0 && p.revenue <= 5000;
+        if (range === 'AED 5,001–10,000') return p.revenue >= 5001 && p.revenue <= 10000;
+        if (range === 'AED 10,001–15,000')return p.revenue >= 10001 && p.revenue <= 15000;
+        if (range === 'AED 15,001+')      return p.revenue >= 15001;
+        return true;
+      })
+    );
     const clientMatch = af.clients.length === 0     || af.clients.includes(p.client.name);
 
     const allMembers  = [...p.teamLeads, ...p.assignees].map(m => m.name);
@@ -458,7 +467,7 @@ export function ProjectsScreen() {
     })();
 
     return statusMatch && searchMatch &&
-      deptMatch && svcMatch && clientMatch && assigneeMatch &&
+      deptMatch && svcMatch && revenueMatch && clientMatch && assigneeMatch &&
       dueDaysMatch && overdueDaysMatch && periodMatch;
   };
 

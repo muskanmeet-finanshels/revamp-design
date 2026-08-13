@@ -88,6 +88,7 @@ function useSavedFilters(storageKey: string) {
 export const FILTER_OPTIONS = {
   departments: ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
   services:    ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
+  revenueRanges: ['AED 0–5,000', 'AED 5,001–10,000', 'AED 10,001–15,000', 'AED 15,001+'],
   dueDays:     ['Today', '1–7 Days', '8–14 Days', '15–30 Days', '30–60 Days', '60+ Days'],
   overdueDays: ['1–10 Days', '10–30 Days', '30–60 Days', '60+ Days'],
   clients:     ['Nexora', 'Finovo', 'Lumo', 'Talvo', 'Orvix', 'Stratco'],
@@ -109,6 +110,7 @@ export const FILTER_OPTIONS = {
 export interface FilterState {
   departments:    string[];
   services:       string[];
+  revenueRanges:  string[];
   dueDays:        string[];
   overdueDays:    string[];
   clients:        string[];
@@ -120,7 +122,7 @@ export interface FilterState {
 }
 
 export const EMPTY_FILTERS: FilterState = {
-  departments: [], services: [], dueDays: [], overdueDays: [],
+  departments: [], services: [], revenueRanges: [], dueDays: [], overdueDays: [],
   clients: [], assignees: [], tags: [], dueDatePresets: [],
   periodFrom: '', periodTo: '',
 };
@@ -129,6 +131,7 @@ export function countActiveFilters(f: FilterState): number {
   return (
     (f.departments.length > 0 ? 1 : 0) +
     (f.services.length > 0 ? 1 : 0) +
+    (f.revenueRanges.length > 0 ? 1 : 0) +
     (f.dueDays.length > 0 ? 1 : 0) +
     (f.overdueDays.length > 0 ? 1 : 0) +
     (f.clients.length > 0 ? 1 : 0) +
@@ -143,12 +146,13 @@ export function countActiveFilters(f: FilterState): number {
    Strips any stored values that no longer exist and returns the cleaned
    state plus a record of { fieldLabel → removedCount } for user feedback. */
 const FILTER_OPTION_KEYS: Array<{
-  key:     keyof Pick<FilterState, 'departments'|'services'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
+  key:     keyof Pick<FilterState, 'departments'|'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
   options: readonly string[];
   label:   string;
 }> = [
   { key: 'departments',    options: FILTER_OPTIONS.departments,    label: 'Department' },
   { key: 'services',       options: FILTER_OPTIONS.services,       label: 'Service' },
+  { key: 'revenueRanges',  options: FILTER_OPTIONS.revenueRanges,  label: 'Revenue' },
   { key: 'dueDays',        options: FILTER_OPTIONS.dueDays,        label: 'Due Days' },
   { key: 'overdueDays',    options: FILTER_OPTIONS.overdueDays,    label: 'Overdue Days' },
   { key: 'clients',        options: FILTER_OPTIONS.clients,        label: 'Client Name' },
@@ -788,12 +792,12 @@ export function FilterDrawer({
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="flex flex-shrink-0 items-center gap-0.5">
+                                  <div className="flex flex-shrink-0 items-center gap-1">
                                     {activeSavedFilterId === sf.id && (
                                       <button
                                         type="button"
                                         onClick={() => handleUpdate(sf)}
-                                        className="rounded-lg border border-brand/30 bg-orange-50 px-2 py-1 text-[11.5px] font-semibold text-brand hover:bg-orange-100 transition-colors"
+                                        className="h-7 rounded-md border border-orange-200 bg-orange-50 px-2.5 text-[11.5px] font-semibold text-brand transition-colors hover:border-orange-300 hover:bg-orange-100"
                                         aria-label={`Update ${sf.name}`}
                                       >
                                         Update
@@ -818,12 +822,12 @@ export function FilterDrawer({
                                         setDropdownOpen(false);
                                         onClose();
                                       }}
-                                      className="rounded-lg bg-brand px-2.5 py-1 text-[11.5px] font-semibold text-white hover:bg-brand-hover transition-colors"
+                                      className="h-7 rounded-md bg-brand px-3 text-[11.5px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
                                     >
                                       Apply
                                     </button>
-                                     <TooltipProvider delayDuration={150}>
-                                       <Tooltip>
+                                    <TooltipProvider delayDuration={150}>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -840,8 +844,8 @@ export function FilterDrawer({
                                          <TooltipContent side="bottom" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
                                            {sf.isDefault ? 'Remove as default' : 'Set as default'}
                                          </TooltipContent>
-                                       </Tooltip>
-                                       <Tooltip>
+                                      </Tooltip>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -858,8 +862,8 @@ export function FilterDrawer({
                                          >
                                            Rename filter
                                          </TooltipContent>
-                                       </Tooltip>
-                                       <Tooltip>
+                                      </Tooltip>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -876,8 +880,8 @@ export function FilterDrawer({
                                          >
                                            Delete filter
                                          </TooltipContent>
-                                       </Tooltip>
-                                     </TooltipProvider>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   </div>
                                 )}
                               </div>
@@ -1015,6 +1019,15 @@ export function FilterDrawer({
                 drawerOpen={open}
               />
               <MultiSelectDropdown
+                label="Revenue"
+                placeholder="Any Revenue"
+                options={FILTER_OPTIONS.revenueRanges}
+                selected={pending.revenueRanges}
+                onChange={v => set('revenueRanges', v)}
+                searchPlaceholder="Search revenue..."
+                drawerOpen={open}
+              />
+              <MultiSelectDropdown
                 label="Due Days"
                 placeholder="Any"
                 options={FILTER_OPTIONS.dueDays}
@@ -1127,7 +1140,10 @@ export function sanitizeSavedFilter(filters: FilterState): {
   sanitized: FilterState;
   removedByField: Record<string, number>;
 } {
-  const sanitized: FilterState = { ...filters };
+  const sanitized: FilterState = {
+    ...filters,
+    revenueRanges: Array.isArray(filters.revenueRanges) ? filters.revenueRanges : [],
+  };
   const removedByField: Record<string, number> = {};
 
   for (const { key, options, label } of FILTER_OPTION_KEYS) {

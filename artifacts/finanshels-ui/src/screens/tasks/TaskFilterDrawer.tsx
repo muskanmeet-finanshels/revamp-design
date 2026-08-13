@@ -759,12 +759,12 @@ export function TaskFilterDrawer({
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="flex flex-shrink-0 items-center gap-0.5">
+                                  <div className="flex flex-shrink-0 items-center gap-1">
                                     {activeSavedFilterId === sf.id && (
                                       <button
                                         type="button"
                                         onClick={() => handleUpdate(sf)}
-                                        className="rounded-lg border border-brand/30 bg-orange-50 px-2 py-1 text-[11.5px] font-semibold text-brand hover:bg-orange-100 transition-colors"
+                                        className="h-7 rounded-md border border-orange-200 bg-orange-50 px-2.5 text-[11.5px] font-semibold text-brand transition-colors hover:border-orange-300 hover:bg-orange-100"
                                         aria-label={`Update ${sf.name}`}
                                       >
                                         Update
@@ -779,12 +779,12 @@ export function TaskFilterDrawer({
                                         setDropdownOpen(false);
                                         onClose();
                                       }}
-                                      className="rounded-lg bg-brand px-2.5 py-1 text-[11.5px] font-semibold text-white hover:bg-brand-hover transition-colors"
+                                      className="h-7 rounded-md bg-brand px-3 text-[11.5px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
                                     >
                                       Apply
                                     </button>
-                                     <TooltipProvider delayDuration={150}>
-                                       <Tooltip>
+                                    <TooltipProvider delayDuration={150}>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -801,8 +801,8 @@ export function TaskFilterDrawer({
                                          <TooltipContent side="bottom" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
                                            {sf.isDefault ? 'Remove as default' : 'Set as default'}
                                          </TooltipContent>
-                                       </Tooltip>
-                                       <Tooltip>
+                                      </Tooltip>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -819,8 +819,8 @@ export function TaskFilterDrawer({
                                          >
                                            Rename filter
                                          </TooltipContent>
-                                       </Tooltip>
-                                       <Tooltip>
+                                      </Tooltip>
+                                      <Tooltip>
                                          <TooltipTrigger asChild>
                                            <button
                                              type="button"
@@ -837,8 +837,8 @@ export function TaskFilterDrawer({
                                          >
                                            Delete filter
                                          </TooltipContent>
-                                       </Tooltip>
-                                     </TooltipProvider>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   </div>
                                 )}
                               </div>
