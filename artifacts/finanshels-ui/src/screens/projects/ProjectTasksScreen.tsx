@@ -66,20 +66,20 @@ const STATUS_CHIP: Record<ProjectStatus, { label: string; dotCls: string; chipCl
 
 /* Circular project progress indicator */
 function ProgressRing({ pct }: { pct: number }) {
-  const r = 35;
+  const r = 29;
   const circumference = 2 * Math.PI * r;
   const offset = circumference - (pct / 100) * circumference;
 
   return (
-    <svg width="92" height="92" viewBox="0 0 92 92" className="-rotate-90">
-      <circle cx="46" cy="46" r={r} fill="none" stroke="#f3f4f6" strokeWidth="8" />
+    <svg width="78" height="78" viewBox="0 0 78 78" className="-rotate-90">
+      <circle cx="39" cy="39" r={r} fill="none" stroke="#f3f4f6" strokeWidth="6" />
       <circle
-        cx="46"
-        cy="46"
+        cx="39"
+        cy="39"
         r={r}
         fill="none"
         stroke="url(#ringGrad)"
-        strokeWidth="8"
+        strokeWidth="6"
         strokeLinecap="round"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
@@ -125,7 +125,7 @@ function ProjectDetailCard({ project }: { project: Project }) {
         <div className="p-6">
           {/* Header row: title + status chip */}
           <div className="relative min-h-[76px]">
-            <div className="min-w-0 pr-[104px]">
+            <div className="min-w-0 pr-[90px]">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Project</p>
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="min-w-0 truncate text-[19px] font-bold leading-snug text-gray-900">
@@ -150,11 +150,13 @@ function ProjectDetailCard({ project }: { project: Project }) {
                 </span>
               </div>
             </div>
-            <div className="absolute right-0 top-0 h-[92px] w-[92px]">
+            <div className="absolute right-0 top-0 h-[78px] w-[78px]">
               <ProgressRing pct={project.progress} />
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[22px] font-bold leading-none text-gray-900">{project.progress}%</span>
-                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-gray-400">Done</span>
+                <div className="flex flex-col items-center leading-none">
+                  <span className="text-[18px] font-semibold tracking-tight text-gray-900">{project.progress}%</span>
+                  <span className="mt-1 text-[7px] font-medium uppercase tracking-[0.16em] text-gray-400">Done</span>
+                </div>
               </div>
             </div>
           </div>
