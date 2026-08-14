@@ -13,9 +13,9 @@ interface ProjectsPaginationProps {
 
 /** Returns page-number slots; `null` = ellipsis gap. */
 function buildPageSlots(current: number, total: number): (number | null)[] {
-  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 
-  const delta = 1; // one page each side of current
+  const delta = 2; // pages on each side of current
   const left  = Math.max(2, current - delta);
   const right = Math.min(total - 1, current + delta);
 
@@ -39,33 +39,26 @@ export function ProjectsPagination({
   const to   = Math.min(page * pageSize, totalItems);
   const slots = buildPageSlots(page, totalPages);
 
-  const pageSizeOptions = Array.from(
-    new Set([10, 12, 20, 50, pageSize]),
-  ).sort((a, b) => a - b);
+  const pageSizeOptions = Array.from(new Set([10, 12, 20, 50, pageSize])).sort((a, b) => a - b);
 
-  /* ── shared icon-button class (K < > >|) ── */
-  const iconBtn = cn(
-    'inline-flex h-8 w-8 items-center justify-center rounded-md',
-    'border border-gray-200 bg-white text-gray-500',
-    'transition-colors hover:bg-gray-50 hover:text-gray-700',
-    'disabled:cursor-not-allowed disabled:opacity-35',
-  );
+  const navBtnBase =
+    'flex h-8 items-center justify-center rounded-lg border border-gray-200 px-2 text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-y-3 gap-x-6 border-t border-gray-100 px-1 py-3">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 border-t border-gray-100 px-1 py-3">
 
       {/* ── Left — Rows per page ── */}
       <label className="flex items-center gap-2.5 whitespace-nowrap">
-        <span className="text-[13px] font-medium text-gray-700">Rows per page</span>
+        <span className="text-[12.5px] text-gray-500">Rows per page</span>
         <span className="relative">
           <select
             value={pageSize}
             onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
             aria-label="Rows per page"
             className={cn(
-              'h-8 w-[62px] appearance-none rounded-md',
+              'h-8 w-[58px] appearance-none rounded-lg',
               'border border-gray-200 bg-white',
-              'pl-3 pr-7 text-[13px] text-gray-700',
+              'pl-3 pr-7 text-[12.5px] text-gray-700 shadow-sm',
               'outline-none transition-colors',
               'focus:border-brand focus:ring-1 focus:ring-brand/20',
             )}
@@ -82,25 +75,15 @@ export function ProjectsPagination({
         </span>
       </label>
 
-      {/* ── Center — Showing X to Y of Z ── */}
-      <p className="whitespace-nowrap text-[13px] text-gray-500">
-        Showing{' '}
-        <span className="font-semibold text-gray-800">{from}</span>
-        {' '}to{' '}
-        <span className="font-semibold text-gray-800">{to}</span>
-        {' '}of{' '}
-        <span className="font-semibold text-gray-800">{totalItems}</span>
-      </p>
-
-      {/* ── Right — navigation ── */}
-      <div className="flex items-center gap-0.5">
+      {/* ── Centre: navigation controls ── */}
+      <div className="flex items-center gap-1">
 
         {/* First */}
         <button
           onClick={() => onPageChange(1)}
           disabled={page === 1}
           title="First page"
-          className={iconBtn}
+          className={navBtnBase}
         >
           <ChevronsLeft size={14} strokeWidth={1.8} />
         </button>
@@ -110,8 +93,9 @@ export function ProjectsPagination({
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
           title="Previous page"
-          className={iconBtn}
+          className={cn(navBtnBase, 'gap-1 px-3 text-[12.5px] font-medium')}
         >
+          Previous
           <ChevronLeft size={14} strokeWidth={1.8} />
         </button>
 
@@ -121,21 +105,20 @@ export function ProjectsPagination({
             /* Ellipsis */
             <span
               key={`ellipsis-${idx}`}
-              className="inline-flex h-8 w-8 items-center justify-center text-[13px] text-gray-400 select-none"
+              className="flex h-8 w-7 items-center justify-center text-[12.5px] text-gray-400 select-none"
             >
-              ···
+              …
             </span>
           ) : (
-            /* Page button — active gets a circle outline, inactive is bare text */
             <button
               key={slot}
               onClick={() => onPageChange(slot)}
               aria-current={slot === page ? 'page' : undefined}
               className={cn(
-                'inline-flex h-8 w-8 items-center justify-center rounded-full text-[13px] transition-colors',
+                'flex h-8 w-8 items-center justify-center rounded-lg text-[12.5px] font-medium transition-colors',
                 slot === page
-                  ? 'border border-gray-800 font-semibold text-gray-900'
-                  : 'font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800',
+                  ? 'bg-brand text-white'
+                  : 'border border-gray-200 text-gray-600 hover:bg-gray-50',
               )}
             >
               {slot}
@@ -148,8 +131,9 @@ export function ProjectsPagination({
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
           title="Next page"
-          className={iconBtn}
+          className={cn(navBtnBase, 'gap-1 px-3 text-[12.5px] font-medium')}
         >
+          Next
           <ChevronRight size={14} strokeWidth={1.8} />
         </button>
 
@@ -158,7 +142,7 @@ export function ProjectsPagination({
           onClick={() => onPageChange(totalPages)}
           disabled={page === totalPages}
           title="Last page"
-          className={iconBtn}
+          className={navBtnBase}
         >
           <ChevronsRight size={14} strokeWidth={1.8} />
         </button>
