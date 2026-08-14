@@ -20,6 +20,7 @@ function Toaster({ ...props }: ToasterProps) {
             'group-[.toaster]:border-red-200 group-[.toaster]:bg-red-50 group-[.toaster]:text-red-800',
         },
       }}
+      closeButton
       {...props}
     />
   );
