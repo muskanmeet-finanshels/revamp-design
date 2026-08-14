@@ -80,33 +80,8 @@ export function ProjectsPagination({
     <div className="mt-3 border-t border-gray-100 px-1 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
-        {/* ── Row 1 (mobile) / Left (desktop): Rows per page + Go to page ── */}
+        {/* ── Left (desktop) / Row 1 (mobile): Go to page ── */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:justify-start">
-          <label className="flex items-center gap-2.5 whitespace-nowrap">
-            <span className="text-[12.5px] text-gray-500">Rows per page</span>
-            <span className="relative">
-              <select
-                value={pageSize}
-                onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
-                aria-label="Rows per page"
-                className={cn(
-                  'h-8 w-[58px] appearance-none rounded-lg',
-                  'border border-gray-200 bg-white shadow-sm',
-                  'pl-3 pr-7 text-[12.5px] text-gray-700',
-                  'outline-none transition-colors',
-                  'focus:border-brand focus:ring-1 focus:ring-brand/20',
-                )}
-              >
-                {sizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-              <ChevronDown
-                size={12}
-                aria-hidden
-                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-            </span>
-          </label>
-
           <form
             className="flex items-center gap-2"
             onSubmit={event => {
@@ -149,8 +124,33 @@ export function ProjectsPagination({
 
         </div>
 
-        {/* ── Row 2 (mobile) / Right (desktop): navigation ── */}
-        <div className="flex items-center justify-center gap-4 sm:justify-end sm:gap-5">
+        {/* ── Right (desktop): Rows per page + navigation ── */}
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end sm:gap-5">
+
+          <label className="flex items-center gap-2.5 whitespace-nowrap">
+            <span className="text-[12.5px] text-gray-500">Rows per page</span>
+            <span className="relative">
+              <select
+                value={pageSize}
+                onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
+                aria-label="Rows per page"
+                className={cn(
+                  'h-8 w-[58px] appearance-none rounded-lg',
+                  'border border-gray-200 bg-white shadow-sm',
+                  'pl-3 pr-7 text-[12.5px] text-gray-700',
+                  'outline-none transition-colors',
+                  'focus:border-brand focus:ring-1 focus:ring-brand/20',
+                )}
+              >
+                {sizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <ChevronDown
+                size={12}
+                aria-hidden
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+            </span>
+          </label>
 
           {/* Navigation */}
           <div className="flex items-center gap-1">
@@ -172,9 +172,9 @@ export function ProjectsPagination({
               title="Previous page"
               className={labelBtn(page === 1)}
             >
-              {/* Text hidden on mobile */}
-              <span className="hidden sm:inline mr-1">Previous</span>
               <ChevronLeft size={14} strokeWidth={1.8} />
+              {/* Text hidden on mobile */}
+              <span className="hidden sm:inline ml-1">Previous</span>
             </button>
 
             {/* Page number slots */}
