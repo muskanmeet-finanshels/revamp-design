@@ -331,7 +331,7 @@ function ProjectDetailCard({ project }: { project: Project }) {
 
 /* ── constants ── */
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 20;
 
 type StatusView =
   | 'All' | 'Overdue' | 'Today' | 'Next 30 days'

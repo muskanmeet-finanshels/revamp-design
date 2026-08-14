@@ -487,7 +487,7 @@ const GENERATED_TASK_ASSIGNEES = [
 const GENERATED_TASK_STATUSES: TaskStatus[] = ['To Do', 'In Progress', 'Done', 'Overdue', 'On Hold', 'In Review', 'Completed'];
 const GENERATED_TASK_PRIORITIES: TaskPriority[] = ['Low', 'Medium', 'High', 'Urgent'];
 
-const GENERATED_TASKS: TaskItem[] = Array.from({ length: 60 }, (_, index) => {
+const GENERATED_TASKS: TaskItem[] = Array.from({ length: 110 }, (_, index) => {
   const project = MOCK_PROJECTS[index % MOCK_PROJECTS.length];
   const month = String((index % 12) + 1).padStart(2, '0');
   const day = String((index * 2) % 25 + 1).padStart(2, '0');

@@ -44,7 +44,7 @@ import { AttendanceCalendar } from './AttendanceCalendar';
 import { toast } from 'sonner';
 
 /* ── constants ── */
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 20;
 
 type StatusFilter = 'All' | TimesheetStatus;
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [

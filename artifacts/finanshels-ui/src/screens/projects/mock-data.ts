@@ -919,7 +919,7 @@ const SEED_PROJECTS: Project[] = [
   },
 ];
 
-const GENERATED_PROJECTS: Project[] = Array.from({ length: 38 }, (_, index) => {
+const GENERATED_PROJECTS: Project[] = Array.from({ length: 88 }, (_, index) => {
   const number = index + 53;
   const clients = [
     { name: 'Nexora', color: '#334756' },

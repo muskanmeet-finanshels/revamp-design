@@ -39,7 +39,7 @@ import { toast } from 'sonner';
 
 /* ─────────────────── constants ─────────────────── */
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 20;
 
 /* ─────────────────── status options ─────────────────── */
 
