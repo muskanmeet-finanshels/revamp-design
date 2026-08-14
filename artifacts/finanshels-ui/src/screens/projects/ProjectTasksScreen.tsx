@@ -331,7 +331,7 @@ function ProjectDetailCard({ project }: { project: Project }) {
 
 /* ── constants ── */
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 type StatusView =
   | 'All' | 'Overdue' | 'Today' | 'Next 30 days'
@@ -470,6 +470,7 @@ export function ProjectTasksScreen() {
 
   /* pagination + selection */
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedIds, setSelectedIds]       = useState<Set<string>>(new Set());
   const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TaskStatus>>({});
@@ -651,7 +652,7 @@ export function ProjectTasksScreen() {
     return list;
   }, [search, status, sortKey, sortDir, appliedFilters, displayTasks]);
 
-  const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
 
   return (
@@ -920,11 +921,11 @@ export function ProjectTasksScreen() {
         <>
           <div className="mt-4">
             <TasksTable
-              tasks={tasks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)}
+              tasks={tasks.slice((safePage - 1) * pageSize, safePage * pageSize)}
               selectedIds={selectedIds}
               onToggle={toggleSelect}
               onSelectAll={() => {
-                const pageTasks = tasks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+                const pageTasks = tasks.slice((safePage - 1) * pageSize, safePage * pageSize);
                 const allSelected = pageTasks.length > 0 && pageTasks.every(task => selectedIds.has(task.id));
 
                 setSelectedIds(prev => {
@@ -951,8 +952,9 @@ export function ProjectTasksScreen() {
           <ProjectsPagination
             page={safePage}
             totalItems={tasks.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </>
       )}

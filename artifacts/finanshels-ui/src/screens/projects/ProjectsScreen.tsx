@@ -264,6 +264,7 @@ export function ProjectsScreen() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusOption>('All');
   const [view,   setView]   = useState<'grid' | 'list'>('grid');
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_GRID);
   const [visibleColumns, setVisibleColumns] = useState<Set<ProjectColumnKey>>(
     () => new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key)),
   );
@@ -573,7 +574,7 @@ export function ProjectsScreen() {
     });
   }
 
-  const PAGE_SIZE = view === 'list' ? PAGE_SIZE_LIST : PAGE_SIZE_GRID;
+  const PAGE_SIZE = pageSize;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageProjects = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -1076,6 +1077,7 @@ export function ProjectsScreen() {
         totalItems={filtered.length}
         pageSize={PAGE_SIZE}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       {/* ── Filter drawer ── */}

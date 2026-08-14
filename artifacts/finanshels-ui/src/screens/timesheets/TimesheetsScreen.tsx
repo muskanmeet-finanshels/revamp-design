@@ -44,7 +44,7 @@ import { AttendanceCalendar } from './AttendanceCalendar';
 import { toast } from 'sonner';
 
 /* ── constants ── */
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 type StatusFilter = 'All' | TimesheetStatus;
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
@@ -3056,6 +3056,7 @@ function AllTimesheets() {
   const [dateFilter, setDateFilter]   = useState<DateFilter>('All');
   const [dateOpen, setDateOpen]       = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortKey, setSortKey] = useState<TimesheetSortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [columnOrder, setColumnOrder] = useTimesheetColumnOrder();
@@ -3108,9 +3109,9 @@ function AllTimesheets() {
   });
 
   const sorted = sortTimesheets(filtered, sortKey, sortDirection);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage   = Math.min(page, totalPages);
-  const pageItems  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageItems  = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleSort(key: TimesheetSortKey) {
@@ -3313,8 +3314,14 @@ function AllTimesheets() {
         </Table>
       </div>
 
-      {filtered.length > PAGE_SIZE && (
-        <ProjectsPagination page={safePage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      {filtered.length > pageSize && (
+        <ProjectsPagination
+          page={safePage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* Delete confirmation dialog */}
@@ -3385,6 +3392,7 @@ function parseDurationToMinutes(d: string): number {
 function PendingActions() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortKey, setSortKey] = useState<TimesheetSortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [deletedIds, setDeletedIds]       = useState<Set<string>>(new Set());
@@ -3435,9 +3443,9 @@ function PendingActions() {
   });
 
   const sorted = sortTimesheets(filtered, sortKey, sortDirection);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage   = Math.min(page, totalPages);
-  const pageItems  = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageItems  = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function handleSort(key: TimesheetSortKey) {
     if (sortKey === key) {
@@ -3573,8 +3581,14 @@ function PendingActions() {
         </Table>
       </div>
 
-      {filtered.length > PAGE_SIZE && (
-        <ProjectsPagination page={safePage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      {filtered.length > pageSize && (
+        <ProjectsPagination
+          page={safePage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* Delete confirmation dialog */}
