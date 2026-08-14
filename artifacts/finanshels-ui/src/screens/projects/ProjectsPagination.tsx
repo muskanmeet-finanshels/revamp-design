@@ -75,13 +75,13 @@ export function ProjectsPagination({
         </span>
       </label>
 
-      {/* ── Centre: visible range ── */}
-      <p className="whitespace-nowrap text-[12.5px] text-gray-500">
-        Showing {from} to {to} of {totalItems}
-      </p>
+      {/* ── Right: visible range + navigation controls ── */}
+      <div className="ml-auto flex items-center gap-6">
+        <p className="whitespace-nowrap text-[12.5px] text-gray-500">
+          Showing {from} to {to} of {totalItems}
+        </p>
 
-      {/* ── Right: navigation controls ── */}
-      <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1">
 
         {/* First */}
         <button
@@ -152,6 +152,7 @@ export function ProjectsPagination({
           <ChevronsRight size={14} strokeWidth={1.8} />
         </button>
 
+        </div>
       </div>
     </div>
   );
