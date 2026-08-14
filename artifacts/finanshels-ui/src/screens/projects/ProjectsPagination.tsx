@@ -9,6 +9,7 @@ export interface ProjectsPaginationProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+  pageSizeOptions?: number[];
 }
 
 /** Returns page-number slots; `null` = ellipsis gap. Delta=1 keeps it mobile-friendly. */
@@ -26,21 +27,20 @@ function buildPageSlots(current: number, total: number): (number | null)[] {
   return slots;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 12, 20, 50];
-
 export function ProjectsPagination({
   page,
   totalItems,
   pageSize,
   onPageChange,
   onPageSizeChange,
+  pageSizeOptions = [10, 12, 20, 50],
 }: ProjectsPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const from = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const to   = Math.min(page * pageSize, totalItems);
   const slots = buildPageSlots(page, totalPages);
 
-  const sizeOptions = Array.from(new Set([...PAGE_SIZE_OPTIONS, pageSize])).sort((a, b) => a - b);
+  const sizeOptions = Array.from(new Set([...pageSizeOptions, pageSize])).sort((a, b) => a - b);
 
   /* Shared base for the « / < / > / » icon buttons */
   const iconBtn = (disabled: boolean) =>

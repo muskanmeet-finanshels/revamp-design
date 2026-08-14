@@ -258,13 +258,15 @@ const SORT_OPTIONS: Array<{ value: SortByOption; label: string }> = [
 /* ─────────────────────────────── screen ────────────────────────────────── */
 
 export function ProjectsScreen() {
-  const PAGE_SIZE_LIST = 10;
-  const PAGE_SIZE_GRID = 12;
+  const PAGE_SIZE_LIST = 20;
+  const PAGE_SIZE_GRID = 90;
   /* filter state */
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusOption>('All');
   const [view,   setView]   = useState<'grid' | 'list'>('grid');
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_GRID);
+  const [gridPageSize, setGridPageSize] = useState(PAGE_SIZE_GRID);
+  const [listPageSize, setListPageSize] = useState(PAGE_SIZE_LIST);
+  const pageSize = view === 'grid' ? gridPageSize : listPageSize;
   const [visibleColumns, setVisibleColumns] = useState<Set<ProjectColumnKey>>(
     () => new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key)),
   );
@@ -325,6 +327,14 @@ export function ProjectsScreen() {
     if (params.get('view') === 'list') setView('list');
   }, []);
   const [page, setPage] = useState(1);
+  const handlePageSizeChange = (nextPageSize: number) => {
+    if (view === 'grid') {
+      setGridPageSize(nextPageSize);
+    } else {
+      setListPageSize(nextPageSize);
+    }
+    setPage(1);
+  };
 
   /* sort – pending (staging) vs applied */
   const [sortOpen,        setSortOpen]        = useState(false);
@@ -1077,7 +1087,8 @@ export function ProjectsScreen() {
         totalItems={filtered.length}
         pageSize={PAGE_SIZE}
         onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageSizeChange={handlePageSizeChange}
+        pageSizeOptions={view === 'grid' ? [12, 30, 60, 90] : [10, 12, 20, 50]}
       />
 
       {/* ── Filter drawer ── */}
