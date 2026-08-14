@@ -39,7 +39,7 @@ export interface Project {
   deleteReason?: string;
 }
 
-export const MOCK_PROJECTS: Project[] = [
+const SEED_PROJECTS: Project[] = [
   {
     id: '1',
     title: 'VAT Filing Jul 2025 – Sep 2025',
@@ -918,3 +918,55 @@ export const MOCK_PROJECTS: Project[] = [
     revenue: 10800,
   },
 ];
+
+const GENERATED_PROJECTS: Project[] = Array.from({ length: 38 }, (_, index) => {
+  const number = index + 53;
+  const clients = [
+    { name: 'Nexora', color: '#334756' },
+    { name: 'Finovo', color: '#F16611' },
+    { name: 'Lumo', color: '#22C55E' },
+    { name: 'Stratco', color: '#F16611' },
+    { name: 'Talvo', color: '#334756' },
+    { name: 'Orvix', color: '#0A2B3B' },
+  ];
+  const services = ['Accounting', 'Audit', 'Finance', 'Compliance', 'HR', 'Technology'];
+  const statuses: ProjectStatus[] = ['Current', 'Current', 'Overdue', 'On Hold', 'Completed', 'Archived'];
+  const client = clients[index % clients.length];
+  const status = statuses[index % statuses.length];
+  const tasksTotal = 8 + (index % 8);
+  const tasksCompleted =
+    status === 'Completed' || status === 'Archived'
+      ? tasksTotal
+      : (index * 3) % (tasksTotal + 1);
+  const month = String((index % 12) + 1).padStart(2, '0');
+  const day = String((index * 3) % 25 + 1).padStart(2, '0');
+
+  return {
+    id: String(number),
+    title: `${services[index % services.length]} Review – FY 2026 ${number}`,
+    status,
+    client,
+    serviceType: { label: services[index % services.length] },
+    teamLeads: [{
+      initials: ['AK', 'AM', 'DK', 'GH', 'KT', 'LN'][index % 6],
+      name: ['Arjun Kumar', 'Aisha Mohammed', 'David Kim', 'Grace Hassan', 'Karim Tahir', 'Lina Noor'][index % 6],
+      color: index % 2 === 0 ? '#F16611' : '#334756',
+    }],
+    assignees: [{
+      initials: ['MK', 'TI', 'SN', 'TP', 'QA', 'EF'][index % 6],
+      name: ['Mohammed Khan', 'Tariq Ibrahim', 'Sarah Nasser', 'Tina Patel', 'Qasim Ahmed', 'Elena Flores'][index % 6],
+      color: index % 3 === 0 ? '#22C55E' : '#334756',
+    }],
+    progress: Math.round((tasksCompleted / tasksTotal) * 100),
+    tasksCompleted,
+    tasksTotal,
+    dueDate: `Due ${day} ${new Date(2026, index % 12, 1).toLocaleString('en-US', { month: 'short' })} 2026`,
+    ...(status === 'On Hold' ? { holdDate: `2026-${month}-${day}`, holdReason: 'Awaiting client information before work can continue.' } : {}),
+    ...(status === 'Completed' ? { completedDate: `2026-${month}-${day}` } : {}),
+    badge: index % 4,
+    invoiceType: index % 2 === 0 ? 'bundled' : 'individual',
+    revenue: 3500 + index * 275,
+  };
+});
+
+export const MOCK_PROJECTS: Project[] = [...SEED_PROJECTS, ...GENERATED_PROJECTS];

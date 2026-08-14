@@ -1,3 +1,5 @@
+import { MOCK_PROJECTS } from '../projects/mock-data';
+
 export type TaskStatus   = 'To Do' | 'In Progress' | 'Done' | 'Overdue' | 'On Hold' | 'Archived' | 'In Review' | 'Completed';
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
@@ -21,7 +23,7 @@ export interface TaskItem {
   comments:          number;
 }
 
-export const MOCK_TASKS: TaskItem[] = [
+const SEED_TASKS: TaskItem[] = [
   {
     id: 't1',
     name: 'Collect VAT invoices from client',
@@ -473,3 +475,48 @@ export const MOCK_TASKS: TaskItem[] = [
     comments: 1,
   },
 ];
+
+const GENERATED_TASK_ASSIGNEES = [
+  { initials: 'MK', name: 'Mohammed Khan' },
+  { initials: 'TI', name: 'Tariq Ibrahim' },
+  { initials: 'SN', name: 'Sarah Nasser' },
+  { initials: 'TP', name: 'Tina Patel' },
+  { initials: 'QA', name: 'Qasim Ahmed' },
+  { initials: 'EF', name: 'Elena Flores' },
+];
+const GENERATED_TASK_STATUSES: TaskStatus[] = ['To Do', 'In Progress', 'Done', 'Overdue', 'On Hold', 'In Review', 'Completed'];
+const GENERATED_TASK_PRIORITIES: TaskPriority[] = ['Low', 'Medium', 'High', 'Urgent'];
+
+const GENERATED_TASKS: TaskItem[] = Array.from({ length: 60 }, (_, index) => {
+  const project = MOCK_PROJECTS[index % MOCK_PROJECTS.length];
+  const month = String((index % 12) + 1).padStart(2, '0');
+  const day = String((index * 2) % 25 + 1).padStart(2, '0');
+  const assignee = GENERATED_TASK_ASSIGNEES[index % GENERATED_TASK_ASSIGNEES.length];
+
+  return {
+    id: `t${index + 41}`,
+    name: [
+      'Prepare supporting schedules',
+      'Review client documentation',
+      'Reconcile outstanding balances',
+      'Upload final evidence pack',
+      'Complete quality review',
+      'Send progress update to client',
+    ][index % 6] + ` – ${project.title}`,
+    projects: [{
+      id: project.id,
+      title: project.title,
+      clientName: project.client.name,
+      clientColor: project.client.color,
+    }],
+    assignee: index % 11 === 0 ? null : assignee,
+    ...(index % 9 === 0 ? { reassignmentNote: 'Reassigned from the previous project owner' } : {}),
+    status: GENERATED_TASK_STATUSES[index % GENERATED_TASK_STATUSES.length],
+    priority: GENERATED_TASK_PRIORITIES[index % GENERATED_TASK_PRIORITIES.length],
+    dueDate: `2026-${month}-${day}`,
+    timeSpentSeconds: (index % 7) * 1800,
+    comments: index % 6,
+  };
+});
+
+export const MOCK_TASKS: TaskItem[] = [...SEED_TASKS, ...GENERATED_TASKS];
