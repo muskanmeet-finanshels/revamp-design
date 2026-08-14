@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,19 +35,6 @@ export function ProjectsPagination({
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const from = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const to   = Math.min(page * pageSize, totalItems);
-
-  /* ── Go-to-page input state ── */
-  const [jumpValue, setJumpValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  /* Keep input blank when current page changes via other controls */
-  useEffect(() => { setJumpValue(''); }, [page]);
-
-  function commitJump(raw: string) {
-    const n = parseInt(raw, 10);
-    if (!Number.isNaN(n)) onPageChange(Math.min(Math.max(1, n), totalPages));
-    setJumpValue('');
-  }
 
   const slots = buildPageSlots(page, totalPages);
 
@@ -131,39 +117,6 @@ export function ProjectsPagination({
           className={navBtnBase}
         >
           <ChevronsRight size={14} />
-        </button>
-      </div>
-
-      {/* ── Right: jump to page ── */}
-      <div className="flex items-center gap-1.5 whitespace-nowrap">
-        <span className="text-[12.5px] text-gray-500">Go to</span>
-        <input
-          ref={inputRef}
-          type="number"
-          min={1}
-          max={totalPages}
-          value={jumpValue}
-          onChange={e => setJumpValue(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') commitJump(jumpValue);
-          }}
-          placeholder="page"
-          className={cn(
-            'h-8 w-16 rounded-lg border border-gray-200 bg-white px-2 text-center text-[12.5px] text-gray-800',
-            'placeholder:text-gray-400',
-            'focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20',
-            '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
-          )}
-        />
-        <button
-          onClick={() => commitJump(jumpValue)}
-          disabled={!jumpValue.trim()}
-          className={cn(
-            'h-8 rounded-lg border border-gray-200 px-3 text-[12.5px] font-medium text-gray-600 transition-colors',
-            'hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40',
-          )}
-        >
-          Go
         </button>
       </div>
 
