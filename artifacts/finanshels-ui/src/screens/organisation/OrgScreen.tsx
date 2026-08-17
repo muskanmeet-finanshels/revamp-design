@@ -894,16 +894,25 @@ export function OrgScreen() {
         ))}
       </div>
 
-      {/* Tabs */}
+      {/* Line tabs */}
       <Tabs defaultValue="departments">
-        <TabsList className="mb-5 h-9 rounded-lg bg-gray-100 p-0.5">
-          <TabsTrigger value="departments" className="rounded-md px-4 text-[13px] font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+        <TabsList className="mb-5 h-auto w-full justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent p-0">
+          <TabsTrigger
+            value="departments"
+            className="relative flex-none rounded-none border-b-2 border-transparent px-2.5 py-3 text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none sm:px-4 sm:text-[13px]"
+          >
             Departments
           </TabsTrigger>
-          <TabsTrigger value="verticals" className="rounded-md px-4 text-[13px] font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger
+            value="verticals"
+            className="relative flex-none rounded-none border-b-2 border-transparent px-2.5 py-3 text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none sm:px-4 sm:text-[13px]"
+          >
             Verticals
           </TabsTrigger>
-          <TabsTrigger value="teams" className="rounded-md px-4 text-[13px] font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <TabsTrigger
+            value="teams"
+            className="relative flex-none rounded-none border-b-2 border-transparent px-2.5 py-3 text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none sm:px-4 sm:text-[13px]"
+          >
             Teams
           </TabsTrigger>
         </TabsList>
