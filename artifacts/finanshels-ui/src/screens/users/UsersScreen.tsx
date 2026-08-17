@@ -1386,7 +1386,18 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                   {/* Email */}
                   <TableCell className="py-3">
-                    <p className="truncate text-[13px] text-gray-700">{u.email}</p>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="block max-w-[190px] cursor-default truncate whitespace-nowrap text-[13px] text-gray-700">
+                            {u.email}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+                          {u.email}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
 
                   {/* Job title */}
