@@ -24,7 +24,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
-import { ActiveFilterChips, type ActiveFilterChip } from '@/components/ActiveFilterChips';
+import {
+  ActiveFilterChips,
+  makeActiveFilterChipKey,
+  parseActiveFilterChipKey,
+  type ActiveFilterChip,
+} from '@/components/ActiveFilterChips';
 import {
   DrawerField, DrawerInput, DrawerSelect, DrawerTextarea,
 } from '@/components/ui/drawer-fields';
@@ -3114,21 +3119,28 @@ function AllTimesheets() {
   const safePage   = Math.min(page, totalPages);
   const pageItems  = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const activeFilterChips: ActiveFilterChip[] = [
-    ...(statusFilter.length > 0
-      ? [{ key: 'status', label: 'Status', value: statusFilter.join(', ') }]
-      : []),
-    ...(memberFilter.length > 0
-      ? [{ key: 'member', label: 'Member', value: memberFilter.join(', ') }]
-      : []),
-    ...(dateFilter !== 'All'
-      ? [{ key: 'date', label: 'Date', value: activeDateLabel }]
-      : []),
+    ...statusFilter.map(value => ({
+      key: makeActiveFilterChipKey('status', value),
+      label: 'Status',
+      value,
+    })),
+    ...memberFilter.map(value => ({
+      key: makeActiveFilterChipKey('member', value),
+      label: 'Member',
+      value,
+    })),
+    ...(dateFilter !== 'All' ? [{ key: 'date', label: 'Date', value: activeDateLabel }] : []),
   ];
 
   function removeTimesheetFilter(key: string) {
-    if (key === 'status') setStatusFilter([]);
-    if (key === 'member') setMemberFilter([]);
-    if (key === 'date') setDateFilter('All');
+    const { filterKey, value } = parseActiveFilterChipKey(key);
+    if (filterKey === 'status') {
+      setStatusFilter(current => value === null ? [] : current.filter(option => option !== value));
+    }
+    if (filterKey === 'member') {
+      setMemberFilter(current => value === null ? [] : current.filter(option => option !== value));
+    }
+    if (filterKey === 'date') setDateFilter('All');
     setPage(1);
   }
 

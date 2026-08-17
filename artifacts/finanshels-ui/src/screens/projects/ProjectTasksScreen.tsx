@@ -37,7 +37,12 @@ import { TaskReassignDrawer } from '../tasks/TaskReassignDrawer';
 import {
   AddTagsDialog, type PriorityValue, type SeverityValue,
 } from './AddTagsDialog';
-import { ActiveFilterChips, type ActiveFilterChip } from '@/components/ActiveFilterChips';
+import {
+  ActiveFilterChips,
+  makeActiveFilterChipKey,
+  parseActiveFilterChipKey,
+  type ActiveFilterChip,
+} from '@/components/ActiveFilterChips';
 
 /* ── Tag badge maps (same as ProjectCard) ── */
 const PRIORITY_BADGE: Record<string, string> = {
@@ -662,11 +667,11 @@ export function ProjectTasksScreen() {
   ) => {
     const values = appliedFilters[key];
     if (values.length === 0) return;
-    activeFilterChips.push({
-      key,
+    values.forEach(value => activeFilterChips.push({
+      key: makeActiveFilterChipKey(key, value),
       label,
-      value: values.join(', '),
-    });
+      value,
+    }));
   };
   taskArrayChip('taskNames', 'Task');
   taskArrayChip('frequencies', 'Frequency');
@@ -686,15 +691,20 @@ export function ProjectTasksScreen() {
   }
 
   function removeTaskFilter(key: string) {
+    const { filterKey, value } = parseActiveFilterChipKey(key);
+    const arrayKeys = ['taskNames', 'frequencies', 'clients', 'projectNames', 'services', 'assignees', 'tags'] as const;
     const next = { ...appliedFilters };
-    if (key === 'dueDateFilter') {
+    if ((arrayKeys as readonly string[]).includes(filterKey)) {
+      const arrayKey = filterKey as typeof arrayKeys[number];
+      next[arrayKey] = value === null
+        ? []
+        : appliedFilters[arrayKey].filter(option => option !== value);
+    } else if (filterKey === 'dueDateFilter') {
       next.dueDateFilter = 'All dates';
       next.dueDateStart = '';
       next.dueDateEnd = '';
-    } else if (key === 'dueDateStart' || key === 'dueDateEnd') {
-      next[key] = '';
-    } else {
-      next[key as keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>] = [];
+    } else if (filterKey === 'dueDateStart' || filterKey === 'dueDateEnd') {
+      next[filterKey] = '';
     }
     setAppliedFilters(next);
     setPendingFilters(next);

@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ActiveFilterChips, type ActiveFilterChip } from '@/components/ActiveFilterChips';
+import {
+  ActiveFilterChips,
+  makeActiveFilterChipKey,
+  parseActiveFilterChipKey,
+  type ActiveFilterChip,
+} from '@/components/ActiveFilterChips';
 import {
   Search, Download, SlidersHorizontal, LayoutGrid, AlignJustify, Columns3, Trash2,
   TriangleAlert, Clock3, CheckCircle2, PauseCircle, CalendarDays, CalendarClock,
@@ -970,8 +975,9 @@ export function ProjectsScreen() {
         ) => {
           const vals = af[key] as string[];
           if (!vals.length) return;
-          const display = vals.join(', ');
-          chips.push({ key, label, value: display });
+          vals.forEach(value => {
+            chips.push({ key: makeActiveFilterChipKey(key, value), label, value });
+          });
         };
 
         arrayChip('departments',    'Department');
@@ -988,12 +994,19 @@ export function ProjectsScreen() {
 
         function removeChip(key: string) {
           const arrayKeys = ['departments','services','revenueRanges','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
-          if ((arrayKeys as readonly string[]).includes(key)) {
-            const next = { ...appliedFilters, [key as typeof arrayKeys[number]]: [] };
+          const parsed = parseActiveFilterChipKey(key);
+          if ((arrayKeys as readonly string[]).includes(parsed.filterKey)) {
+            const arrayKey = parsed.filterKey as typeof arrayKeys[number];
+            const next = {
+              ...appliedFilters,
+              [arrayKey]: parsed.value === null
+                ? []
+                : appliedFilters[arrayKey].filter(value => value !== parsed.value),
+            };
             setAppliedFilters(next);
             setPendingFilters(next);
           } else {
-            const next = { ...appliedFilters, [key as 'periodFrom' | 'periodTo']: '' };
+            const next = { ...appliedFilters, [parsed.filterKey as 'periodFrom' | 'periodTo']: '' };
             setAppliedFilters(next);
             setPendingFilters(next);
           }
