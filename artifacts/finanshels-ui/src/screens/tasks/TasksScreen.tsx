@@ -36,6 +36,7 @@ import { TaskEditDeadlineDrawer } from './TaskEditDeadlineDrawer';
 import { AdHocTaskDialog } from '@/components/AdHocTaskDialog';
 import { TaskReassignDrawer } from './TaskReassignDrawer';
 import { toast } from 'sonner';
+import { ActiveFilterChips, type ActiveFilterChip } from '@/components/ActiveFilterChips';
 
 /* ─────────────────── constants ─────────────────── */
 
@@ -568,6 +569,51 @@ export function TasksScreen() {
 
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
+  const activeFilterChips: ActiveFilterChip[] = [];
+  const taskArrayChip = (
+    key: keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>,
+    label: string,
+  ) => {
+    const values = appliedFilters[key];
+    if (values.length === 0) return;
+    activeFilterChips.push({
+      key,
+      label,
+      value: values.length === 1 ? values[0] : `${values.length} selected`,
+    });
+  };
+  taskArrayChip('taskNames', 'Task');
+  taskArrayChip('frequencies', 'Frequency');
+  taskArrayChip('clients', 'Client');
+  taskArrayChip('projectNames', 'Project');
+  taskArrayChip('services', 'Service');
+  taskArrayChip('assignees', 'Assignee');
+  taskArrayChip('tags', 'Tags');
+  if (appliedFilters.dueDateFilter !== 'All dates') {
+    activeFilterChips.push({ key: 'dueDateFilter', label: 'Due Date', value: appliedFilters.dueDateFilter });
+  }
+  if (appliedFilters.dueDateStart) {
+    activeFilterChips.push({ key: 'dueDateStart', label: 'From', value: appliedFilters.dueDateStart });
+  }
+  if (appliedFilters.dueDateEnd) {
+    activeFilterChips.push({ key: 'dueDateEnd', label: 'To', value: appliedFilters.dueDateEnd });
+  }
+
+  function removeTaskFilter(key: string) {
+    const next = { ...appliedFilters };
+    if (key === 'dueDateFilter') {
+      next.dueDateFilter = 'All dates';
+      next.dueDateStart = '';
+      next.dueDateEnd = '';
+    } else if (key === 'dueDateStart' || key === 'dueDateEnd') {
+      next[key] = '';
+    } else {
+      next[key as keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>] = [];
+    }
+    setAppliedFilters(next);
+    setPendingFilters(next);
+    setPage(1);
+  }
 
   return (
     <div className="min-h-screen bg-white px-4 pt-5 pb-10 sm:px-6 sm:pt-6">
@@ -786,6 +832,16 @@ export function TasksScreen() {
 
         </div>
       </div>
+
+      <ActiveFilterChips
+        chips={activeFilterChips}
+        onRemove={removeTaskFilter}
+        onClearAll={() => {
+          setAppliedFilters(EMPTY_TASK_FILTERS);
+          setPendingFilters(EMPTY_TASK_FILTERS);
+          setPage(1);
+        }}
+      />
 
       {/* ── Urgency summary cards (hidden when All Status) ── */}
       {(() => {

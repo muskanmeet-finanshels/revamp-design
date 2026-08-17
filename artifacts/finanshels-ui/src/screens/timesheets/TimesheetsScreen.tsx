@@ -24,6 +24,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
+import { ActiveFilterChips, type ActiveFilterChip } from '@/components/ActiveFilterChips';
 import {
   DrawerField, DrawerInput, DrawerSelect, DrawerTextarea,
 } from '@/components/ui/drawer-fields';
@@ -3112,6 +3113,24 @@ function AllTimesheets() {
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage   = Math.min(page, totalPages);
   const pageItems  = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const activeFilterChips: ActiveFilterChip[] = [
+    ...(statusFilter.length > 0
+      ? [{ key: 'status', label: 'Status', value: statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} selected` }]
+      : []),
+    ...(memberFilter.length > 0
+      ? [{ key: 'member', label: 'Member', value: memberFilter.length === 1 ? memberFilter[0] : `${memberFilter.length} selected` }]
+      : []),
+    ...(dateFilter !== 'All'
+      ? [{ key: 'date', label: 'Date', value: activeDateLabel }]
+      : []),
+  ];
+
+  function removeTimesheetFilter(key: string) {
+    if (key === 'status') setStatusFilter([]);
+    if (key === 'member') setMemberFilter([]);
+    if (key === 'date') setDateFilter('All');
+    setPage(1);
+  }
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleSort(key: TimesheetSortKey) {
@@ -3212,6 +3231,17 @@ function AllTimesheets() {
           onChange={v => { setMemberFilter(v); setPage(1); }}
         />
       </div>
+
+      <ActiveFilterChips
+        chips={activeFilterChips}
+        onRemove={removeTimesheetFilter}
+        onClearAll={() => {
+          setStatusFilter([]);
+          setMemberFilter([]);
+          setDateFilter('All');
+          setPage(1);
+        }}
+      />
 
       {/* Table */}
       <div className="mt-3 min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
