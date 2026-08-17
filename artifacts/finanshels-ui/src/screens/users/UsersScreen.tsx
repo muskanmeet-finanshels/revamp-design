@@ -931,7 +931,7 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
    MAIN SCREEN
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function UsersScreen() {
+export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [users, setUsers] = useState<AppUser[]>(MOCK_USERS);
 
   /* Filters */
@@ -1013,12 +1013,14 @@ export function UsersScreen() {
   return (
     <div className="px-6 py-6 lg:px-8">
       {/* Page header */}
-      <div className="mb-6">
-        <h1 className="text-[20px] font-bold text-gray-900">User Management</h1>
-        <p className="mt-0.5 text-[13.5px] text-gray-500">
-          Add, manage, and control access for all users in your organisation.
-        </p>
-      </div>
+      {!hideHeader && (
+        <div className="mb-6">
+          <h1 className="text-[20px] font-bold text-gray-900">User Management</h1>
+          <p className="mt-0.5 text-[13.5px] text-gray-500">
+            Add, manage, and control access for all users in your organisation.
+          </p>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-4 gap-4">

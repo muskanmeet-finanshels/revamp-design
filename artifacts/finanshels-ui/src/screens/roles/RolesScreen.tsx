@@ -515,7 +515,7 @@ function ToggleDialog({ role, onClose, onConfirm }: {
 
 type TabFilter = 'all' | 'system' | 'custom';
 
-export function RolesScreen() {
+export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [roles, setRoles] = useState<AppRole[]>(MOCK_ROLES);
 
   const [tab,    setTab]    = useState<TabFilter>('all');
@@ -583,12 +583,14 @@ export function RolesScreen() {
   return (
     <div className="px-6 py-6 lg:px-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-[20px] font-bold text-gray-900">Role Management</h1>
-        <p className="mt-0.5 text-[13.5px] text-gray-500">
-          Define system and custom roles with module-level permission control.
-        </p>
-      </div>
+      {!hideHeader && (
+        <div className="mb-6">
+          <h1 className="text-[20px] font-bold text-gray-900">Role Management</h1>
+          <p className="mt-0.5 text-[13.5px] text-gray-500">
+            Define system and custom roles with module-level permission control.
+          </p>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-4 gap-4">

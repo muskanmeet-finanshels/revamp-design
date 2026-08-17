@@ -856,7 +856,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
    MAIN SCREEN
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function OrgScreen() {
+export function OrgScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
   const [verticals,   setVerticals]   = useState<Vertical[]>(MOCK_VERTICALS);
   const [teams,       setTeams]       = useState<Team[]>(MOCK_TEAMS);
@@ -868,12 +868,14 @@ export function OrgScreen() {
   return (
     <div className="px-6 py-6 lg:px-8">
       {/* Page header */}
-      <div className="mb-6">
-        <h1 className="text-[20px] font-bold text-gray-900">Organisation</h1>
-        <p className="mt-0.5 text-[13.5px] text-gray-500">
-          Manage your organisation's departments, verticals, and teams.
-        </p>
-      </div>
+      {!hideHeader && (
+        <div className="mb-6">
+          <h1 className="text-[20px] font-bold text-gray-900">Organisation</h1>
+          <p className="mt-0.5 text-[13.5px] text-gray-500">
+            Manage your organisation's departments, verticals, and teams.
+          </p>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-3 gap-4">
