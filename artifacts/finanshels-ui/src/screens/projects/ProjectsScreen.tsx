@@ -958,6 +958,88 @@ export function ProjectsScreen() {
         </div>{/* end filter controls */}
       </div>{/* end toolbar */}
 
+      {/* ── Active filter chips ── */}
+      {filterActiveCount > 0 && (() => {
+        const af = appliedFilters;
+
+        type ChipDef = { key: keyof FilterState | 'periodFrom' | 'periodTo'; label: string; value: string };
+
+        const chips: ChipDef[] = [];
+
+        const arrayChip = (
+          key: keyof Pick<FilterState, 'departments'|'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>,
+          label: string,
+        ) => {
+          const vals = af[key] as string[];
+          if (!vals.length) return;
+          const display = vals.length === 1 ? vals[0] : `${vals.length} selected`;
+          chips.push({ key, label, value: display });
+        };
+
+        arrayChip('departments',    'Department');
+        arrayChip('services',       'Service');
+        arrayChip('revenueRanges',  'Revenue');
+        arrayChip('dueDays',        'Due Days');
+        arrayChip('overdueDays',    'Overdue');
+        arrayChip('clients',        'Client');
+        arrayChip('assignees',      'Assignee');
+        arrayChip('tags',           'Tags');
+        arrayChip('dueDatePresets', 'Due Date');
+        if (af.periodFrom) chips.push({ key: 'periodFrom', label: 'From', value: af.periodFrom });
+        if (af.periodTo)   chips.push({ key: 'periodTo',   label: 'To',   value: af.periodTo });
+
+        function removeChip(key: ChipDef['key']) {
+          const arrayKeys = ['departments','services','revenueRanges','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
+          if ((arrayKeys as readonly string[]).includes(key)) {
+            const next = { ...appliedFilters, [key]: [] };
+            setAppliedFilters(next);
+            setPendingFilters(next);
+          } else {
+            const next = { ...appliedFilters, [key]: '' };
+            setAppliedFilters(next);
+            setPendingFilters(next);
+          }
+          setPage(1);
+        }
+
+        return (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {chips.map(chip => (
+              <span
+                key={chip.key}
+                className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-orange-50 pl-3 pr-2 py-1 text-[12px] font-medium text-brand"
+              >
+                <span className="text-gray-500 font-normal">{chip.label}:</span>
+                {chip.value}
+                <button
+                  type="button"
+                  onClick={() => removeChip(chip.key)}
+                  aria-label={`Remove ${chip.label} filter`}
+                  className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand transition-colors hover:bg-brand/20"
+                >
+                  <X size={9} strokeWidth={2.5} />
+                </button>
+              </span>
+            ))}
+
+            {chips.length > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAppliedFilters(EMPTY_FILTERS);
+                  setPendingFilters(EMPTY_FILTERS);
+                  setPage(1);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-[12px] font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+              >
+                <X size={10} strokeWidth={2.5} />
+                Clear all
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Urgency summary cards (hidden for All Status and Archived) ── */}
       {(() => {
         const urgency = buildUrgencyCards(status, MOCK_PROJECTS);
