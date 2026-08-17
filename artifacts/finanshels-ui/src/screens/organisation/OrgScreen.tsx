@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, MoreHorizontal, Pencil, PowerOff, Power,
-  ArrowLeft, Building2, Layers, Users, SearchX,
+  ArrowLeft, Building2, Layers, Users, SearchX, CircleAlert, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
@@ -208,21 +208,42 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[400px] rounded-2xl p-6">
-        <DialogHeader className="gap-2">
-          <DialogTitle className="text-[20px] font-semibold leading-tight text-gray-900">
-            {isDeactivate ? 'Deactivate' : 'Reactivate'} "{entityName}"?
+        {/* Icon badge */}
+        <div className={cn(
+          'flex h-10 w-10 items-center justify-center rounded-full',
+          isDeactivate ? 'bg-red-50' : 'bg-emerald-50',
+        )}>
+          {isDeactivate
+            ? <CircleAlert size={20} className="text-red-500" />
+            : <RefreshCw   size={20} className="text-emerald-500" />}
+        </div>
+
+        <DialogHeader className="gap-0 text-left">
+          <DialogTitle className="mt-4 text-[16px] font-semibold text-gray-900">
+            {isDeactivate ? 'Deactivate this item?' : 'Reactivate this item?'}
           </DialogTitle>
-          <DialogDescription className="text-[15px] leading-relaxed text-gray-500">
-            {isDeactivate
-              ? 'This will mark it as inactive. It will remain visible but cannot be assigned to new items.'
-              : 'This will restore it to active status and make it available for assignments again.'}
+          <DialogDescription className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
+            {isDeactivate ? (
+              <>
+                Are you sure you want to deactivate{' '}
+                <span className="font-medium text-gray-700">&ldquo;{entityName}&rdquo;</span>?{' '}
+                It will remain visible but cannot be assigned to new items.
+              </>
+            ) : (
+              <>
+                Are you sure you want to reactivate{' '}
+                <span className="font-medium text-gray-700">&ldquo;{entityName}&rdquo;</span>?{' '}
+                It will be restored to active status and available for assignments again.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-2 gap-2 sm:gap-2">
+
+        <DialogFooter className="mt-6 gap-2 sm:space-x-0">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[14px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -230,7 +251,7 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
             type="button"
             onClick={() => { onConfirm(); onOpenChange(false); }}
             className={cn(
-              'flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white transition-colors',
+              'flex-1 rounded-lg px-4 py-2.5 text-[13px] font-medium text-white transition-colors',
               isDeactivate ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600',
             )}
           >
