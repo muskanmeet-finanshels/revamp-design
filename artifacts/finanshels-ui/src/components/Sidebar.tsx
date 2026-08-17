@@ -38,8 +38,8 @@ const NAV: NavEntry[] = [
   {
     kind: 'group', label: 'Admin', icon: <Shield size={16} />,
     children: [
-      { kind: 'leaf', label: 'Roles',       href: '/settings/admin#roles',       icon: <Shield size={14} /> },
-      { kind: 'leaf', label: 'Permissions', href: '/settings/admin#permissions', icon: <KeyRound size={14} /> },
+      { kind: 'leaf', label: 'Roles',       href: '/settings/roles',       icon: <Shield size={14} /> },
+      { kind: 'leaf', label: 'Permissions', href: '/settings/permissions', icon: <KeyRound size={14} /> },
     ],
   },
 ];
