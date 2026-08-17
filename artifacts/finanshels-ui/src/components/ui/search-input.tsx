@@ -23,19 +23,19 @@ export function SearchInput({
   return (
     <div
       className={cn(
-        'relative flex h-9 items-center rounded-xl border border-gray-200 bg-white transition-colors focus-within:border-brand focus-within:ring-1 focus-within:ring-brand/20',
+        'relative w-full sm:w-80',
         className,
       )}
     >
-      <Search size={14} className="pointer-events-none absolute left-3 text-gray-400" />
+      <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
       <input
-        type="search"
+        type="text"
         value={value}
         onChange={event => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
         className={cn(
-          'h-full w-full bg-transparent pl-9 pr-8 text-[13px] text-gray-800 outline-none placeholder:text-gray-400',
+          'h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-9 text-[13px] placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20 transition',
           inputClassName,
         )}
       />
@@ -44,9 +44,9 @@ export function SearchInput({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-2.5 flex h-4 w-4 items-center justify-center rounded-md bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+          className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded bg-gray-200 transition-colors hover:bg-gray-300"
         >
-          <X size={10} />
+          <X size={11} className="text-gray-600" />
         </button>
       )}
     </div>

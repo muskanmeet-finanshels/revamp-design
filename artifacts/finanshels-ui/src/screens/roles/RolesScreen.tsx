@@ -363,7 +363,7 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} />
 
       <div className={cn(
-        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[36rem]',
+        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[52rem]',
         open ? 'translate-x-0' : 'translate-x-full',
       )}>
         {/* Header */}
@@ -654,7 +654,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
         className="fixed inset-0 z-40 bg-black/20 transition-opacity duration-300" />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[36rem]">
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[480px]">
 
         {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-amber-100 bg-amber-50 px-5 py-[14px]">
@@ -1032,7 +1032,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           onChange={setSearch}
           placeholder="Search roles…"
           aria-label="Search roles"
-          className="w-[220px]"
+          className="w-full sm:w-80"
         />
 
         <div className="ml-auto">

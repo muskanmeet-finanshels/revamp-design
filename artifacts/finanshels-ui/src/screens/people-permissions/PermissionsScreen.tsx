@@ -117,7 +117,7 @@ export function PermissionsScreen() {
             onChange={setPermissionSearch}
             placeholder="Search permissions…"
             aria-label="Search permissions"
-            className="w-full sm:w-[220px]"
+            className="w-full sm:w-80"
           />
           <div className="w-full sm:w-[260px]">
             <label htmlFor="permission-role" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
