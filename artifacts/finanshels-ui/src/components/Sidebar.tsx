@@ -40,6 +40,7 @@ const NAV: NavEntry[] = [
     children: [
       { kind: 'leaf', label: 'Roles',       href: '/settings/roles',       icon: <Shield size={14} /> },
       { kind: 'leaf', label: 'Permissions', href: '/settings/permissions', icon: <KeyRound size={14} /> },
+      { kind: 'leaf', label: 'Users',       href: '/settings/users',       icon: <Users2 size={14} /> },
     ],
   },
 ];
