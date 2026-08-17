@@ -207,7 +207,7 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
   const isDeactivate = action === 'deactivate';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] rounded-2xl p-6">
+      <DialogContent className="max-w-[420px] rounded-2xl p-6">
         {/* Icon badge */}
         <div className={cn(
           'flex h-10 w-10 items-center justify-center rounded-full',
