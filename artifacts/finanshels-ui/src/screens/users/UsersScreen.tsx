@@ -654,7 +654,7 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
   function handleConfirm() {
     onConfirm();
     onClose();
-    toast.success(`${user.firstName} ${user.lastName} has been deactivated. Dependencies transferred.`);
+    toast.success(`${user?.firstName ?? ''} ${user?.lastName ?? ''} has been deactivated. Dependencies transferred.`.trim());
   }
 
   /* Total steps: if no deps, skip step 1 (transfer) */

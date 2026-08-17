@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/ui/date-picker';
+import { useOrgContext } from '@/contexts/OrgContext';
 
 /* ─────────────────────────────── option lists ───────────────────────────── */
 
@@ -113,6 +114,7 @@ export interface TaskFilterState {
   frequencies:  string[];
   clients:      string[];
   projectNames: string[];
+  departments:  string[];
   services:     string[];
   assignees:    string[];
   tags:         string[];
@@ -123,7 +125,7 @@ export interface TaskFilterState {
 
 export const EMPTY_TASK_FILTERS: TaskFilterState = {
   taskNames: [], frequencies: [], clients: [], projectNames: [],
-  services: [], assignees: [], tags: [],
+  departments: [], services: [], assignees: [], tags: [],
   dueDateFilter: 'All dates',
   dueDateStart: '',
   dueDateEnd: '',
@@ -135,6 +137,7 @@ export function countActiveTaskFilters(f: TaskFilterState): number {
     (f.frequencies.length > 0 ? 1 : 0) +
     (f.clients.length > 0 ? 1 : 0) +
     (f.projectNames.length > 0 ? 1 : 0) +
+    (f.departments.length > 0 ? 1 : 0) +
     (f.services.length > 0 ? 1 : 0) +
     (f.assignees.length > 0 ? 1 : 0) +
     (f.tags.length > 0 ? 1 : 0) +
@@ -529,6 +532,11 @@ export function TaskFilterDrawer({
   open, onClose, pending, onChange, onApply, onReset, onApplyDirect,
   storageKey = 'finanshels-tasks-filters', hideProjectContextFilters = false,
 }: TaskFilterDrawerProps) {
+  const { departments: orgDepts } = useOrgContext();
+  const activeDepts = orgDepts.filter(d => d.status === 'Active');
+  const activeDepartmentNames = activeDepts.map(d => d.name);
+  const nameToId = Object.fromEntries(activeDepts.map(d => [d.name, d.id]));
+  const idToName = Object.fromEntries(activeDepts.map(d => [d.id, d.name]));
   const hasPending = countActiveTaskFilters(pending) > 0;
 
   function set<K extends keyof TaskFilterState>(key: K, value: TaskFilterState[K]) {
@@ -772,8 +780,13 @@ export function TaskFilterDrawer({
                                       type="button"
                                       onClick={() => {
                                         setActiveSavedFilterId(sf.id);
-                                        if (onApplyDirect) { onApplyDirect(sf.filters); }
-                                        else { onChange(sf.filters); onApply(); }
+                                        const activeDeptIdSet = new Set(activeDepts.map(d => d.id));
+                                        const sanitized: TaskFilterState = {
+                                          ...sf.filters,
+                                          departments: (sf.filters.departments ?? []).filter(id => activeDeptIdSet.has(id)),
+                                        };
+                                        if (onApplyDirect) { onApplyDirect(sanitized); }
+                                        else { onChange(sanitized); onApply(); }
                                         setDropdownOpen(false);
                                         onClose();
                                       }}
@@ -994,6 +1007,15 @@ export function TaskFilterDrawer({
                   />
                 </>
               )}
+              <MultiSelectDropdown
+                label="Department"
+                placeholder="Select departments..."
+                options={activeDepartmentNames}
+                selected={pending.departments.map(id => idToName[id]).filter(Boolean)}
+                onChange={v => set('departments', v.map(n => nameToId[n]).filter(Boolean))}
+                searchPlaceholder="Search departments..."
+                drawerOpen={open}
+              />
               <MultiSelectDropdown
                 label="Service"
                 placeholder="Select services..."

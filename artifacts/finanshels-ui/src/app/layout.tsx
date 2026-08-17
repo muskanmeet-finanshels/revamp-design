@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { JetBrains_Mono, Poppins } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { TimerProvider } from '@/contexts/TimerContext';
+import { OrgProvider } from '@/contexts/OrgContext';
 import { TimerWidget } from '@/components/TimerWidget';
 
 import './globals.css';
@@ -33,11 +34,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable} ${jetbrainsMono.variable}`}>
       <body>
-        <TimerProvider>
-          {children}
-          <TimerWidget />
-          <Toaster position="bottom-right" richColors />
-        </TimerProvider>
+        <OrgProvider>
+          <TimerProvider>
+            {children}
+            <TimerWidget />
+            <Toaster position="bottom-right" richColors />
+          </TimerProvider>
+        </OrgProvider>
       </body>
     </html>
   );

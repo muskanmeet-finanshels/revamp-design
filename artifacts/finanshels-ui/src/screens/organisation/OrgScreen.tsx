@@ -18,9 +18,10 @@ import {
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
 import { toast } from 'sonner';
 import {
-  MOCK_DEPARTMENTS, MOCK_VERTICALS, MOCK_TEAMS,
+  MOCK_VERTICALS, MOCK_TEAMS,
   type Department, type Vertical, type Team, type OrgStatus,
 } from './mock-data';
+import { useOrgContext } from '@/contexts/OrgContext';
 
 /* ─── helpers ──────────────────────────────────────────────────────────── */
 
@@ -857,7 +858,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function OrgScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS);
+  const { departments, setDepartments } = useOrgContext();
   const [verticals,   setVerticals]   = useState<Vertical[]>(MOCK_VERTICALS);
   const [teams,       setTeams]       = useState<Team[]>(MOCK_TEAMS);
 

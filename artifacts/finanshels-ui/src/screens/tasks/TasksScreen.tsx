@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from './mock-data';
+import { MOCK_PROJECTS } from '../projects/mock-data';
+import { useOrgContext } from '@/contexts/OrgContext';
 import {
   TaskFilterDrawer,
   EMPTY_TASK_FILTERS,
@@ -255,11 +257,18 @@ function matchesTaskTag(task: TaskItem, tag: string): boolean {
   return patterns[tag]?.test(text) ?? false;
 }
 
+/** Stable projectId → departmentId lookup built from the project mock data. */
+const PROJECT_DEPT_MAP: Record<string, string> = Object.fromEntries(
+  MOCK_PROJECTS.map(p => [p.id, p.serviceType.departmentId]),
+);
+
 function filterTasksByAppliedFilters(
   taskList: TaskItem[],
   statusView: StatusView,
   searchValue: string,
   appliedFilters: TaskFilterState,
+  /** Resolved dept IDs for the selected department names (from org context). */
+  resolvedDeptIds: string[],
 ): TaskItem[] {
   let list = taskList.filter(task => matchesStatusView(task, statusView));
 
@@ -293,6 +302,12 @@ function filterTasksByAppliedFilters(
       task.projects.some(project =>
         includesSelectedValue(appliedFilters.projectNames, [project.title]),
       ),
+    );
+  }
+  if (appliedFilters.departments.length > 0) {
+    list = list.filter(task =>
+      resolvedDeptIds.length > 0 &&
+      task.projects.some(tp => resolvedDeptIds.includes(PROJECT_DEPT_MAP[tp.id] ?? '')),
     );
   }
   if (appliedFilters.services.length > 0) {
@@ -335,6 +350,8 @@ function filterTasksByAppliedFilters(
 /* ─────────────────── screen ─────────────────── */
 
 export function TasksScreen() {
+  const { departments: orgDepts } = useOrgContext();
+
   /* search */
   const [search, setSearch] = useState('');
 
@@ -536,10 +553,11 @@ export function TasksScreen() {
   const [pendingFilters,   setPendingFilters]    = useState<TaskFilterState>(EMPTY_TASK_FILTERS);
   const [appliedFilters,   setAppliedFilters]    = useState<TaskFilterState>(EMPTY_TASK_FILTERS);
   const filterActiveCount = countActiveTaskFilters(appliedFilters);
-  const filteredTasksForCounts = useMemo(
-    () => filterTasksByAppliedFilters(displayTasks, 'All', search, appliedFilters),
-    [displayTasks, search, appliedFilters],
-  );
+  const filteredTasksForCounts = useMemo(() => {
+    const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
+    return filterTasksByAppliedFilters(displayTasks, 'All', search, appliedFilters, rDeptIds);
+  }, [displayTasks, search, appliedFilters, orgDepts]);
   const statusCounts = STATUSES.reduce<Record<StatusView, number>>((counts, { value }) => {
     counts[value] = filteredTasksForCounts.filter(task => matchesStatusView(task, value)).length;
     return counts;
@@ -553,7 +571,9 @@ export function TasksScreen() {
 
   /* filtered + sorted list */
   const tasks = useMemo(() => {
-    const list = filterTasksByAppliedFilters(displayTasks, status, search, appliedFilters);
+    const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
+    const list = filterTasksByAppliedFilters(displayTasks, status, search, appliedFilters, rDeptIds);
 
     // sort
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -570,13 +590,13 @@ export function TasksScreen() {
     });
 
     return list;
-  }, [search, status, sortKey, sortDir, appliedFilters, displayTasks]);
+  }, [search, status, sortKey, sortDir, appliedFilters, displayTasks, orgDepts]);
 
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
   const activeFilterChips: ActiveFilterChip[] = [];
   const taskArrayChip = (
-    key: keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>,
+    key: keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'departments' | 'services' | 'assignees' | 'tags'>,
     label: string,
   ) => {
     const values = appliedFilters[key];
@@ -591,6 +611,11 @@ export function TasksScreen() {
   taskArrayChip('frequencies', 'Frequency');
   taskArrayChip('clients', 'Client');
   taskArrayChip('projectNames', 'Project');
+  const deptIdToName = Object.fromEntries(orgDepts.map(d => [d.id, d.name]));
+  appliedFilters.departments.forEach(deptId => {
+    const name = deptIdToName[deptId] ?? deptId;
+    activeFilterChips.push({ key: makeActiveFilterChipKey('departments', deptId), label: 'Department', value: name });
+  });
   taskArrayChip('services', 'Service');
   taskArrayChip('assignees', 'Assignee');
   taskArrayChip('tags', 'Tags');
@@ -606,7 +631,7 @@ export function TasksScreen() {
 
   function removeTaskFilter(key: string) {
     const { filterKey, value } = parseActiveFilterChipKey(key);
-    const arrayKeys = ['taskNames', 'frequencies', 'clients', 'projectNames', 'services', 'assignees', 'tags'] as const;
+    const arrayKeys = ['taskNames', 'frequencies', 'clients', 'projectNames', 'departments', 'services', 'assignees', 'tags'] as const;
     const next = { ...appliedFilters };
     if ((arrayKeys as readonly string[]).includes(filterKey)) {
       const arrayKey = filterKey as typeof arrayKeys[number];

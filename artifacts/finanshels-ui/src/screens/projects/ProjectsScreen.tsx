@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import { useOrgContext } from '@/contexts/OrgContext';
 
 const PROJECT_COLUMN_ORDER_STORAGE_KEY = 'fh_projects_column_order';
 
@@ -263,6 +264,7 @@ const SORT_OPTIONS: Array<{ value: SortByOption; label: string }> = [
 /* ─────────────────────────────── screen ────────────────────────────────── */
 
 export function ProjectsScreen() {
+  const { departments: orgDepts } = useOrgContext();
   const PAGE_SIZE_LIST = 20;
   const PAGE_SIZE_GRID = 90;
   /* filter state */
@@ -486,7 +488,10 @@ export function ProjectsScreen() {
     /* drawer filters */
     const af = appliedFilters;
 
-    const deptMatch   = af.departments.length === 0 || af.departments.includes(p.serviceType.label);
+    const activeDeptIdSet = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    const selectedDeptIds = af.departments.filter(id => activeDeptIdSet.has(id));
+    const deptMatch   = af.departments.length === 0
+      || (selectedDeptIds.length > 0 && selectedDeptIds.includes(p.serviceType.departmentId));
     const svcMatch    = af.services.length === 0    || af.services.includes(p.serviceType.label);
     const revenueRanges = Array.isArray(af.revenueRanges) ? af.revenueRanges : [];
     const revenueMatch = revenueRanges.length === 0 || (
@@ -981,7 +986,11 @@ export function ProjectsScreen() {
           });
         };
 
-        arrayChip('departments',    'Department');
+        const deptIdToName = Object.fromEntries(orgDepts.map(d => [d.id, d.name]));
+        af.departments.forEach(deptId => {
+          const name = deptIdToName[deptId] ?? deptId;
+          chips.push({ key: makeActiveFilterChipKey('departments', deptId), label: 'Department', value: name });
+        });
         arrayChip('services',       'Service');
         arrayChip('revenueRanges',  'Revenue');
         arrayChip('dueDays',        'Due Days');

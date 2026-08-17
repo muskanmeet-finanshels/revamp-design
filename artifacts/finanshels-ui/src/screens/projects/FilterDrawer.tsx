@@ -17,6 +17,7 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useOrgContext } from '@/contexts/OrgContext';
 
 /* ─────────────────────────────── saved-filter storage ──────────────────── */
 
@@ -148,11 +149,10 @@ export function countActiveFilters(f: FilterState): number {
    Strips any stored values that no longer exist and returns the cleaned
    state plus a record of { fieldLabel → removedCount } for user feedback. */
 const FILTER_OPTION_KEYS: Array<{
-  key:     keyof Pick<FilterState, 'departments'|'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
+  key:     keyof Pick<FilterState, 'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
   options: readonly string[];
   label:   string;
 }> = [
-  { key: 'departments',    options: FILTER_OPTIONS.departments,    label: 'Department' },
   { key: 'services',       options: FILTER_OPTIONS.services,       label: 'Service' },
   { key: 'revenueRanges',  options: FILTER_OPTIONS.revenueRanges,  label: 'Revenue' },
   { key: 'dueDays',        options: FILTER_OPTIONS.dueDays,        label: 'Due Days' },
@@ -557,6 +557,11 @@ export function FilterDrawer({
   open, onClose, pending, onChange, onApply, onReset, onApplyDirect,
   storageKey = 'finanshels-projects-filters',
 }: FilterDrawerProps) {
+  const { departments: orgDepts } = useOrgContext();
+  const activeDepts = orgDepts.filter(d => d.status === 'Active');
+  const activeDepartmentNames = activeDepts.map(d => d.name);
+  const nameToId = Object.fromEntries(activeDepts.map(d => [d.name, d.id]));
+  const idToName = Object.fromEntries(activeDepts.map(d => [d.id, d.name]));
   const hasPendingFilters = countActiveFilters(pending) > 0;
 
   function set<K extends keyof FilterState>(key: K, value: FilterState[K]) {
@@ -733,7 +738,7 @@ export function FilterDrawer({
                     <div className="absolute right-0 top-full z-50 mt-1.5 w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                       <div className="max-h-[220px] overflow-y-auto p-1.5 space-y-0.5">
                         {saved.map(sf => {
-                            const { removedByField } = sanitizeSavedFilter(sf.filters);
+                            const { removedByField } = sanitizeSavedFilter(sf.filters, activeDepts.map(d => d.id));
                             const isStale   = Object.keys(removedByField).length > 0;
                             const isEditing = editingId === sf.id;
                             return (
@@ -809,7 +814,7 @@ export function FilterDrawer({
                                       type="button"
                                       onClick={() => {
                                         setActiveSavedFilterId(sf.id);
-                                        const { sanitized, removedByField } = sanitizeSavedFilter(sf.filters);
+                                        const { sanitized, removedByField } = sanitizeSavedFilter(sf.filters, activeDepts.map(d => d.id));
                                         const removedFields = Object.entries(removedByField);
                                         if (removedFields.length > 0) {
                                           const totalRemoved = removedFields.reduce((sum, [, n]) => sum + n, 0);
@@ -1005,9 +1010,9 @@ export function FilterDrawer({
               <MultiSelectDropdown
                 label="Department"
                 placeholder="All Department"
-                options={FILTER_OPTIONS.departments}
-                selected={pending.departments}
-                onChange={v => set('departments', v)}
+                options={activeDepartmentNames}
+                selected={pending.departments.map(id => idToName[id]).filter(Boolean)}
+                onChange={v => set('departments', v.map(n => nameToId[n]).filter(Boolean))}
                 searchPlaceholder="Search department..."
                 drawerOpen={open}
               />
@@ -1138,7 +1143,12 @@ export function FilterDrawer({
   );
 }
 
-export function sanitizeSavedFilter(filters: FilterState): {
+export function sanitizeSavedFilter(
+  filters: FilterState,
+  /** Active department IDs from the live org hierarchy. When provided, strips
+   *  any stored department IDs that no longer belong to an active department. */
+  liveDeptIds?: readonly string[],
+): {
   sanitized: FilterState;
   removedByField: Record<string, number>;
 } {
@@ -1147,6 +1157,18 @@ export function sanitizeSavedFilter(filters: FilterState): {
     revenueRanges: Array.isArray(filters.revenueRanges) ? filters.revenueRanges : [],
   };
   const removedByField: Record<string, number> = {};
+
+  /* Validate department ID selections against the live active dept ID set. */
+  if (liveDeptIds) {
+    const liveSet = new Set(liveDeptIds);
+    const stored  = Array.isArray(filters.departments) ? filters.departments : [];
+    const valid   = stored.filter(id => liveSet.has(id));
+    const diff    = stored.length - valid.length;
+    if (diff > 0) {
+      removedByField['Department'] = diff;
+      sanitized.departments = valid;
+    }
+  }
 
   for (const { key, options, label } of FILTER_OPTION_KEYS) {
     const stored = Array.isArray(filters[key]) ? filters[key] as string[] : [];
