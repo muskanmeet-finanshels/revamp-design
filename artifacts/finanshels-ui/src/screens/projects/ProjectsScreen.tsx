@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   ActiveFilterChips,
-  makeActiveFilterChipKey,
   parseActiveFilterChipKey,
   type ActiveFilterChip,
 } from '@/components/ActiveFilterChips';
@@ -975,8 +974,10 @@ export function ProjectsScreen() {
         ) => {
           const vals = af[key] as string[];
           if (!vals.length) return;
-          vals.forEach(value => {
-            chips.push({ key: makeActiveFilterChipKey(key, value), label, value });
+          chips.push({
+            key,
+            label,
+            value: vals.join(', '),
           });
         };
 
