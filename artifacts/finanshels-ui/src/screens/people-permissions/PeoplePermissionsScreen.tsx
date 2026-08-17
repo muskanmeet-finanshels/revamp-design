@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { ChevronDown } from 'lucide-react';
 import { OrgScreen }   from '@/screens/organisation/OrgScreen';
 import { UsersScreen } from '@/screens/users/UsersScreen';
 import { RolesScreen } from '@/screens/roles/RolesScreen';
@@ -46,30 +46,30 @@ export function PeoplePermissionsScreen() {
     <div className="flex min-h-full flex-col">
 
       {/* ── Module header ───────────────────────────────────────────── */}
-      <div className="border-b border-gray-100 bg-white px-6 pb-0 pt-6 lg:px-8">
-        <div className="mb-4">
+      <div className="border-b border-gray-100 bg-white px-6 py-6 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <h1 className="text-[20px] font-bold text-gray-900">People & Permissions</h1>
-          <p className="mt-0.5 text-[13.5px] text-gray-500">{current.description}</p>
-        </div>
-
-        {/* ── Line tabs ────────────────────────────────────────────── */}
-        <div className="flex gap-0 overflow-x-auto scrollbar-none">
-          {TABS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => changeTab(value)}
-              className={cn(
-                'relative flex-none whitespace-nowrap border-b-2 px-5 pb-3 pt-0.5 text-[13px] font-medium transition-colors focus:outline-none',
-                tab === value
-                  ? 'border-brand font-semibold text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
-              )}
+          <div className="relative w-full sm:w-[260px]">
+            <label htmlFor="people-permissions-section" className="sr-only">
+              Select People & Permissions section
+            </label>
+            <select
+              id="people-permissions-section"
+              value={tab}
+              onChange={event => changeTab(event.target.value as Tab)}
+              className="h-10 w-full appearance-none rounded-lg border border-gray-200 bg-white px-3.5 pr-10 text-[13px] font-medium text-gray-800 shadow-sm outline-none transition-colors hover:border-gray-300 focus:border-brand focus:ring-2 focus:ring-brand/10"
             >
-              {label}
-            </button>
-          ))}
+              {TABS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <ChevronDown
+              size={15}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+          </div>
         </div>
+        <p className="mt-1 text-[13.5px] text-gray-500">{current.description}</p>
       </div>
 
       {/* ── Tab content ─────────────────────────────────────────────── */}
