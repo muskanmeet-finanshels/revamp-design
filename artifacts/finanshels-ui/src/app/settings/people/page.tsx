@@ -1,10 +1,5 @@
-import { AppShell } from '@/components/AppShell';
-import { PeoplePermissionsScreen } from '@/screens/people-permissions/PeoplePermissionsScreen';
+import { redirect } from 'next/navigation';
 
 export default function PeoplePage() {
-  return (
-    <AppShell breadcrumbs={[{ label: 'Settings' }, { label: 'People & Permissions' }]}>
-      <PeoplePermissionsScreen />
-    </AppShell>
-  );
+  redirect('/settings/admin');
 }
