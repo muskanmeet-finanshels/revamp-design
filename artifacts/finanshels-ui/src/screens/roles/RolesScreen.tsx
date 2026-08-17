@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
-  ArrowLeft, ArrowRight, Lock, Shield, Check, Search, X,
+  ArrowLeft, ArrowRight, Lock, Shield, Check,
   AlertTriangle, Info, Users, UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
+import { SearchInput } from '@/components/ui/search-input';
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
@@ -362,7 +363,7 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} />
 
       <div className={cn(
-        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[52rem]',
+        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[36rem]',
         open ? 'translate-x-0' : 'translate-x-full',
       )}>
         {/* Header */}
@@ -653,7 +654,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
         className="fixed inset-0 z-40 bg-black/20 transition-opacity duration-300" />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[480px]">
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[36rem]">
 
         {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-amber-100 bg-amber-50 px-5 py-[14px]">
@@ -1025,23 +1026,14 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           ))}
         </div>
 
-        {/* Search */}
-        <div className="relative flex h-9 items-center">
-          <Search size={14} className="pointer-events-none absolute left-3 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search roles…"
-            className="h-full w-[220px] rounded-xl border border-gray-200 bg-white pl-9 pr-8 text-[13px] placeholder:text-gray-400 focus:border-brand focus:outline-none transition-colors"
-          />
-          {search && (
-            <button type="button" onClick={() => setSearch('')}
-              className="absolute right-2.5 flex h-4 w-4 items-center justify-center rounded bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors">
-              <X size={10} />
-            </button>
-          )}
-        </div>
+        {/* Shared platform search */}
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search roles…"
+          aria-label="Search roles"
+          className="w-[220px]"
+        />
 
         <div className="ml-auto">
           <button type="button" onClick={openCreate}

@@ -5,6 +5,7 @@ import { Check, Lock, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MODULES, MOCK_ROLES, type AppRole } from '@/screens/roles/mock-data';
+import { SearchInput } from '@/components/ui/search-input';
 
 type PermissionMap = Record<string, string[]>;
 
@@ -44,6 +45,7 @@ export function PermissionsScreen() {
     clonePermissions(MOCK_ROLES.find(role => role.id === 'role-admin')?.permissions ?? {}),
   );
   const [isSaved, setIsSaved] = useState(true);
+  const [permissionSearch, setPermissionSearch] = useState('');
 
   const selectedRole = useMemo(
     () => MOCK_ROLES.find(role => role.id === selectedRoleId) ?? MOCK_ROLES[0],
@@ -59,6 +61,18 @@ export function PermissionsScreen() {
   const total = totalActions();
   const coverage = Math.round((granted / total) * 100);
   const readOnly = selectedRole.isProtected;
+  const filteredModules = useMemo(() => {
+    const query = permissionSearch.trim().toLowerCase();
+    if (!query) return MODULES;
+
+    return MODULES.map(module => {
+      const moduleMatches = module.label.toLowerCase().includes(query);
+      const actions = moduleMatches
+        ? module.actions
+        : module.actions.filter(action => action.label.toLowerCase().includes(query));
+      return { ...module, actions };
+    }).filter(module => module.actions.length > 0);
+  }, [permissionSearch]);
 
   function toggleAction(moduleId: string, actionId: string) {
     if (readOnly) return;
@@ -97,20 +111,29 @@ export function PermissionsScreen() {
             Configure module-level access for each role.
           </p>
         </div>
-        <div className="w-full sm:w-[260px]">
-          <label htmlFor="permission-role" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-            Configure role
-          </label>
-          <select
-            id="permission-role"
-            value={selectedRoleId}
-            onChange={event => setSelectedRoleId(event.target.value)}
-            className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] font-medium text-gray-800 shadow-sm outline-none transition-colors hover:border-gray-300 focus:border-brand focus:ring-2 focus:ring-brand/10"
-          >
-            {MOCK_ROLES.map(role => (
-              <option key={role.id} value={role.id}>{role.name}</option>
-            ))}
-          </select>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+          <SearchInput
+            value={permissionSearch}
+            onChange={setPermissionSearch}
+            placeholder="Search permissions…"
+            aria-label="Search permissions"
+            className="w-full sm:w-[220px]"
+          />
+          <div className="w-full sm:w-[260px]">
+            <label htmlFor="permission-role" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+              Configure role
+            </label>
+            <select
+              id="permission-role"
+              value={selectedRoleId}
+              onChange={event => setSelectedRoleId(event.target.value)}
+              className="h-9 w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] font-medium text-gray-800 shadow-sm outline-none transition-colors hover:border-gray-300 focus:border-brand focus:ring-1 focus:ring-brand/20"
+            >
+              {MOCK_ROLES.map(role => (
+                <option key={role.id} value={role.id}>{role.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -154,8 +177,12 @@ export function PermissionsScreen() {
           </button>
         </div>
 
-        <div className="space-y-2 p-4">
-          {MODULES.map(module => {
+          <div className="space-y-2 p-4">
+          {filteredModules.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-[13px] text-gray-400">
+              No permissions match “{permissionSearch}”.
+            </div>
+          ) : filteredModules.map(module => {
             const grantedActions = permissions[module.id] ?? [];
             const allGranted = module.actions.every(action => grantedActions.includes(action.id));
             const someGranted = module.actions.some(action => grantedActions.includes(action.id));
