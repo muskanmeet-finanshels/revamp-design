@@ -3115,10 +3115,10 @@ function AllTimesheets() {
   const pageItems  = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const activeFilterChips: ActiveFilterChip[] = [
     ...(statusFilter.length > 0
-      ? [{ key: 'status', label: 'Status', value: statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} selected` }]
+      ? [{ key: 'status', label: 'Status', value: statusFilter.join(', ') }]
       : []),
     ...(memberFilter.length > 0
-      ? [{ key: 'member', label: 'Member', value: memberFilter.length === 1 ? memberFilter[0] : `${memberFilter.length} selected` }]
+      ? [{ key: 'member', label: 'Member', value: memberFilter.join(', ') }]
       : []),
     ...(dateFilter !== 'All'
       ? [{ key: 'date', label: 'Date', value: activeDateLabel }]

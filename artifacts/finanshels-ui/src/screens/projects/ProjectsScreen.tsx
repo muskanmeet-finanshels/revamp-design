@@ -970,7 +970,7 @@ export function ProjectsScreen() {
         ) => {
           const vals = af[key] as string[];
           if (!vals.length) return;
-          const display = vals.length === 1 ? vals[0] : `${vals.length} selected`;
+          const display = vals.join(', ');
           chips.push({ key, label, value: display });
         };
 

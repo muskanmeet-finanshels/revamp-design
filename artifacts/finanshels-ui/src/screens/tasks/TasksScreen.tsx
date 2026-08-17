@@ -579,7 +579,7 @@ export function TasksScreen() {
     activeFilterChips.push({
       key,
       label,
-      value: values.length === 1 ? values[0] : `${values.length} selected`,
+      value: values.join(', '),
     });
   };
   taskArrayChip('taskNames', 'Task');
