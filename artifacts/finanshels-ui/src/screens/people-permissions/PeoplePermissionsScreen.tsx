@@ -23,10 +23,15 @@ const SUBMODULES: { value: AdminSection; label: string; description: string }[] 
 export function PeoplePermissionsScreen() {
   const [section, setSection] = useState<AdminSection>('roles');
 
-  /* Restore the selected Admin submodule from the URL hash on mount. */
+  /* Keep the selected Admin submodule in sync with the URL hash and sidebar links. */
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '') as AdminSection;
-    if (['roles', 'permissions'].includes(hash)) setSection(hash);
+    const syncSection = () => {
+      const hash = window.location.hash.replace('#', '') as AdminSection;
+      if (['roles', 'permissions'].includes(hash)) setSection(hash);
+    };
+    syncSection();
+    window.addEventListener('hashchange', syncSection);
+    return () => window.removeEventListener('hashchange', syncSection);
   }, []);
 
   function changeSection(nextSection: AdminSection) {

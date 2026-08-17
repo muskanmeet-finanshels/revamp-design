@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
   LayoutGrid, Users2, ShieldCheck, Briefcase,
   ClipboardList, HelpCircle, Settings,
-  FolderKanban, CheckSquare, Inbox, Timer, Shield,
+  FolderKanban, CheckSquare, Inbox, Timer, Shield, KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -35,7 +35,13 @@ const NAV: NavEntry[] = [
   },
   { kind: 'leaf', label: 'Timesheets', href: '/timesheets', icon: <Timer size={16} /> },
   { kind: 'leaf', label: 'Audit Trail', href: '/audit-trail', icon: <ClipboardList size={16} /> },
-  { kind: 'leaf', label: 'Admin', href: '/settings/admin', icon: <Shield size={16} /> },
+  {
+    kind: 'group', label: 'Admin', icon: <Shield size={16} />,
+    children: [
+      { kind: 'leaf', label: 'Roles',       href: '/settings/admin#roles',       icon: <Shield size={14} /> },
+      { kind: 'leaf', label: 'Permissions', href: '/settings/admin#permissions', icon: <KeyRound size={14} /> },
+    ],
+  },
 ];
 
 const BOTTOM: NavLeaf[] = [
@@ -79,8 +85,24 @@ function ExpandedGroup({ group, pathname, onClick }: {
   group: NavGroup; pathname: string;
   onClick?: () => void;
 }) {
-  const hasActive = group.children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'));
+  const [hash, setHash] = useState('');
+  const isActive = (href: string) => {
+    const [path, targetHash] = href.split('#');
+    return pathname === path || pathname.startsWith(path + '/') ? (!targetHash || hash === `#${targetHash}`) : false;
+  };
+  const hasActive = group.children.some(c => isActive(c.href));
   const [open, setOpen] = useState(hasActive || group.label === 'Workspace');
+
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, []);
+
+  useEffect(() => {
+    if (hasActive) setOpen(true);
+  }, [hasActive]);
 
   return (
     <div>
@@ -102,7 +124,7 @@ function ExpandedGroup({ group, pathname, onClick }: {
             <ExpandedLeaf
               key={child.href}
               item={child}
-              active={pathname === child.href || pathname.startsWith(child.href + '/')}
+              active={isActive(child.href)}
               indent
               onClick={onClick}
             />
@@ -144,9 +166,21 @@ function CollapsedLeafBtn({ item, active }: {
 function CollapsedGroupBtn({ group, pathname }: {
   group: NavGroup; pathname: string;
 }) {
-  const hasActive = group.children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'));
+  const [hash, setHash] = useState('');
+  const isActive = (href: string) => {
+    const [path, targetHash] = href.split('#');
+    return pathname === path || pathname.startsWith(path + '/') ? (!targetHash || hash === `#${targetHash}`) : false;
+  };
+  const hasActive = group.children.some(c => isActive(c.href));
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, []);
 
   return (
     <div
@@ -181,7 +215,7 @@ function CollapsedGroupBtn({ group, pathname }: {
             {group.label}
           </div>
           {group.children.map(child => {
-            const active = pathname === child.href || pathname.startsWith(child.href + '/');
+            const active = isActive(child.href);
             return (
               <Link
                 key={child.href}
