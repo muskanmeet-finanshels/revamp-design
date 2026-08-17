@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
+import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
 import { toast } from 'sonner';
 import {
   type Department, type Vertical, type Team, type OrgStatus,
@@ -32,6 +33,18 @@ import { useOrgContext } from '@/contexts/OrgContext';
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+function compareSortValues(a: string | number, b: string | number) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+type DepartmentSortKey = 'name' | 'description' | 'verticals' | 'teams' | 'status';
+type VerticalSortKey = 'name' | 'description' | 'department' | 'status';
+type TeamSortKey = 'name' | 'description' | 'department' | 'status';
 
 function StatusBadge({ status }: { status: OrgStatus }) {
   return (
@@ -334,6 +347,8 @@ interface DepartmentsTabProps {
 
 function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: DepartmentsTabProps) {
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<DepartmentSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   /* Drawer state */
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -392,6 +407,38 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
     d.description.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const sorted = [...filtered].sort((a, b) => {
+    const verticalCountA = verticals.filter(v => v.departmentId === a.id).length;
+    const verticalCountB = verticals.filter(v => v.departmentId === b.id).length;
+    const teamCountA = teams.filter(t => t.departmentId === a.id).length;
+    const teamCountB = teams.filter(t => t.departmentId === b.id).length;
+    const values: Record<DepartmentSortKey, string | number> = {
+      name: a.name,
+      description: a.description,
+      verticals: verticalCountA,
+      teams: teamCountA,
+      status: a.status,
+    };
+    const otherValues: Record<DepartmentSortKey, string | number> = {
+      name: b.name,
+      description: b.description,
+      verticals: verticalCountB,
+      teams: teamCountB,
+      status: b.status,
+    };
+    return compareSortValues(values[sortKey], otherValues[sortKey]) * (sortDirection === 'asc' ? 1 : -1);
+  });
+
+  function handleSort(key: string) {
+    const nextKey = key as DepartmentSortKey;
+    if (sortKey === nextKey) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(nextKey);
+      setSortDirection('asc');
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -412,20 +459,20 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[260px]">
-                Department
+              <TableHead className="pl-5 w-[260px]">
+                <SortableTableHead label="Department" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-                Description
+              <TableHead>
+                <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[90px] text-center">
-                Verticals
+              <TableHead className="w-[90px] text-center">
+                <SortableTableHead label="Verticals" sortKey="verticals" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
               </TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[80px] text-center">
-                Teams
+              <TableHead className="w-[80px] text-center">
+                <SortableTableHead label="Teams" sortKey="teams" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
               </TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[100px]">
-                Status
+              <TableHead className="w-[100px]">
+                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
@@ -444,7 +491,7 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
                   />
                 </TableCell>
               </TableRow>
-            ) : filtered.map(dept => {
+            ) : sorted.map(dept => {
               const vertCount = verticals.filter(v => v.departmentId === dept.id).length;
               const teamCount = teams.filter(t => t.departmentId === dept.id).length;
               const isInactive = dept.status === 'Inactive';
@@ -541,6 +588,8 @@ interface VerticalsTabProps {
 
 function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTabProps) {
   const [search,     setSearch]     = useState('');
+  const [sortKey,    setSortKey]    = useState<VerticalSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editId,     setEditId]     = useState<string | null>(null);
   const [formName,   setFormName]   = useState('');
@@ -595,6 +644,32 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
     );
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    const values: Record<VerticalSortKey, string | number> = {
+      name: a.name,
+      description: a.description,
+      department: deptMap[a.departmentId] ?? '',
+      status: a.status,
+    };
+    const otherValues: Record<VerticalSortKey, string | number> = {
+      name: b.name,
+      description: b.description,
+      department: deptMap[b.departmentId] ?? '',
+      status: b.status,
+    };
+    return compareSortValues(values[sortKey], otherValues[sortKey]) * (sortDirection === 'asc' ? 1 : -1);
+  });
+
+  function handleSort(key: string) {
+    const nextKey = key as VerticalSortKey;
+    if (sortKey === nextKey) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(nextKey);
+      setSortDirection('asc');
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -613,10 +688,18 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[220px]">Vertical</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Description</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[160px]">Department</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[100px]">Status</TableHead>
+              <TableHead className="pl-5 w-[220px]">
+                <SortableTableHead label="Vertical" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead>
+                <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[160px]">
+                <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
           </TableHeader>
@@ -634,7 +717,7 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
                   />
                 </TableCell>
               </TableRow>
-            ) : filtered.map(v => (
+            ) : sorted.map(v => (
               <TableRow
                 key={v.id}
                 className={cn(
@@ -654,9 +737,12 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
                   <span className="line-clamp-1 text-[13px] text-gray-600">{v.description || '—'}</span>
                 </TableCell>
                 <TableCell className="py-3.5">
-                  <span className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[12px] font-medium text-gray-700">
+                  <div className="flex items-center gap-2">
+                    <Users size={13} className="text-gray-400" />
+                    <span className="text-[13px] text-gray-700">
                     {deptMap[v.departmentId] ?? '—'}
-                  </span>
+                    </span>
+                  </div>
                 </TableCell>
                 <TableCell className="py-3.5">
                   <StatusBadge status={v.status} />
@@ -726,6 +812,8 @@ interface TeamsTabProps {
 
 function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
   const [search,     setSearch]     = useState('');
+  const [sortKey,    setSortKey]    = useState<TeamSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editId,     setEditId]     = useState<string | null>(null);
   const [formName,   setFormName]   = useState('');
@@ -780,6 +868,32 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
     );
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    const values: Record<TeamSortKey, string | number> = {
+      name: a.name,
+      description: a.description,
+      department: deptMap[a.departmentId] ?? '',
+      status: a.status,
+    };
+    const otherValues: Record<TeamSortKey, string | number> = {
+      name: b.name,
+      description: b.description,
+      department: deptMap[b.departmentId] ?? '',
+      status: b.status,
+    };
+    return compareSortValues(values[sortKey], otherValues[sortKey]) * (sortDirection === 'asc' ? 1 : -1);
+  });
+
+  function handleSort(key: string) {
+    const nextKey = key as TeamSortKey;
+    if (sortKey === nextKey) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(nextKey);
+      setSortDirection('asc');
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -798,10 +912,18 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[220px]">Team</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Description</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[160px]">Department</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[100px]">Status</TableHead>
+              <TableHead className="pl-5 w-[220px]">
+                <SortableTableHead label="Team" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead>
+                <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[160px]">
+                <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
           </TableHeader>
@@ -819,7 +941,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
                   />
                 </TableCell>
               </TableRow>
-            ) : filtered.map(t => (
+            ) : sorted.map(t => (
               <TableRow
                 key={t.id}
                 className={cn(
@@ -839,9 +961,12 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
                   <span className="line-clamp-1 text-[13px] text-gray-600">{t.description || '—'}</span>
                 </TableCell>
                 <TableCell className="py-3.5">
-                  <span className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[12px] font-medium text-gray-700">
+                  <div className="flex items-center gap-2">
+                    <Users size={13} className="text-gray-400" />
+                    <span className="text-[13px] text-gray-700">
                     {deptMap[t.departmentId] ?? '—'}
-                  </span>
+                    </span>
+                  </div>
                 </TableCell>
                 <TableCell className="py-3.5">
                   <StatusBadge status={t.status} />
@@ -919,8 +1044,8 @@ export function OrgScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       {/* Page header */}
       {!hideHeader && (
         <div className="mb-6">
-          <h1 className="text-[20px] font-bold text-gray-900">Organisation</h1>
-          <p className="mt-0.5 text-[13.5px] text-gray-500">
+          <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Organisation</h1>
+          <p className="mt-0.5 text-[13px] text-gray-500">
             Manage your organisation's departments, verticals, and teams.
           </p>
         </div>

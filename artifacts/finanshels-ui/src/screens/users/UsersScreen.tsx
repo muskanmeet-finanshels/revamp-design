@@ -3,12 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Search, X, Plus, MoreHorizontal, Pencil, Power, PowerOff,
+  X, Plus, MoreHorizontal, Pencil, Power, PowerOff,
   KeyRound, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
-  AlertTriangle, UserCheck, Users, Building2, Layers, SearchX,
+  AlertTriangle, UserCheck, UserRound, Users, Users2, Building2, Layers, SearchX,
+  Mail,
 } from 'lucide-react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
+import { SearchInput } from '@/components/ui/search-input';
+import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
+import { ProjectsPagination } from '../projects/ProjectsPagination';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -22,6 +27,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   MOCK_USERS, MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
@@ -33,6 +39,12 @@ import {
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 
 function makeId() { return `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+
+type UserSortKey = 'name' | 'email' | 'jobTitle' | 'department' | 'roles' | 'manager' | 'status';
+
+function compareSortValues(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
 
 function getInitials(u: AppUser) {
   return `${u.firstName[0]}${u.lastName[0]}`.toUpperCase();
@@ -55,6 +67,25 @@ function StatusBadge({ status }: { status: UserStatus }) {
     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-[3px] text-[11.5px] font-medium', STATUS_STYLE[status])}>
       {status}
     </span>
+  );
+}
+
+function UnassignedManager() {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div aria-label="Unassigned" className="flex cursor-default items-center gap-2">
+            <div className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 ring-[1.5px] ring-white">
+              <UserRound size={11} className="text-gray-400" />
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+          Unassigned
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -389,10 +420,16 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
   const emailErr     = showErrors && (!email.trim() || !isValidEmail(email));
   const deptErr      = showErrors && !departmentId;
   const rolesErr     = showErrors && roles.length === 0;
+  const isFormValid =
+    Boolean(firstName.trim()) &&
+    Boolean(lastName.trim()) &&
+    isValidEmail(email) &&
+    Boolean(departmentId) &&
+    roles.length > 0;
 
   function handleSave() {
     setShowErrors(true);
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !isValidEmail(email) || !departmentId || roles.length === 0) return;
+    if (!isFormValid) return;
     onSave({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -439,7 +476,13 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-brand px-4 py-[7px] text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors"
+            disabled={!isFormValid}
+            className={cn(
+              'rounded-lg px-4 py-[7px] text-[13px] font-semibold text-white transition-colors',
+              isFormValid
+                ? 'bg-brand hover:bg-brand-hover'
+                : 'cursor-not-allowed bg-orange-200',
+            )}
           >
             {editUser ? 'Save Changes' : 'Create User'}
           </button>
@@ -589,31 +632,52 @@ function ResetPasswordDialog({ open, onOpenChange, user }: {
   onOpenChange: (o: boolean) => void;
   user: AppUser | null;
 }) {
-  if (!user) return null;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] rounded-2xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-[15px]">Reset Password</DialogTitle>
-          <DialogDescription className="mt-2 text-[13px] leading-relaxed text-gray-600">
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px] rounded-2xl bg-white p-6 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          {/* Icon */}
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50">
+            <Mail size={20} className="text-brand" />
+          </div>
+          {/* Title */}
+          <DialogPrimitive.Title className="mt-4 text-[16px] font-semibold text-gray-900">
+            Reset Password
+          </DialogPrimitive.Title>
+          {/* Description */}
+          <DialogPrimitive.Description className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
             A password reset link will be sent to{' '}
-            <span className="font-semibold text-gray-900">{user.email}</span>.{' '}
+            <span className="font-medium text-gray-700">{user?.email}</span>.{' '}
             The link expires in 24 hours. The user will remain active until they reset their password.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mt-2 gap-2">
-          <button type="button" onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button type="button"
-            onClick={() => { onOpenChange(false); toast.success(`Reset link sent to ${user.email}`); }}
-            className="rounded-lg bg-brand px-4 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
-            Send Reset Link
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogPrimitive.Description>
+          {/* Buttons */}
+          <div className="mt-6 flex gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { onOpenChange(false); toast.success(`Reset link sent to ${user?.email}`); }}
+              className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-brand-hover"
+            >
+              Send Reset Link
+            </button>
+          </div>
+          {/* Close */}
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={16} strokeWidth={2} />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -627,30 +691,53 @@ function ActivateDialog({ open, onOpenChange, user, onConfirm }: {
   user: AppUser | null;
   onConfirm: () => void;
 }) {
-  if (!user) return null;
-  const label = user.status === 'Inactive' ? 'Reactivate' : 'Activate';
+  const label = user?.status === 'Inactive' ? 'Reactivate' : 'Activate';
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] rounded-2xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-[15px]">{label} "{user.firstName} {user.lastName}"?</DialogTitle>
-          <DialogDescription className="mt-2 text-[13px] leading-relaxed text-gray-600">
-            This user will be marked as <strong>Active</strong> and will be able to log in and be assigned to projects and tasks.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mt-2 gap-2">
-          <button type="button" onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button type="button"
-            onClick={() => { onConfirm(); onOpenChange(false); }}
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-emerald-600 transition-colors">
-            {label}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px] rounded-2xl bg-white p-6 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          {/* Icon */}
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+            <UserCheck size={20} className="text-emerald-500" />
+          </div>
+          {/* Title */}
+          <DialogPrimitive.Title className="mt-4 text-[16px] font-semibold text-gray-900">
+            {label} "{user?.firstName} {user?.lastName}"?
+          </DialogPrimitive.Title>
+          {/* Description */}
+          <DialogPrimitive.Description className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
+            This user will be marked as{' '}
+            <span className="font-medium text-gray-700">Active</span>{' '}
+            and will be able to log in and be assigned to projects and tasks.
+          </DialogPrimitive.Description>
+          {/* Buttons */}
+          <div className="mt-6 flex gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { onConfirm(); onOpenChange(false); }}
+              className="flex-1 rounded-lg bg-emerald-500 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-emerald-600"
+            >
+              {label}
+            </button>
+          </div>
+          {/* Close */}
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={16} strokeWidth={2} />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -996,6 +1083,11 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | UserStatus>('All');
   const [deptFilter,   setDeptFilter]   = useState('');
+  const [deptMenuOpen, setDeptMenuOpen] = useState(false);
+  const [page,         setPage]         = useState(1);
+  const [pageSize,     setPageSize]     = useState(20);
+  const [sortKey,      setSortKey]      = useState<UserSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   /* Drawer state */
   const [drawerOpen,  setDrawerOpen]  = useState(false);
@@ -1029,6 +1121,47 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     const deptMatch = !deptFilter || u.departmentId === deptFilter;
     return nameMatch && statusMatch && deptMatch;
   });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const values: Record<UserSortKey, string> = {
+      name: `${a.firstName} ${a.lastName}`,
+      email: a.email,
+      jobTitle: a.jobTitle ?? '',
+      department: deptMap[a.departmentId] ?? '',
+      roles: a.roles.join(', '),
+      manager: a.reportingManagerId ? managerMap[a.reportingManagerId] ?? '' : '',
+      status: a.status,
+    };
+    const otherValues: Record<UserSortKey, string> = {
+      name: `${b.firstName} ${b.lastName}`,
+      email: b.email,
+      jobTitle: b.jobTitle ?? '',
+      department: deptMap[b.departmentId] ?? '',
+      roles: b.roles.join(', '),
+      manager: b.reportingManagerId ? managerMap[b.reportingManagerId] ?? '' : '',
+      status: b.status,
+    };
+    return compareSortValues(values[sortKey], otherValues[sortKey]) * (sortDirection === 'asc' ? 1 : -1);
+  });
+
+  function handleSort(key: string) {
+    const nextKey = key as UserSortKey;
+    if (sortKey === nextKey) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(nextKey);
+      setSortDirection('asc');
+    }
+    setPage(1);
+  }
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, deptFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function handleSave(data: Partial<AppUser>) {
     if (editUser) {
@@ -1073,8 +1206,8 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       {/* Page header */}
       {!hideHeader && (
         <div className="mb-6">
-          <h1 className="text-[20px] font-bold text-gray-900">User Management</h1>
-          <p className="mt-0.5 text-[13.5px] text-gray-500">
+          <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">User Management</h1>
+          <p className="mt-0.5 text-[13px] text-gray-500">
             Add, manage, and control access for all users in your organisation.
           </p>
         </div>
@@ -1104,45 +1237,80 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       {/* Toolbar */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {/* Search */}
-        <div className="relative flex h-9 items-center">
-          <Search size={14} className="pointer-events-none absolute left-3 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, email, or ID…"
-            className="h-full w-[260px] rounded-xl border border-gray-200 bg-white pl-9 pr-8 text-[13px] text-gray-800 placeholder:text-gray-400 focus:border-brand focus:outline-none transition-colors"
-          />
-          {search && (
-            <button type="button" onClick={() => setSearch('')}
-              className="absolute right-2.5 flex h-4 w-4 items-center justify-center rounded bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors">
-              <X size={10} />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name, email, or ID..."
+          aria-label="Search users by name, email, or ID"
+          className="w-full sm:w-80"
+          inputClassName="h-9"
+        />
 
-        {/* Department filter */}
-        <div className="relative">
-          <select
-            value={deptFilter}
-            onChange={e => setDeptFilter(e.target.value)}
-            className="h-9 appearance-none rounded-xl border border-gray-200 bg-white pl-3 pr-8 text-[13px] text-gray-700 focus:border-brand focus:outline-none transition-colors"
-          >
-            <option value="">All Departments</option>
-            {MOCK_DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-        </div>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Department filter */}
+          <Popover open={deptMenuOpen} onOpenChange={setDeptMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Filter by department"
+                aria-expanded={deptMenuOpen}
+                className={cn(
+                  'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
+                  deptFilter
+                    ? 'border-brand text-brand hover:bg-orange-50/50'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >
+                {deptFilter ? deptMap[deptFilter] ?? 'Department' : 'Department'}
+                <ChevronDown size={13} className={deptFilter ? 'text-brand' : 'text-gray-500'} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="w-56 rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
+                  Department
+                </span>
+                {deptFilter && (
+                  <button
+                    type="button"
+                    onClick={() => { setDeptFilter(''); setDeptMenuOpen(false); }}
+                    className="text-[11.5px] font-semibold text-brand transition-colors hover:text-brand/70"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {/* Options */}
+              <div className="space-y-0.5">
+                {[
+                  { value: '', label: 'All Departments' },
+                  ...MOCK_DEPARTMENTS.map(d => ({ value: d.id, label: d.name })),
+                ].map(option => {
+                  const isSelected = deptFilter === option.value;
+                  return (
+                    <button
+                      key={option.value || 'all'}
+                      type="button"
+                      onClick={() => { setDeptFilter(option.value); setDeptMenuOpen(false); }}
+                      className={cn(
+                        'flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium outline-none transition-colors',
+                        isSelected ? 'bg-orange-50 text-brand' : 'text-gray-700 hover:bg-gray-100',
+                      )}
+                    >
+                      {option.label}
+                      {isSelected && <Check size={14} className="flex-shrink-0 text-brand" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
 
-        {(search || deptFilter || statusFilter !== 'All') && (
-          <button type="button"
-            onClick={() => { setSearch(''); setDeptFilter(''); setStatusFilter('All'); }}
-            className="flex items-center gap-1 text-[12.5px] text-gray-500 hover:text-brand transition-colors">
-            <X size={12} /> Clear filters
-          </button>
-        )}
-
-        <div className="ml-auto">
           <button type="button" onClick={openAdd}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
             <Plus size={14} /> Add User
@@ -1151,22 +1319,38 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table>
-          <TableHeader>
+      <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
+        <Table className="w-full min-w-[1040px] table-auto">
+          <TableHeader className="whitespace-nowrap">
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500">User</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[200px]">Department</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Roles</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[160px]">Reporting Manager</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[100px]">Status</TableHead>
+              <TableHead className="w-[150px] pl-5">
+                <SortableTableHead label="User" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[210px]">
+                <SortableTableHead label="Email" sortKey="email" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[150px]">
+                <SortableTableHead label="Job Title" sortKey="jobTitle" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[140px]">
+                <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[150px]">
+                <SortableTableHead label="Roles" sortKey="roles" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[140px]">
+                <SortableTableHead label="Reporting Manager" sortKey="manager" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-0">
+                <TableCell colSpan={8} className="py-0">
                   <Empty
                     icon={search || deptFilter || statusFilter !== 'All' ? SearchX : Users}
                     title={search || deptFilter || statusFilter !== 'All'
@@ -1179,7 +1363,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   />
                 </TableCell>
               </TableRow>
-            ) : filtered.map(u => {
+            ) : paginatedUsers.map(u => {
               const deptName = deptMap[u.departmentId] ?? '—';
               const manager  = u.reportingManagerId ? managerMap[u.reportingManagerId] : null;
               const shownRoles = u.roles.slice(0, 2);
@@ -1193,23 +1377,29 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     isInactive && 'opacity-55',
                   )}
                 >
-                  {/* User column */}
+                  {/* User */}
                   <TableCell className="pl-5 py-3">
-                    <div className="min-w-0">
-                      <p className="text-[13.5px] font-semibold text-gray-900 truncate">
-                        {u.firstName} {u.lastName}
-                      </p>
-                      <p className="text-[12px] text-gray-400 truncate">{u.email}</p>
-                      {u.jobTitle && <p className="text-[11.5px] text-gray-400">{u.jobTitle}</p>}
-                    </div>
+                    <p className="block max-w-[220px] cursor-default truncate text-[13px] font-normal text-gray-900">
+                      {u.firstName} {u.lastName}
+                    </p>
+                  </TableCell>
+
+                  {/* Email */}
+                  <TableCell className="py-3">
+                    <p className="truncate text-[13px] text-gray-700">{u.email}</p>
+                  </TableCell>
+
+                  {/* Job title */}
+                  <TableCell className="py-3">
+                    <p className="truncate text-[13px] text-gray-700">{u.jobTitle ?? '—'}</p>
                   </TableCell>
 
                   {/* Department */}
                   <TableCell className="py-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[12px] font-medium text-gray-700">
-                      <Building2 size={11} className="text-brand" />
-                      {deptName}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Users2 size={12} className="flex-shrink-0 text-gray-400" />
+                      <span className="block min-w-0 truncate text-[12.5px] text-gray-700">{deptName}</span>
+                    </div>
                   </TableCell>
 
                   {/* Roles */}
@@ -1225,8 +1415,8 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   </TableCell>
 
                   {/* Manager */}
-                  <TableCell className="py-3 text-[12.5px] text-gray-600">
-                    {manager ?? <span className="text-gray-300">—</span>}
+                  <TableCell className="py-3 text-[13px] text-gray-700">
+                    {manager ?? <UnassignedManager />}
                   </TableCell>
 
                   {/* Status */}
@@ -1256,9 +1446,15 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
       {/* Results count */}
       {filtered.length > 0 && (
-        <p className="mt-3 text-[12px] text-gray-400">
-          Showing {filtered.length} of {total} user{total !== 1 ? 's' : ''}
-        </p>
+        <>
+          <ProjectsPagination
+            page={safePage}
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </>
       )}
 
       {/* Add/Edit drawer */}
