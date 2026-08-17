@@ -410,8 +410,6 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
     });
   }
 
-  const avatarColors = ['#F16611','#334756','#22C55E','#0A2B3B','#8B5CF6','#3B82F6'];
-
   if (!mounted) return null;
 
   const content = (
@@ -573,23 +571,6 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
               />
             </DrawerField>
 
-            {/* Avatar color (visual only) */}
-            {!editUser && (
-              <DrawerField label="Avatar Color">
-                <div className="flex gap-2">
-                  {avatarColors.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => {}}
-                      className="h-7 w-7 rounded-full ring-offset-2 transition-all"
-                      style={{ background: color }}
-                      aria-label={color}
-                    />
-                  ))}
-                </div>
-              </DrawerField>
-            )}
           </div>
         </div>
       </div>
@@ -1214,15 +1195,12 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 >
                   {/* User column */}
                   <TableCell className="pl-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar user={u} />
-                      <div className="min-w-0">
-                        <p className="text-[13.5px] font-semibold text-gray-900 truncate">
-                          {u.firstName} {u.lastName}
-                        </p>
-                        <p className="text-[12px] text-gray-400 truncate">{u.email}</p>
-                        {u.jobTitle && <p className="text-[11.5px] text-gray-400">{u.jobTitle}</p>}
-                      </div>
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-semibold text-gray-900 truncate">
+                        {u.firstName} {u.lastName}
+                      </p>
+                      <p className="text-[12px] text-gray-400 truncate">{u.email}</p>
+                      {u.jobTitle && <p className="text-[11.5px] text-gray-400">{u.jobTitle}</p>}
                     </div>
                   </TableCell>
 
