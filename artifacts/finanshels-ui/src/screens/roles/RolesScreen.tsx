@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
   ArrowLeft, ArrowRight, Lock, Shield, Check,
-  AlertTriangle, Info, Users, UserCheck,
+  AlertTriangle, Info, Users, UserCheck, SearchX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Empty } from '@/components/ui/empty';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -1059,8 +1060,15 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-[13px] text-gray-400">
-                  {search ? 'No roles match your search.' : 'No roles found.'}
+                <TableCell colSpan={6} className="py-0">
+                  <Empty
+                    icon={search ? SearchX : Shield}
+                    title={search ? 'No matching roles' : 'No roles yet'}
+                    description={search
+                      ? 'Try adjusting your search to find what you’re looking for.'
+                      : 'Create a role to define access across your organisation.'}
+                    className="py-16"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.map(role => (

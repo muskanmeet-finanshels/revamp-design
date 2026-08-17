@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Search, X, Plus, MoreHorizontal, Pencil, PowerOff, Power,
-  ArrowLeft, Building2, Layers, Users,
+  Plus, MoreHorizontal, Pencil, PowerOff, Power,
+  ArrowLeft, Building2, Layers, Users, SearchX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Empty } from '@/components/ui/empty';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -16,9 +17,12 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { SearchInput } from '@/components/ui/search-input';
 import { toast } from 'sonner';
 import {
-  MOCK_VERTICALS, MOCK_TEAMS,
   type Department, type Vertical, type Team, type OrgStatus,
 } from './mock-data';
 import { useOrgContext } from '@/contexts/OrgContext';
@@ -203,22 +207,22 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
   const isDeactivate = action === 'deactivate';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[420px] rounded-2xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-[16px]">
+      <DialogContent className="max-w-[400px] rounded-2xl p-6">
+        <DialogHeader className="gap-2">
+          <DialogTitle className="text-[20px] font-semibold leading-tight text-gray-900">
             {isDeactivate ? 'Deactivate' : 'Reactivate'} "{entityName}"?
           </DialogTitle>
-          <DialogDescription className="mt-1.5 text-[13.5px] leading-relaxed text-gray-600">
+          <DialogDescription className="text-[15px] leading-relaxed text-gray-500">
             {isDeactivate
               ? 'This will mark it as inactive. It will remain visible but cannot be assigned to new items.'
               : 'This will restore it to active status and make it available for assignments again.'}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-2 gap-2">
+        <DialogFooter className="mt-2 gap-2 sm:gap-2">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[14px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -226,7 +230,7 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
             type="button"
             onClick={() => { onConfirm(); onOpenChange(false); }}
             className={cn(
-              'rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-colors',
+              'flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold text-white transition-colors',
               isDeactivate ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600',
             )}
           >
@@ -238,7 +242,7 @@ function ToggleDialog({ open, onOpenChange, entityName, action, onConfirm }: Tog
   );
 }
 
-/* ─── Simple department select (for Vertical / Team drawer) ─────────────── */
+/* ─── Department select (for Vertical / Team drawer) ────────────────────── */
 
 function DeptSelect({
   departments,
@@ -249,24 +253,38 @@ function DeptSelect({
   value: string;
   onChange: (id: string) => void;
 }) {
+  const activeDepts = departments.filter(d => d.status === 'Active');
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className={cn(
-        'h-11 w-full appearance-none rounded-xl border bg-white px-4 text-[13px] transition-colors focus:outline-none focus:ring-0',
-        value ? 'border-brand text-gray-900' : 'border-gray-200 text-gray-400',
-      )}
-    >
-      <option value="" disabled>Select department…</option>
-      {departments.filter(d => d.status === 'Active').map(d => (
-        <option key={d.id} value={d.id}>{d.name}</option>
-      ))}
-    </select>
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger
+        aria-label="Select department"
+        className={cn(
+          'h-11 w-full rounded-xl border bg-white px-3.5 text-[13px] transition-colors',
+          'focus:outline-none focus:ring-1 focus:ring-brand/20 [&>svg]:text-gray-400',
+          value
+            ? 'border-brand focus:border-brand'
+            : 'border-gray-200 text-gray-400 focus:border-brand',
+          '[&>span]:truncate',
+        )}
+      >
+        <SelectValue placeholder="Select department…" />
+      </SelectTrigger>
+      <SelectContent className="z-[200] rounded-xl border border-gray-100 bg-white shadow-xl">
+        {activeDepts.map(d => (
+          <SelectItem
+            key={d.id}
+            value={d.id}
+            className="cursor-pointer rounded-lg py-2.5 pl-3 pr-8 text-[13px] text-gray-800 focus:bg-orange-50 focus:text-brand data-[state=checked]:font-medium"
+          >
+            {d.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
-/* ─── Search bar ─────────────────────────────────────────────────────── */
+/* ─── Shared Projects-style search bar ───────────────────────────────── */
 
 function OrgSearch({ value, onChange, placeholder }: {
   value: string;
@@ -274,25 +292,11 @@ function OrgSearch({ value, onChange, placeholder }: {
   placeholder?: string;
 }) {
   return (
-    <div className="relative flex h-9 w-full max-w-[280px] items-center">
-      <Search size={14} className="pointer-events-none absolute left-3 text-gray-400" />
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder ?? 'Search…'}
-        className="h-full w-full rounded-xl border border-gray-200 bg-white pl-9 pr-8 text-[13px] text-gray-800 placeholder:text-gray-400 focus:border-brand focus:outline-none transition-colors"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className="absolute right-2.5 flex h-4 w-4 items-center justify-center rounded bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
-        >
-          <X size={10} />
-        </button>
-      )}
-    </div>
+    <SearchInput
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder ?? 'Search…'}
+    />
   );
 }
 
@@ -371,7 +375,7 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
-        <OrgSearch value={search} onChange={setSearch} placeholder="Search departments…" />
+        <OrgSearch value={search} onChange={setSearch} placeholder="Search departments..." />
         <button
           type="button"
           onClick={openCreate}
@@ -408,8 +412,15 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-[13px] text-gray-400">
-                  {search ? 'No departments match your search.' : 'No departments yet. Create one to get started.'}
+                <TableCell colSpan={6} className="py-0">
+                  <Empty
+                    icon={search ? SearchX : Building2}
+                    title={search ? 'No matching departments' : 'No departments yet'}
+                    description={search
+                      ? 'Try adjusting your search to find what you’re looking for.'
+                      : 'Create a department to start organising your teams and verticals.'}
+                    className="py-16"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.map(dept => {
@@ -566,7 +577,7 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <OrgSearch value={search} onChange={setSearch} placeholder="Search verticals…" />
+        <OrgSearch value={search} onChange={setSearch} placeholder="Search verticals..." />
         <button
           type="button"
           onClick={openCreate}
@@ -591,8 +602,15 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-[13px] text-gray-400">
-                  {search ? 'No verticals match your search.' : 'No verticals yet. Create one to get started.'}
+                <TableCell colSpan={5} className="py-0">
+                  <Empty
+                    icon={search ? SearchX : Layers}
+                    title={search ? 'No matching verticals' : 'No verticals yet'}
+                    description={search
+                      ? 'Try adjusting your search to find what you’re looking for.'
+                      : 'Create a vertical to define a service area within a department.'}
+                    className="py-16"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.map(v => (
@@ -744,7 +762,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <OrgSearch value={search} onChange={setSearch} placeholder="Search teams…" />
+        <OrgSearch value={search} onChange={setSearch} placeholder="Search teams..." />
         <button
           type="button"
           onClick={openCreate}
@@ -769,8 +787,15 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-[13px] text-gray-400">
-                  {search ? 'No teams match your search.' : 'No teams yet. Create one to get started.'}
+                <TableCell colSpan={5} className="py-0">
+                  <Empty
+                    icon={search ? SearchX : Users}
+                    title={search ? 'No matching teams' : 'No teams yet'}
+                    description={search
+                      ? 'Try adjusting your search to find what you’re looking for.'
+                      : 'Create a team to start assigning work within a department.'}
+                    className="py-16"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.map(t => (
@@ -858,9 +883,11 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function OrgScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { departments, setDepartments } = useOrgContext();
-  const [verticals,   setVerticals]   = useState<Vertical[]>(MOCK_VERTICALS);
-  const [teams,       setTeams]       = useState<Team[]>(MOCK_TEAMS);
+  const {
+    departments, setDepartments,
+    verticals,   setVerticals,
+    teams,       setTeams,
+  } = useOrgContext();
 
   const activeDepts  = departments.filter(d => d.status === 'Active').length;
   const activeVerts  = verticals.filter(v => v.status === 'Active').length;

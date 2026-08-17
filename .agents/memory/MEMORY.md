@@ -8,3 +8,4 @@
 - [Timesheet delete dialog](timesheet-delete-dialog.md) — keep entry deletion confirmations compact and consistent with the app-wide delete modal.
 - [React 18 web build isolation](react18-web-build-isolation.md) — map web TypeScript resolution to local React 18 types in the mixed React 18/19 workspace.
 - [Table auto-width layout](table-auto-width.md) — use `w-full min-w-[Xpx] table-auto`, never `w-max`, or the table shrinks to content and leaves blank space in the container.
+- [Shared empty states](shared-empty-states.md) — use the shared Empty component for list/table empty and filtered-empty states across modules.

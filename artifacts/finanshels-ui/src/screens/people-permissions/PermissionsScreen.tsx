@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Lock, Save, ShieldCheck } from 'lucide-react';
+import { Check, Lock, Save, ShieldCheck, SearchX } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MODULES, MOCK_ROLES, type AppRole } from '@/screens/roles/mock-data';
 import { SearchInput } from '@/components/ui/search-input';
+import { Empty } from '@/components/ui/empty';
 
 type PermissionMap = Record<string, string[]>;
 
@@ -179,9 +180,12 @@ export function PermissionsScreen() {
 
           <div className="space-y-2 p-4">
           {filteredModules.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-[13px] text-gray-400">
-              No permissions match “{permissionSearch}”.
-            </div>
+            <Empty
+              icon={SearchX}
+              title="No matching permissions"
+              description="Try adjusting your search to find what you’re looking for."
+              className="py-16"
+            />
           ) : filteredModules.map(module => {
             const grantedActions = permissions[module.id] ?? [];
             const allGranted = module.actions.every(action => grantedActions.includes(action.id));

@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import {
   Search, X, Plus, MoreHorizontal, Pencil, Power, PowerOff,
   KeyRound, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
-  AlertTriangle, UserCheck, Users, Building2, Layers,
+  AlertTriangle, UserCheck, Users, Building2, Layers, SearchX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Empty } from '@/components/ui/empty';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -16,6 +17,10 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   MOCK_USERS, MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
@@ -85,7 +90,7 @@ function UserAvatar({ user, size = 32 }: { user: AppUser; size?: number }) {
   );
 }
 
-/* ─── Multi-checkbox list (roles & groups) ────────────────────────────── */
+/* ─── Multi-checkbox list (employee groups) ────────────────────────────── */
 
 function MultiCheckList({
   options,
@@ -125,7 +130,7 @@ function MultiCheckList({
   );
 }
 
-/* ─── Simple select for drawers ───────────────────────────────────────── */
+/* ─── App select for drawers ───────────────────────────────────────────── */
 
 function DrawerSelectField({
   value,
@@ -141,17 +146,34 @@ function DrawerSelectField({
   error?: boolean;
 }) {
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className={cn(
-        'h-11 w-full appearance-none rounded-xl border bg-white px-3.5 text-[13px] transition-colors focus:outline-none focus:ring-1 focus:ring-brand/20',
-        error ? 'border-red-400 focus:border-red-400' : value ? 'border-brand focus:border-brand' : 'border-gray-200 text-gray-400 focus:border-brand',
-      )}
-    >
-      <option value="" disabled>{placeholder}</option>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger
+        aria-label={placeholder}
+        className={cn(
+          'h-11 w-full rounded-xl border bg-white px-3.5 text-[13px] transition-colors',
+          'focus:outline-none focus:ring-1 focus:ring-brand/20 [&>svg]:text-gray-400',
+          error
+            ? 'border-red-400 focus:border-red-400'
+            : value
+              ? 'border-brand focus:border-brand'
+              : 'border-gray-200 text-gray-400 focus:border-brand',
+          '[&>span]:truncate [&>span[data-placeholder]]:text-gray-400',
+        )}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="z-[200] rounded-xl border border-gray-100 bg-white shadow-xl">
+        {options.map(o => (
+          <SelectItem
+            key={o.value}
+            value={o.value}
+            className="cursor-pointer rounded-lg py-2.5 pl-3 pr-8 text-[13px] text-gray-800 focus:bg-orange-50 focus:text-brand data-[state=checked]:font-medium"
+          >
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -431,7 +453,11 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
               <DrawerInput value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="e.g. Senior Accountant" />
             </DrawerField>
             <DrawerField label="Joining Date">
-              <DrawerInput type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} />
+              <DatePicker
+                value={joiningDate}
+                onChange={setJoiningDate}
+                placeholder="dd / mm / yyyy"
+              />
             </DrawerField>
 
             <div className="border-t border-gray-100" />
@@ -480,10 +506,12 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
             {/* Roles */}
             <DrawerField label="Roles" required>
               {rolesErr && <p className="mb-1 text-[11.5px] text-red-500">At least one role is required.</p>}
-              <MultiCheckList
-                options={ROLE_OPTIONS}
-                selected={roles}
-                onChange={v => setRoles(v as UserRole[])}
+              <DrawerSelectField
+                value={roles[0] ?? ''}
+                onChange={value => setRoles(value ? [value as UserRole] : [])}
+                placeholder="Select a role…"
+                options={ROLE_OPTIONS.map(role => ({ value: role, label: role }))}
+                error={rolesErr}
               />
             </DrawerField>
 
@@ -1108,10 +1136,17 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-14 text-center text-[13px] text-gray-400">
-                  {search || deptFilter || statusFilter !== 'All'
-                    ? 'No users match your filters.'
-                    : 'No users yet. Click "Add User" to get started.'}
+                <TableCell colSpan={6} className="py-0">
+                  <Empty
+                    icon={search || deptFilter || statusFilter !== 'All' ? SearchX : Users}
+                    title={search || deptFilter || statusFilter !== 'All'
+                      ? 'No matching users'
+                      : 'No users yet'}
+                    description={search || deptFilter || statusFilter !== 'All'
+                      ? 'Try adjusting your search or filters to find what you’re looking for.'
+                      : 'Add a user to start managing access and assignments.'}
+                    className="py-16"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.map(u => {
