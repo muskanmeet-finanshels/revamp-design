@@ -21,6 +21,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import {
   MOCK_USERS, MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
@@ -90,43 +91,90 @@ function UserAvatar({ user, size = 32 }: { user: AppUser; size?: number }) {
   );
 }
 
-/* ─── Multi-checkbox list (employee groups) ────────────────────────────── */
+/* ─── Multi-select dropdown (roles) ────────────────────────────────────── */
 
-function MultiCheckList({
+function MultiSelectField({
   options,
   selected,
   onChange,
+  placeholder,
+  error,
 }: {
-  options: string[];
+  options: Array<{ value: string; label: string }>;
   selected: string[];
   onChange: (v: string[]) => void;
+  placeholder: string;
+  error?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const selectedLabels = options
+    .filter(option => selected.includes(option.value))
+    .map(option => option.label);
+
   function toggle(opt: string) {
     onChange(selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]);
   }
+
   return (
-    <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-gray-200 bg-white p-3">
-      {options.map(opt => {
-        const checked = selected.includes(opt);
-        return (
-          <label key={opt} className={cn(
-            'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors',
-            checked ? 'bg-orange-50 font-medium text-brand' : 'text-gray-700 hover:bg-gray-50',
-          )}>
-            <span
-              onClick={e => { e.preventDefault(); toggle(opt); }}
-              className={cn(
-                'flex h-[16px] w-[16px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] cursor-pointer transition-colors',
-                checked ? 'bg-brand border-brand' : 'border-gray-300 bg-white',
-              )}
-            >
-              {checked && <Check size={10} className="text-white" strokeWidth={3} />}
-            </span>
-            {opt}
-          </label>
-        );
-      })}
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={placeholder}
+          aria-expanded={open}
+          className={cn(
+            'flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white px-3.5 text-left text-[13px] transition-colors',
+            'focus:outline-none focus:ring-1 focus:ring-brand/20',
+            error
+              ? 'border-red-400 focus:border-red-400'
+              : selected.length
+                ? 'border-brand focus:border-brand'
+                : 'border-gray-200 text-gray-400 focus:border-brand',
+          )}
+        >
+          <span className="min-w-0 truncate">
+            {selectedLabels.length === 0
+              ? placeholder
+              : selectedLabels.length === 1
+                ? selectedLabels[0]
+                : `${selectedLabels.length} roles selected`}
+          </span>
+          <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5"
+      >
+        <div className="max-h-60 overflow-y-auto">
+          {options.map(option => {
+            const checked = selected.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggle(option.value)}
+                aria-pressed={checked}
+                className={cn(
+                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
+                  checked
+                    ? 'bg-orange-50 font-medium text-brand'
+                    : 'text-gray-700 hover:bg-gray-50',
+                )}
+              >
+                <span className={cn(
+                  'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
+                  checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
+                )}>
+                  {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+                </span>
+                <span className="truncate">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -292,7 +340,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
   const [verticalId,        setVerticalId]        = useState('');
   const [reportingManagerId, setReportingManagerId] = useState('');
   const [roles,             setRoles]             = useState<UserRole[]>([]);
-  const [employeeGroups,    setEmployeeGroups]    = useState<string[]>([]);
+  const [employeeGroup,     setEmployeeGroup]     = useState('');
   const [joiningDate,       setJoiningDate]       = useState('');
   const [showErrors,        setShowErrors]        = useState(false);
 
@@ -312,13 +360,13 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
         setVerticalId(editUser.verticalId ?? '');
         setReportingManagerId(editUser.reportingManagerId ?? '');
         setRoles([...editUser.roles]);
-        setEmployeeGroups([...editUser.employeeGroups]);
+        setEmployeeGroup(editUser.employeeGroups[0] ?? '');
         setJoiningDate(editUser.joiningDate ?? '');
       } else {
         setFirstName(''); setLastName(''); setEmail(''); setPhone('');
         setJobTitle(''); setEmployeeId(''); setDepartmentId('');
         setTeamId(''); setVerticalId(''); setReportingManagerId('');
-        setRoles([]); setEmployeeGroups([]); setJoiningDate('');
+        setRoles([]); setEmployeeGroup(''); setJoiningDate('');
       }
     }
   }, [open, editUser]);
@@ -357,7 +405,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
       verticalId: verticalId || undefined,
       reportingManagerId: reportingManagerId || undefined,
       roles,
-      employeeGroups,
+      employeeGroups: employeeGroup ? [employeeGroup] : [],
       joiningDate: joiningDate || undefined,
     });
   }
@@ -504,23 +552,24 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
             <div className="border-t border-gray-100" />
 
             {/* Roles */}
-            <DrawerField label="Roles" required>
+            <DrawerField label="Assign Multiple Roles" required>
               {rolesErr && <p className="mb-1 text-[11.5px] text-red-500">At least one role is required.</p>}
-              <DrawerSelectField
-                value={roles[0] ?? ''}
-                onChange={value => setRoles(value ? [value as UserRole] : [])}
-                placeholder="Select a role…"
+              <MultiSelectField
+                selected={roles}
+                onChange={values => setRoles(values as UserRole[])}
+                placeholder="Select roles…"
                 options={ROLE_OPTIONS.map(role => ({ value: role, label: role }))}
                 error={rolesErr}
               />
             </DrawerField>
 
             {/* Employee Groups */}
-            <DrawerField label="Employee Groups">
-              <MultiCheckList
-                options={EMPLOYEE_GROUP_OPTIONS}
-                selected={employeeGroups}
-                onChange={setEmployeeGroups}
+            <DrawerField label="Assign Employee Groups">
+              <DrawerSelectField
+                value={employeeGroup}
+                onChange={setEmployeeGroup}
+                placeholder="Select employee group…"
+                options={EMPLOYEE_GROUP_OPTIONS.map(group => ({ value: group, label: group }))}
               />
             </DrawerField>
 
