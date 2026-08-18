@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDown, ArrowUp, ArrowUpDown, Check, GripVertical,
@@ -63,7 +63,8 @@ export type ProjectColumnKey =
   | 'dueDate'
   | 'status'
   | 'tags'
-  | 'resume';
+  | 'resume'
+  | 'reassignNote';
 
 export const PROJECT_COLUMN_OPTIONS: Array<{ key: ProjectColumnKey; label: string }> = [
   { key: 'client',         label: 'Client' },
@@ -78,6 +79,7 @@ export const PROJECT_COLUMN_OPTIONS: Array<{ key: ProjectColumnKey; label: strin
   { key: 'status',         label: 'Status' },
   { key: 'tags',           label: 'Tags' },
   { key: 'resume',         label: 'Actions' },
+  { key: 'reassignNote',   label: 'Reassignment Note' },
 ];
 
 const COLUMN_LABEL: Record<ProjectColumnKey, string> = Object.fromEntries(
@@ -98,6 +100,7 @@ const PROJECT_COLUMN_WEIGHTS: Record<ProjectColumnKey, number> = {
   accountManager: 12, teamLead: 9, assignees: 10,
   progress: 14, tasks: 13, dueDate: 18,
   status: 11, tags: 13, resume: 11,
+  reassignNote: 12,
 };
 
 interface Props {
@@ -158,6 +161,18 @@ export function ProjectsTable({
   const router = useRouter();
   const [tags, setTags]   = useState<Record<string, TagEntry>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+  const [reassignNotes, setReassignNotes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    projects.forEach(p => {
+      map[p.id] =
+        localStorage.getItem(`fh_reassign_reason_${p.id}`) ||
+        p.reassignReason ||
+        '';
+    });
+    setReassignNotes(map);
+  }, [projects]);
 
   /* ── Drag-and-drop state ── */
   const dragKey  = useRef<ProjectColumnKey | null>(null);
@@ -409,6 +424,32 @@ export function ProjectsTable({
             )}
           </TableCell>
         );
+      case 'reassignNote': {
+        const note = reassignNotes[p.id] || '';
+        return (
+          <TableCell key={key} className="py-3">
+            {note ? (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block max-w-[160px] cursor-default truncate whitespace-nowrap text-[12px] text-gray-600">
+                      {note}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    className="max-w-[320px] whitespace-normal break-words rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                  >
+                    {note}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <span className="text-[12px] text-gray-300">—</span>
+            )}
+          </TableCell>
+        );
+      }
       default:
         return null;
     }

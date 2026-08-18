@@ -241,7 +241,7 @@ const STATUSES: Array<{ value: StatusOption; label: string }> = [
 
 function matchesStatusTab(project: Project, status: StatusOption): boolean {
   return (
-    status === 'All' ||
+    (status === 'All' && project.status !== 'Archived') ||
     status === 'Next Month' ||
     status === 'Upcoming' ||
     status === 'Archived' ||
@@ -1110,7 +1110,11 @@ export function ProjectsScreen() {
         <ProjectsTable
           projects={pageProjects}
           selectedIds={selectedIds}
-          visibleColumns={visibleColumns}
+          visibleColumns={
+            status === 'Completed'
+              ? new Set([...visibleColumns].filter(c => c !== 'reassignNote'))
+              : visibleColumns
+          }
           columnOrder={columnOrder}
           onColumnReorder={setColumnOrder}
           onToggle={toggleSelect}
