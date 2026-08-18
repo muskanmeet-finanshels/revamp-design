@@ -19,6 +19,7 @@ import {
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
 import { SearchInput } from '@/components/ui/search-input';
 import { DescriptionTooltip } from '@/components/ui/description-tooltip';
+import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -36,6 +37,8 @@ import { MOCK_USERS, type AppUser } from '@/screens/users/mock-data';
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 
 function makeId() { return `role-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+
+type RoleSortKey = 'name' | 'description' | 'type' | 'permissions' | 'users' | 'status';
 
 function countGranted(perms: Record<string, string[]>): number {
   return Object.values(perms).reduce((sum, arr) => sum + arr.length, 0);
@@ -386,8 +389,12 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
               )}
             </div>
           </div>
-          <button type="button" onClick={handleSave}
-            className="rounded-lg bg-brand px-4 py-[7px] text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!name.trim()}
+            className="rounded-lg bg-brand px-4 py-[7px] text-[13px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand"
+          >
             {editRole ? 'Save Changes' : isClone ? 'Create Clone' : 'Create Role'}
           </button>
         </div>
@@ -908,6 +915,8 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortKey, setSortKey] = useState<RoleSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   /* Drawer */
   const [drawerOpen,   setDrawerOpen]   = useState(false);
@@ -930,13 +939,49 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     return matchSearch && matchTab;
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    const values: Record<RoleSortKey, string | number> = {
+      name: a.name,
+      description: a.description,
+      type: a.isProtected ? 'Super Admin' : a.type,
+      permissions: countGranted(a.permissions),
+      users: a.userCount,
+      status: a.status,
+    };
+    const otherValues: Record<RoleSortKey, string | number> = {
+      name: b.name,
+      description: b.description,
+      type: b.isProtected ? 'Super Admin' : b.type,
+      permissions: countGranted(b.permissions),
+      users: b.userCount,
+      status: b.status,
+    };
+    const first = values[sortKey];
+    const second = otherValues[sortKey];
+    const result = typeof first === 'number' && typeof second === 'number'
+      ? first - second
+      : String(first).localeCompare(String(second), undefined, { numeric: true, sensitivity: 'base' });
+    return result * (sortDirection === 'asc' ? 1 : -1);
+  });
+
   useEffect(() => {
     setPage(1);
   }, [search, tab]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  function handleSort(key: string) {
+    const nextKey = key as RoleSortKey;
+    if (sortKey === nextKey) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(nextKey);
+      setSortDirection('asc');
+    }
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paginatedRoles = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const paginatedRoles = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function openCreate() { setEditRole(null); setCloneSource(null); setDrawerOpen(true); }
   function openEdit(r: AppRole) { setCloneSource(null); setEditRole(r); setDrawerOpen(true); }
@@ -1038,12 +1083,24 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Role</TableHead>
-              <TableHead className="min-w-[260px] text-[10px] font-semibold uppercase tracking-widest text-gray-500">Description</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[110px]">Type</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[130px]">Permissions</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[80px] text-center">Users</TableHead>
-              <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[100px]">Status</TableHead>
+              <TableHead className="pl-5">
+                <SortableTableHead label="Role" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="min-w-[260px]">
+                <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[110px]">
+                <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[130px]">
+                <SortableTableHead label="Permissions" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[80px] text-center">
+                <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
           </TableHeader>
@@ -1080,10 +1137,35 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                         : <Shield size={14} className={role.type === 'system' ? 'text-blue-500' : 'text-brand'} />}
                     </span>
                     <div>
-                      <button type="button" onClick={() => setViewRole(role)}
-                        className="text-[13.5px] font-semibold text-gray-900 hover:text-brand transition-colors text-left">
-                        {role.name}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => setViewRole(role)}
+                          className="text-[13.5px] font-semibold text-gray-900 transition-colors text-left">
+                          {role.name}
+                        </button>
+                        {role.isProtected && (
+                          <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-label="Super Admin role information"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-violet-400 transition-colors hover:bg-violet-50 hover:text-violet-600"
+                                >
+                                  <Info size={12} strokeWidth={2.25} aria-hidden />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="right"
+                                align="center"
+                                sideOffset={8}
+                                className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                              >
+                                Super Admin cannot be modified or deleted.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                       {role.clonedFromId && (
                         <p className="text-[11px] text-gray-400">
                           Cloned from {MOCK_ROLES.find(r => r.id === role.clonedFromId)?.name ?? role.clonedFromId}
@@ -1114,7 +1196,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     <button
                       type="button"
                       onClick={() => { setViewInitialTab('users'); setViewRole(role); }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-1 text-[12.5px] font-semibold text-gray-700 hover:bg-brand/10 hover:text-brand transition-colors"
+                      className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-gray-700 transition-colors hover:text-brand"
                     >
                       <Users size={11} />
                       {role.userCount}
@@ -1154,32 +1236,6 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           onPageSizeChange={setPageSize}
         />
       )}
-
-      <p className="mt-3 text-[12px] text-gray-400">
-        {filtered.length} of {total} role{total !== 1 ? 's' : ''} shown
-        {' · '}
-        <TooltipProvider delayDuration={150}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Super Admin role information"
-                className="inline-flex items-center gap-1 text-violet-600 transition-colors hover:text-violet-700"
-              >
-                <span>Super Admin</span>
-                <Info size={12} strokeWidth={2} aria-hidden />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              sideOffset={6}
-              className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
-            >
-              Super Admin cannot be modified or deleted.
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </p>
 
       {/* Create / Edit drawer */}
       <RoleDrawer
