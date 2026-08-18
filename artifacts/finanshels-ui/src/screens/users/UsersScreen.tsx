@@ -679,8 +679,8 @@ function ActivateDialog({ open, onOpenChange, user, onConfirm }: {
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px] rounded-2xl bg-white p-6 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           {/* Icon */}
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
-            <UserCheck size={20} className="text-emerald-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50">
+            <UserCheck size={20} className="text-brand" />
           </div>
           {/* Title */}
           <DialogPrimitive.Title className="mt-4 text-[16px] font-semibold text-gray-900">
@@ -704,7 +704,7 @@ function ActivateDialog({ open, onOpenChange, user, onConfirm }: {
             <button
               type="button"
               onClick={() => { onConfirm(); onOpenChange(false); }}
-              className="flex-1 rounded-lg bg-emerald-500 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-emerald-600"
+              className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-brand-hover"
             >
               {label}
             </button>

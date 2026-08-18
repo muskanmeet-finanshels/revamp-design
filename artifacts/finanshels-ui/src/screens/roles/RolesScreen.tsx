@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
-  ArrowLeft, ArrowRight, Lock, Shield, Check,
+  ArrowLeft, Lock, Shield, Check,
   AlertTriangle, Info, Users, UserCheck, SearchX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,20 +50,20 @@ function totalActions(): number {
 
 /* ─── Type badge ──────────────────────────────────────────────────────── */
 
-function TypeBadge({ type, isProtected }: { type: RoleType; isProtected?: boolean }) {
+function TypeLabel({ type, isProtected }: { type: RoleType; isProtected?: boolean }) {
   if (isProtected) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-[2px] text-[11px] font-semibold text-violet-700">
-        <Lock size={9} strokeWidth={3} /> Super Admin
+      <span className="text-[12px] font-semibold leading-4 text-violet-700">
+        Super Admin
       </span>
     );
   }
   return type === 'system' ? (
-    <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-[2px] text-[11px] font-medium text-blue-700">
-      <Shield size={10} /> System
+    <span className="text-[12px] font-medium text-blue-700">
+      System
     </span>
   ) : (
-    <span className="inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-2 py-[2px] text-[11px] font-medium text-brand">
+    <span className="text-[12px] font-medium text-brand">
       Custom
     </span>
   );
@@ -591,18 +591,18 @@ function ActivateRoleDialog({ role, onClose, onConfirm }: {
     <Dialog open={Boolean(role)} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-[420px] rounded-2xl p-6">
         <DialogHeader>
-          <DialogTitle className="text-[15px]">Activate "{role.name}"?</DialogTitle>
-          <DialogDescription className="mt-1.5 text-[13px] leading-relaxed text-gray-600">
+          <DialogTitle className="text-[16px] font-semibold text-gray-900">Activate "{role.name}"?</DialogTitle>
+          <DialogDescription className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
             This role will be restored to active status and can be assigned to users again.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-4 gap-2">
+        <DialogFooter className="mt-6 gap-2">
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
             Cancel
           </button>
           <button type="button" onClick={() => { onConfirm(); onClose(); }}
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-emerald-600 transition-colors">
+            className="rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white hover:bg-brand-hover transition-colors">
             Activate Role
           </button>
         </DialogFooter>
@@ -612,7 +612,7 @@ function ActivateRoleDialog({ role, onClose, onConfirm }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   DEACTIVATE ROLE DRAWER — 2-step: transfer users → confirm
+   DEACTIVATE ROLE DRAWER
    ═══════════════════════════════════════════════════════════════════════ */
 
 function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
@@ -622,12 +622,11 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
   onConfirm: (transferToRoleId: string) => void;
 }) {
   const [mounted,        setMounted]        = useState(false);
-  const [step,           setStep]           = useState(0); // 0=transfer 1=confirm
   const [transferRoleId, setTransferRoleId] = useState('');
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
-    if (role) { setStep(0); setTransferRoleId(''); }
+    if (role) setTransferRoleId('');
   }, [role]);
   useEffect(() => {
     document.body.style.overflow = role ? 'hidden' : '';
@@ -649,11 +648,9 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
   );
 
   const transferRole = transferOptions.find(r => r.id === transferRoleId);
-  const canProceed   = !hasUsers || Boolean(transferRoleId);
+  const canConfirm   = !hasUsers || Boolean(transferRoleId);
   const granted      = countGranted(role.permissions);
   const coverage     = Math.round((granted / totalActions()) * 100);
-
-  const STEP_LABELS = ['Transfer Users', 'Confirm Deactivation'];
 
   function handleConfirm() {
     onConfirm(transferRoleId);
@@ -669,35 +666,36 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
       {/* Panel */}
       <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[480px]">
 
-        {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-amber-100 bg-amber-50 px-5 py-[14px]">
+        {/* Header — matches the User deactivation drawer */}
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-5 py-[14px]">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={step === 0 ? onClose : () => setStep(0)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100 transition-colors">
+            <button type="button" onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
               <ArrowLeft size={17} />
             </button>
             <div>
-              <p className="text-[14px] font-bold text-amber-900">Deactivate Role</p>
-              <p className="text-[12px] text-amber-600">"{role.name}" · {STEP_LABELS[step]}</p>
+              <p className="text-[15px] font-semibold text-gray-900">Deactivate Role</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {[0, 1].map(s => (
-              <div key={s} className={cn(
-                'h-2 w-2 rounded-full transition-colors',
-                step === s ? 'bg-amber-500' : step > s ? 'bg-amber-300' : 'bg-amber-200',
-              )} />
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className={cn(
+              'rounded-lg px-4 py-[7px] text-[13px] font-semibold text-white transition-colors',
+              canConfirm ? 'bg-red-500 hover:bg-red-600' : 'cursor-not-allowed bg-red-200',
+            )}
+          >
+            Deactivate Role
+          </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-5 px-5 py-5">
 
-            {/* ── Step 0: Transfer Users ── */}
-            {step === 0 && (
-              <>
+            {/* ── Role and transfer details ── */}
+            <>
                 {/* Warning banner */}
                 <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
                   <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-amber-500" strokeWidth={2} />
@@ -814,87 +812,17 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                     </p>
                   </div>
                 )}
-              </>
-            )}
-
-            {/* ── Step 1: Confirm ── */}
-            {step === 1 && (
-              <>
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4">
-                  <p className="text-[14px] font-bold text-red-800">Confirm Deactivation</p>
-                  <p className="mt-1 text-[13px] text-red-700 leading-relaxed">
-                    <strong>"{role.name}"</strong> will be marked inactive and cannot be assigned to new users.
-                  </p>
-                </div>
-
-                {hasUsers && transferRole && (
-                  <div>
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                      Transfer Summary
-                    </p>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[13px] font-medium text-gray-800">
-                            {role.userCount} user{role.userCount !== 1 ? 's' : ''}
-                          </p>
-                          <p className="text-[11.5px] text-gray-500">previously on "{role.name}"</p>
-                        </div>
-                        <ArrowRight size={16} className="text-gray-400 mx-3 flex-shrink-0" />
-                        <div className="text-right">
-                          <p className="text-[13px] font-semibold text-emerald-700">{transferRole.name}</p>
-                          <p className="text-[11.5px] text-gray-500">replacement role</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
-                  <Info size={14} className="mt-0.5 flex-shrink-0 text-gray-400" />
-                  <p className="text-[12.5px] text-gray-600 leading-relaxed">
-                    This role can be <span className="font-medium text-emerald-600">reactivated</span> at any time from the Roles list.
-                    Existing user permission histories are preserved.
-                  </p>
-                </div>
-              </>
-            )}
+              <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+                <Info size={14} className="mt-0.5 flex-shrink-0 text-gray-400" />
+                <p className="text-[12.5px] text-gray-600 leading-relaxed">
+                  This role can be <span className="font-medium text-emerald-600">reactivated</span> at any time from the Roles list.
+                  Existing user permission histories are preserved.
+                </p>
+              </div>
+            </>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-100 px-5 py-3.5">
-          <button
-            type="button"
-            onClick={step === 0 ? onClose : () => setStep(0)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <ArrowLeft size={14} />
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-
-          {step === 0 ? (
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              disabled={!canProceed}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-colors',
-                canProceed ? 'bg-amber-500 hover:bg-amber-600' : 'cursor-not-allowed bg-amber-200',
-              )}
-            >
-              Review <ArrowRight size={14} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-lg bg-red-500 px-5 py-2 text-[13px] font-semibold text-white hover:bg-red-600 transition-colors"
-            >
-              Confirm Deactivation
-            </button>
-          )}
-        </div>
       </div>
     </>
   );
@@ -1040,7 +968,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       {/* Header */}
       {!hideHeader && (
         <div className="mb-6">
-          <h1 className="text-[20px] font-bold text-gray-900">Role Management</h1>
+          <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Role Management</h1>
           <p className="mt-0.5 text-[13.5px] text-gray-500">
             Define system and custom roles with module-level permission control.
           </p>
@@ -1139,7 +1067,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     <div>
                       <div className="flex items-center gap-1.5">
                         <button type="button" onClick={() => setViewRole(role)}
-                          className="text-[13.5px] font-semibold text-gray-900 transition-colors text-left">
+                          className="text-[13.5px] font-medium text-gray-900 transition-colors text-left">
                           {role.name}
                         </button>
                         {role.isProtected && (
@@ -1182,7 +1110,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                 {/* Type */}
                 <TableCell className="py-3.5">
-                  <TypeBadge type={role.type} isProtected={role.isProtected} />
+                  <TypeLabel type={role.type} isProtected={role.isProtected} />
                 </TableCell>
 
                 {/* Permissions coverage */}
@@ -1260,7 +1188,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onConfirm={() => activateRole && handleActivate(activateRole)}
       />
 
-      {/* Deactivate role — 2-step: transfer users → confirm */}
+      {/* Deactivate role drawer */}
       <DeactivateRoleDrawer
         role={deactivateRole}
         allRoles={roles}

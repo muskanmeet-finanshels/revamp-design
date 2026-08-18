@@ -490,7 +490,7 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
                       <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10">
                         <Building2 size={13} className="text-brand" />
                       </span>
-                      <span className="text-[13.5px] font-semibold text-gray-900">{dept.name}</span>
+                      <span className="text-[13.5px] font-medium text-gray-900">{dept.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="py-3.5 pr-4">
