@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
-  ArrowLeft, Lock, Shield, Check,
+  ArrowLeft, Lock, Shield, Check, X,
   AlertTriangle, Info, Users, UserCheck, SearchX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -589,26 +590,48 @@ function ActivateRoleDialog({ role, onClose, onConfirm }: {
 }) {
   if (!role) return null;
   return (
-    <Dialog open={Boolean(role)} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-[420px] rounded-2xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-[16px] font-semibold text-gray-900">Activate "{role.name}"?</DialogTitle>
-          <DialogDescription className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
+    <DialogPrimitive.Root open={Boolean(role)} onOpenChange={open => { if (!open) onClose(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px] rounded-2xl bg-white p-6 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          {/* Icon — matches the User reactivation modal */}
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50">
+            <UserCheck size={20} className="text-brand" />
+          </div>
+
+          <DialogPrimitive.Title className="mt-4 text-[16px] font-semibold text-gray-900">
+            Activate "{role.name}"?
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
             This role will be restored to active status and can be assigned to users again.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mt-6 gap-2">
-          <button type="button" onClick={onClose}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button type="button" onClick={() => { onConfirm(); onClose(); }}
-            className="rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white hover:bg-brand-hover transition-colors">
-            Activate Role
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogPrimitive.Description>
+
+          <div className="mt-6 flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => { onConfirm(); onClose(); }}
+              className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-brand-hover"
+            >
+              Activate Role
+            </button>
+          </div>
+
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={16} strokeWidth={2} />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
