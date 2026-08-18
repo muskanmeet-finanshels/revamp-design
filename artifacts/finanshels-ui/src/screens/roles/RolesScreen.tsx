@@ -20,6 +20,7 @@ import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer
 import { SearchInput } from '@/components/ui/search-input';
 import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -904,6 +905,8 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   const [tab,    setTab]    = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   /* Drawer */
   const [drawerOpen,   setDrawerOpen]   = useState(false);
@@ -925,6 +928,14 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     const matchTab = tab === 'all' || r.type === tab;
     return matchSearch && matchTab;
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, tab]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedRoles = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function openCreate() { setEditRole(null); setCloneSource(null); setDrawerOpen(true); }
   function openEdit(r: AppRole) { setCloneSource(null); setEditRole(r); setDrawerOpen(true); }
@@ -956,13 +967,13 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   }
 
   function handleActivate(r: AppRole) {
-    setRoles(rs => rs.map(x => x.id === r.id ? { ...x, status: 'Active' } : x));
+    setRoles(rs => rs.map(x => x.id === r.id ? { ...x, status: 'Active' as const } : x));
     toast.success(`"${r.name}" activated`);
   }
 
   function handleDeactivate(r: AppRole, transferToRoleId: string) {
     setRoles(rs => rs.map(x => {
-      if (x.id === r.id) return { ...x, status: 'Inactive' };
+      if (x.id === r.id) return { ...x, status: 'Inactive' as const };
       if (transferToRoleId && x.id === transferToRoleId) {
         return { ...x, userCount: x.userCount + r.userCount };
       }
@@ -1049,11 +1060,11 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   />
                 </TableCell>
               </TableRow>
-            ) : filtered.map(role => (
+            ) : paginatedRoles.map(role => (
               <TableRow key={role.id}
                 className={cn(
                   'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
-                  role.status === 'Inactive' && 'opacity-55',
+                  role.status === 'Inactive' && 'bg-gray-50',
                 )}>
 
                 {/* Role name */}
@@ -1132,6 +1143,16 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           </TableBody>
         </Table>
       </div>
+
+      {filtered.length > 0 && (
+        <ProjectsPagination
+          page={safePage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
       <p className="mt-3 text-[12px] text-gray-400">
         {filtered.length} of {total} role{total !== 1 ? 's' : ''} shown
