@@ -5,7 +5,7 @@ export default function UsersPage() {
   return (
     <AppShell
       breadcrumbs={[
-        { label: 'Settings' },
+        { label: 'Admin' },
         { label: 'User Management' },
       ]}
     >

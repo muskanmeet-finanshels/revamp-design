@@ -5,7 +5,7 @@ export default function OrganisationPage() {
   return (
     <AppShell
       breadcrumbs={[
-        { label: 'Settings' },
+        { label: 'Admin' },
         { label: 'Organisation' },
       ]}
     >

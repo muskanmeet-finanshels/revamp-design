@@ -5,7 +5,7 @@ export default function PermissionsPage() {
   return (
     <AppShell
       breadcrumbs={[
-        { label: 'Settings' },
+        { label: 'Admin' },
         { label: 'Permissions' },
       ]}
     >

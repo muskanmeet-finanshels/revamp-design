@@ -66,10 +66,23 @@ const STATUS_STYLE: Record<UserStatus, string> = {
 };
 
 function StatusBadge({ status }: { status: UserStatus }) {
-  return (
+  const badge = (
     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-[3px] text-[11.5px] font-medium', STATUS_STYLE[status])}>
       {status}
     </span>
+  );
+
+  if (status !== 'Inactive') return badge;
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent side="top" sideOffset={6} className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+          Cannot log in
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -92,24 +105,16 @@ function UnassignedManager() {
   );
 }
 
-/* ─── Role badge ──────────────────────────────────────────────────────── */
+/* ─── Role text ───────────────────────────────────────────────────────── */
 
-const ROLE_ADMIN_STYLE   = 'border-violet-200 bg-violet-50 text-violet-700';
-const ROLE_LEAD_STYLE    = 'border-blue-200 bg-blue-50 text-blue-700';
-const ROLE_DEFAULT_STYLE = 'border-gray-200 bg-gray-50 text-gray-600';
+const ROLE_ADMIN_STYLE   = 'text-violet-700';
+const ROLE_LEAD_STYLE    = 'text-blue-700';
+const ROLE_DEFAULT_STYLE = 'text-gray-700';
 
-function roleBadgeStyle(role: UserRole) {
+function roleTextStyle(role: UserRole) {
   if (role === 'Admin') return ROLE_ADMIN_STYLE;
   if (role === 'Team Lead' || role === 'Finance Manager') return ROLE_LEAD_STYLE;
   return ROLE_DEFAULT_STYLE;
-}
-
-function RoleBadge({ role }: { role: UserRole }) {
-  return (
-    <span className={cn('inline-flex items-center rounded-md border px-2 py-[2px] text-[11px] font-medium', roleBadgeStyle(role))}>
-      {role}
-    </span>
-  );
 }
 
 /* ─── Avatar ──────────────────────────────────────────────────────────── */
@@ -730,7 +735,7 @@ function ActivateDialog({ open, onOpenChange, user, onConfirm }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   EMPLOYEE EXIT & DEPENDENCY TRANSFER DRAWER (multi-step)
+   EMPLOYEE EXIT & DEPENDENCY TRANSFER DRAWER (single view)
    ═══════════════════════════════════════════════════════════════════════ */
 
 interface ExitDrawerProps {
@@ -743,7 +748,6 @@ interface ExitDrawerProps {
 
 function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProps) {
   const [mounted,    setMounted]    = useState(false);
-  const [step,       setStep]       = useState(0); // 0=review 1=transfer 2=confirm
   const [exitDate,   setExitDate]   = useState('');
   const [exitNotes,  setExitNotes]  = useState('');
   /* project transfers: { [projectId]: userId } */
@@ -756,7 +760,6 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
   /* Reset on open */
   useEffect(() => {
     if (open) {
-      setStep(0);
       setExitDate('');
       setExitNotes('');
       setProjTransfers({});
@@ -776,13 +779,10 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
 
   const activeUsersExcluding = allUsers.filter(u => u.status === 'Active' && u.id !== user.id);
 
-  /* Step 1 can advance when exit date is set */
-  const step0CanProceed = Boolean(exitDate);
-
-  /* Step 2 — all projects must have a transfer + tasks must have a transfer (if any) */
+  /* All required information must be complete before deactivation. */
   const projComplete = deps.projects.every(p => Boolean(projTransfers[p.id]));
   const taskComplete = deps.tasks.length === 0 || Boolean(taskTransferTo);
-  const step1CanProceed = !hasDeps || (projComplete && taskComplete);
+  const canConfirm = Boolean(exitDate) && projComplete && taskComplete;
 
   function handleConfirm() {
     onConfirm();
@@ -790,68 +790,57 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
     toast.success(`${user?.firstName ?? ''} ${user?.lastName ?? ''} has been deactivated. Dependencies transferred.`.trim());
   }
 
-  /* Total steps: if no deps, skip step 1 (transfer) */
-  const totalSteps = hasDeps ? 3 : 2; // we show step 0 and 1 (or 0 → 2 when no deps)
-
-  function nextStep() {
-    if (step === 0) {
-      setStep(hasDeps ? 1 : 2);
-    } else {
-      setStep(s => s + 1);
-    }
-  }
-
-  const STEP_LABELS = ['Review & Exit Date', 'Transfer Dependencies', 'Confirm Deactivation'];
-
   const content = (
     <>
       {/* Backdrop */}
       <div
         onClick={onClose}
         className={cn(
-          'fixed inset-0 z-40 bg-black/30 transition-opacity duration-300',
+          'fixed inset-0 z-40 bg-black/20 transition-opacity duration-300',
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         )}
       />
 
       {/* Panel */}
       <div className={cn(
-        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[42rem]',
+        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[36rem]',
         open ? 'translate-x-0' : 'translate-x-full',
       )}>
-        {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-red-100 bg-red-50 px-5 py-[14px]">
+        {/* Header — matches DeleteProjectDrawer exactly */}
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-5 py-[14px]">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-400 hover:bg-red-100 transition-colors">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
               <ArrowLeft size={17} />
             </button>
             <div>
-              <p className="text-[14px] font-bold text-red-800">Employee Exit Process</p>
-              <p className="text-[12px] text-red-500">{user.firstName} {user.lastName} · {STEP_LABELS[step]}</p>
+              <span className="text-[15px] font-semibold text-gray-900">Deactivate User</span>
+              <p className="mt-0.5 text-[12px] text-gray-400">{user.firstName} {user.lastName}</p>
             </div>
           </div>
-          {/* Step indicator */}
-          <div className="flex items-center gap-1.5">
-            {[0, ...(hasDeps ? [1] : []), 2].map((s, idx) => (
-              <div
-                key={s}
-                className={cn(
-                  'h-2 w-2 rounded-full transition-colors',
-                  step === s ? 'bg-red-500' : step > s ? 'bg-red-300' : 'bg-red-200',
-                )}
-              />
-            ))}
-          </div>
+          {/* Action button in header — same pattern as DeleteProjectDrawer */}
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className={cn(
+              'rounded-lg px-4 py-[7px] text-[13px] font-semibold text-white transition-colors',
+              canConfirm ? 'bg-red-500 hover:bg-red-600' : 'bg-red-200 cursor-not-allowed',
+            )}
+          >
+            Deactivate User
+          </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-5 px-5 py-5">
 
-            {/* ── STEP 0: Review & Exit Date ── */}
-            {step === 0 && (
-              <>
+            {/* ── SINGLE VIEW: User and exit details ── */}
+            <>
                 {/* User card */}
                 <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <UserAvatar user={user} size={44} />
@@ -892,16 +881,14 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                     type="date"
                     value={exitDate}
                     onChange={e => setExitDate(e.target.value)}
-                    className={!exitDate && step === 0 ? '' : ''}
+                    className=""
                   />
                   {!exitDate && <p className="mt-1 text-[11.5px] text-gray-400">Required to proceed</p>}
                 </DrawerField>
-              </>
-            )}
+            </>
 
-            {/* ── STEP 1: Transfer Dependencies ── */}
-            {step === 1 && (
-              <>
+            {/* ── SINGLE VIEW: Transfer dependencies ── */}
+            <>
                 {deps.projects.length > 0 && (
                   <div>
                     <div className="mb-3 flex items-center gap-2">
@@ -962,12 +949,10 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                     <p className="text-[13px] text-emerald-700 font-medium">No active dependencies. You can proceed to confirm.</p>
                   </div>
                 )}
-              </>
-            )}
+            </>
 
-            {/* ── STEP 2: Confirm Deactivation ── */}
-            {step === 2 && (
-              <>
+            {/* ── SINGLE VIEW: Final confirmation and notes ── */}
+            <>
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4">
                   <p className="text-[14px] font-bold text-red-800">Final Confirmation</p>
                   <p className="mt-1 text-[13px] text-red-700 leading-relaxed">
@@ -976,7 +961,7 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                   </p>
                 </div>
 
-                {hasDeps && (
+                {hasDeps && projComplete && taskComplete && (
                   <div className="space-y-2">
                     <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">Transfers Summary</p>
                     {deps.projects.map(p => {
@@ -1013,46 +998,10 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                   Exit date: <strong className="text-gray-700">{exitDate}</strong>. This action cannot be undone from this screen.
                   The user can be reactivated later from the User Management list.
                 </p>
-              </>
-            )}
+            </>
           </div>
         </div>
 
-        {/* Footer nav */}
-        <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-100 px-5 py-3.5">
-          <button
-            type="button"
-            onClick={step === 0 ? onClose : () => setStep(s => (s === 2 && !hasDeps) ? 0 : s - 1)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <ArrowLeft size={14} />
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-
-          {step < 2 ? (
-            <button
-              type="button"
-              onClick={nextStep}
-              disabled={step === 0 ? !step0CanProceed : !step1CanProceed}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-colors',
-                (step === 0 ? step0CanProceed : step1CanProceed)
-                  ? 'bg-red-500 hover:bg-red-600'
-                  : 'bg-red-200 cursor-not-allowed',
-              )}
-            >
-              Next <ArrowRight size={14} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-lg bg-red-500 px-5 py-2 text-[13px] font-semibold text-white hover:bg-red-600 transition-colors"
-            >
-              Confirm Deactivation
-            </button>
-          )}
-        </div>
       </div>
     </>
   );
@@ -1354,8 +1303,6 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
             ) : paginatedUsers.map(u => {
               const deptName = deptMap[u.departmentId] ?? '—';
               const manager  = u.reportingManagerId ? managerMap[u.reportingManagerId] : null;
-              const shownRoles = u.roles.slice(0, 2);
-              const extraRoles = u.roles.length - 2;
               const isInactive = u.status === 'Inactive';
               return (
                 <TableRow
@@ -1403,13 +1350,13 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                   {/* Roles */}
                   <TableCell className="py-3">
-                    <div className="flex flex-wrap items-center gap-1">
-                      {shownRoles.map(r => <RoleBadge key={r} role={r} />)}
-                      {extraRoles > 0 && (
-                        <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-[2px] text-[11px] font-medium text-gray-500">
-                          +{extraRoles}
+                    <div className="text-[13px] font-normal leading-relaxed text-gray-700">
+                      {u.roles.map((role, index) => (
+                        <span key={role}>
+                          <span className={roleTextStyle(role)}>{role}</span>
+                          {index < u.roles.length - 1 && <span className="text-gray-400">, </span>}
                         </span>
-                      )}
+                      ))}
                     </div>
                   </TableCell>
 
@@ -1421,9 +1368,6 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   {/* Status */}
                   <TableCell className="py-3">
                     <StatusBadge status={u.status} />
-                    {isInactive && (
-                      <p className="mt-0.5 text-[10.5px] text-gray-400">Cannot log in</p>
-                    )}
                   </TableCell>
 
                   {/* Actions */}

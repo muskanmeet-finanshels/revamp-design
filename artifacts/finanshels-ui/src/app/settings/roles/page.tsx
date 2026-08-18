@@ -5,7 +5,7 @@ export default function RolesPage() {
   return (
     <AppShell
       breadcrumbs={[
-        { label: 'Settings' },
+        { label: 'Admin' },
         { label: 'Role Management' },
       ]}
     >
