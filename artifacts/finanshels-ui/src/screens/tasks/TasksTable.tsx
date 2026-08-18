@@ -1249,7 +1249,7 @@ export function TasksTable({
           ) : task.status === 'Archived' ? null : (
             <ActionMenu
               taskName={task.name}
-              onDelete={() => setDeleteTask({ id: task.id, name: task.name })}
+               onDelete={() => onDelete(task.id)}
               onChangeAssignee={() => onChangeAssignee?.(task)}
               onMarkComplete={() => setCompleteTask({ id: task.id, name: task.name })}
             />
@@ -1275,7 +1275,6 @@ export function TasksTable({
   /* per-row tag state */
   const [taskTags,   setTaskTags]   = useState<Record<string, TaskTagEntry>>({});
   const [openTagId,  setOpenTagId]  = useState<string | null>(null);
-  const [deleteTask, setDeleteTask] = useState<{ id: string; name: string } | null>(null);
   const [incompleteTask, setIncompleteTask] = useState<{ id: string; name: string } | null>(null);
   const [completeTask, setCompleteTask] = useState<{ id: string; name: string } | null>(null);
   const [resumeTask, setResumeTask] = useState<{ id: string; name: string } | null>(null);
@@ -1509,19 +1508,6 @@ export function TasksTable({
       comments={openCommentTaskId ? (commentsMap[openCommentTaskId] ?? []) : []}
       onAdd={text => {
         if (openCommentTaskId) addComment(openCommentTaskId, text);
-      }}
-    />
-
-    <DeleteTaskDialog
-      task={deleteTask}
-      onClose={() => setDeleteTask(null)}
-      onConfirm={({ id, name }) => {
-        onDelete(id);
-        setDeleteTask(null);
-        toast.success(`"${name}" deleted`, {
-          description: 'The task was removed successfully.',
-          duration: 5000,
-        });
       }}
     />
 

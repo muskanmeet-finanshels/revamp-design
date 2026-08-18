@@ -1,6 +1,6 @@
 'use client';
 
-import { CalendarDays, CirclePause, ListTodo, PlayCircle, UserRound, X } from 'lucide-react';
+import { CalendarDays, CirclePause, ListTodo, PlayCircle, Trash2, UserRound, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -27,7 +27,7 @@ export function TaskBulkActionBar({
   onReassign,
   onChangeStatus,
   onEditDeadline,
-  onDelete: _onDelete,
+  onDelete,
   onClear,
 }: Props) {
   return (
@@ -100,6 +100,21 @@ export function TaskBulkActionBar({
         <CalendarDays size={14} strokeWidth={1.8} />
         <span className="hidden sm:inline">Edit Deadline</span>
       </button>
+
+      {onDelete && (
+        <>
+          <Divider />
+
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex flex-shrink-0 items-center gap-1.5 px-3 sm:px-4 py-2.5 text-[13px] font-medium text-red-300 transition-colors hover:text-red-200"
+          >
+            <Trash2 size={14} strokeWidth={1.8} />
+            <span className="hidden sm:inline">Delete</span>
+          </button>
+        </>
+      )}
 
       <Divider />
 

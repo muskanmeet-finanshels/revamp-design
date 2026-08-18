@@ -37,6 +37,7 @@ import { ChangeTaskStatusDrawer } from './ChangeTaskStatusDrawer';
 import { TaskEditDeadlineDrawer } from './TaskEditDeadlineDrawer';
 import { AdHocTaskDialog } from '@/components/AdHocTaskDialog';
 import { TaskReassignDrawer } from './TaskReassignDrawer';
+import { TaskReasonDrawer } from './TaskReasonDrawer';
 import { toast } from 'sonner';
 import {
   ActiveFilterChips,
@@ -443,9 +444,10 @@ export function TasksScreen() {
   const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TaskStatus>>({});
   const [changeStatusDrawerOpen, setChangeStatusDrawerOpen] = useState(false);
-  const [holdDialogOpen, setHoldDialogOpen] = useState(false);
+  const [holdDrawerOpen, setHoldDrawerOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const [holdResumeReason, setHoldResumeReason] = useState('');
+  const [deleteTasks, setDeleteTasks] = useState<TaskItem[]>([]);
   const [editDeadlineOpen, setEditDeadlineOpen] = useState(false);
   const [reassignDrawerOpen, setReassignDrawerOpen] = useState(false);
   const [reassignTask, setReassignTask] = useState<TaskItem | null>(null);
@@ -456,16 +458,37 @@ export function TasksScreen() {
     setSelectedIds(new Set());
   }
 
-  function handleDeleteTask(id: string) {
+  function openDeleteTask(id: string) {
+    const task = displayTasks.find(item => item.id === id);
+    if (task) setDeleteTasks([task]);
+  }
+
+  function openDeleteSelectedTasks() {
+    const selected = displayTasks.filter(task => selectedIds.has(task.id));
+    if (selected.length > 0) setDeleteTasks(selected);
+  }
+
+  function handleDeleteTasks(reason: string) {
+    if (deleteTasks.length === 0 || !reason.trim()) return;
+
     setDeletedTaskIds(prev => {
       const next = new Set(prev);
-      next.add(id);
+      deleteTasks.forEach(task => next.add(task.id));
       return next;
     });
     setSelectedIds(prev => {
       const next = new Set(prev);
-      next.delete(id);
+      deleteTasks.forEach(task => next.delete(task.id));
       return next;
+    });
+    deleteTasks.forEach(task => {
+      localStorage.setItem(`fh_task_delete_reason_${task.id}`, reason.trim());
+    });
+    const count = deleteTasks.length;
+    setDeleteTasks([]);
+    toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} deleted`, {
+      description: `Reason: ${reason}`,
+      duration: 5000,
     });
   }
 
@@ -497,20 +520,22 @@ export function TasksScreen() {
     });
   }
 
-  function handleHoldConfirmed() {
+  function handleHoldConfirmed(reason: string) {
     const count = selectedIds.size;
-    if (count === 0 || !holdResumeReason.trim()) return;
+    if (count === 0 || !reason.trim()) return;
 
     setStatusOverrides(prev => {
       const next = { ...prev };
       selectedIds.forEach(id => { next[id] = 'On Hold'; });
       return next;
     });
-    setHoldDialogOpen(false);
-    setHoldResumeReason('');
+    selectedIds.forEach(id => {
+      localStorage.setItem(`fh_task_hold_reason_${id}`, reason.trim());
+    });
+    setHoldDrawerOpen(false);
     clearSelection();
     toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} put on hold`, {
-      description: `Reason: ${holdResumeReason.trim()}`,
+      description: `Reason: ${reason.trim()}`,
       duration: 3500,
     });
   }
@@ -964,7 +989,7 @@ export function TasksScreen() {
                   return next;
                 });
               }}
-              onDelete={handleDeleteTask}
+              onDelete={openDeleteTask}
               onChangeAssignee={setReassignTask}
               sortKey={sortKey}
               sortDir={sortDir}
@@ -1004,22 +1029,22 @@ export function TasksScreen() {
         count={selectedIds.size}
         onHold={() => {
           if (allSelectedOnHold) setResumeDialogOpen(true);
-          else setHoldDialogOpen(true);
+          else setHoldDrawerOpen(true);
         }}
         showOnHold={!hasArchivedSelected}
         showResume={allSelectedOnHold && !hasArchivedSelected}
         onReassign={() => setReassignDrawerOpen(true)}
         onChangeStatus={() => setChangeStatusDrawerOpen(true)}
         onEditDeadline={() => setEditDeadlineOpen(true)}
+        onDelete={openDeleteSelectedTasks}
         onClear={clearSelection}
       />
 
-      {/* ── Confirm putting selected tasks on hold ── */}
+      {/* ── Confirm resuming selected tasks ── */}
       <Dialog
-        open={holdDialogOpen || resumeDialogOpen}
+        open={resumeDialogOpen}
         onOpenChange={open => {
           if (!open) {
-            setHoldDialogOpen(false);
             setResumeDialogOpen(false);
             setHoldResumeReason('');
           }
@@ -1029,35 +1054,19 @@ export function TasksScreen() {
           <DialogHeader className="gap-2">
             <div className={cn(
               'flex h-10 w-10 items-center justify-center rounded-full',
-              resumeDialogOpen ? 'bg-orange-50' : 'bg-amber-50',
+              'bg-orange-50',
             )}>
-              {resumeDialogOpen
-                ? <PlayCircle size={20} className="text-brand" />
-                : <CirclePause size={20} className="text-amber-600" />}
+              <PlayCircle size={20} className="text-brand" />
             </div>
             <DialogTitle className="text-[16px] font-semibold text-gray-900">
-              {resumeDialogOpen
-                ? `Resume ${selectedIds.size === 1 ? 'Task' : 'Tasks'}`
-                : `Put ${selectedIds.size === 1 ? 'Task' : 'Tasks'} On Hold`}
+              {`Resume ${selectedIds.size === 1 ? 'Task' : 'Tasks'}`}
             </DialogTitle>
             <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
-              {resumeDialogOpen ? (
-                <>
-                  Are you sure you want to resume{' '}
-                  <span className="font-medium text-gray-700">
-                    {selectedIds.size} selected {selectedIds.size === 1 ? 'task' : 'tasks'}
-                  </span>
-                  ? They will return to In Progress.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to put{' '}
-                  <span className="font-medium text-gray-700">
-                    {selectedIds.size} selected {selectedIds.size === 1 ? 'task' : 'tasks'}
-                  </span>
-                  {' '}on hold? Their work will be paused until the status is changed.
-                </>
-              )}
+              Are you sure you want to resume{' '}
+              <span className="font-medium text-gray-700">
+                {selectedIds.size} selected {selectedIds.size === 1 ? 'task' : 'tasks'}
+              </span>
+              ? They will return to In Progress.
             </DialogDescription>
           </DialogHeader>
 
@@ -1069,7 +1078,7 @@ export function TasksScreen() {
               rows={3}
               value={holdResumeReason}
               onChange={e => setHoldResumeReason(e.target.value)}
-              placeholder={resumeDialogOpen ? 'Why are these tasks being resumed?' : 'Why are these tasks being put on hold?'}
+              placeholder="Why are these tasks being resumed?"
               className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
@@ -1078,7 +1087,6 @@ export function TasksScreen() {
             <button
               type="button"
               onClick={() => {
-                setHoldDialogOpen(false);
                 setResumeDialogOpen(false);
                 setHoldResumeReason('');
               }}
@@ -1088,15 +1096,33 @@ export function TasksScreen() {
             </button>
             <button
               type="button"
-              onClick={resumeDialogOpen ? handleResumeConfirmed : handleHoldConfirmed}
+              onClick={handleResumeConfirmed}
               disabled={!holdResumeReason.trim()}
               className="flex-1 rounded-lg bg-brand px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {resumeDialogOpen ? 'Resume' : 'Put On Hold'}
+              Resume
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Hold tasks drawer ── */}
+      <TaskReasonDrawer
+        open={holdDrawerOpen}
+        onClose={() => setHoldDrawerOpen(false)}
+        tasks={selectedTasks}
+        mode="hold"
+        onConfirm={handleHoldConfirmed}
+      />
+
+      {/* ── Delete task drawer ── */}
+      <TaskReasonDrawer
+        open={deleteTasks.length > 0}
+        onClose={() => setDeleteTasks([])}
+        tasks={deleteTasks}
+        mode="delete"
+        onConfirm={handleDeleteTasks}
+      />
 
       {/* ── Change status drawer ── */}
       <ChangeTaskStatusDrawer
