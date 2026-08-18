@@ -1,11 +1,10 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowDown, ArrowUp, ArrowUpDown, Check, GripVertical,
   Home, Pencil, PlayCircle, Tag, Users2,
-  PauseCircle, ArrowLeftRight, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -150,8 +149,6 @@ function SortableHead({
   );
 }
 
-type ProjectNotes = { hold: string; reassign: string; delete: string };
-
 export function ProjectsTable({
   projects, selectedIds, onToggle, onSelectAll,
   sortKey, sortDir, onSort,
@@ -161,19 +158,6 @@ export function ProjectsTable({
   const router = useRouter();
   const [tags, setTags]   = useState<Record<string, TagEntry>>({});
   const [openId, setOpenId] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, ProjectNotes>>({});
-
-  useEffect(() => {
-    const map: Record<string, ProjectNotes> = {};
-    projects.forEach(p => {
-      map[p.id] = {
-        hold:     localStorage.getItem(`fh_hold_reason_${p.id}`)     || p.holdReason     || '',
-        reassign: localStorage.getItem(`fh_reassign_reason_${p.id}`) || p.reassignReason || '',
-        delete:   localStorage.getItem(`fh_delete_reason_${p.id}`)   || p.deleteReason   || '',
-      };
-    });
-    setNotes(map);
-  }, [projects]);
 
   /* ── Drag-and-drop state ── */
   const dragKey  = useRef<ProjectColumnKey | null>(null);
@@ -523,29 +507,6 @@ export function ProjectsTable({
                     <span className="block max-w-full truncate whitespace-nowrap text-[13px] font-semibold leading-snug text-gray-900">
                       {p.title}
                     </span>
-                    {(() => {
-                      const n = notes[p.id];
-                      if (!n) return null;
-                      if (n.reassign) return (
-                        <span className="mt-1 flex items-center gap-1 text-[11px] text-blue-600">
-                          <ArrowLeftRight size={10} className="flex-shrink-0" />
-                          <span className="truncate">{n.reassign}</span>
-                        </span>
-                      );
-                      if (n.hold) return (
-                        <span className="mt-1 flex items-center gap-1 text-[11px] text-amber-600">
-                          <PauseCircle size={10} className="flex-shrink-0" />
-                          <span className="truncate">{n.hold}</span>
-                        </span>
-                      );
-                      if (n.delete) return (
-                        <span className="mt-1 flex items-center gap-1 text-[11px] text-red-500">
-                          <Trash2 size={10} className="flex-shrink-0" />
-                          <span className="truncate">{n.delete}</span>
-                        </span>
-                      );
-                      return null;
-                    })()}
                   </TableCell>
 
                   {/* Data cells in user-specified order */}
