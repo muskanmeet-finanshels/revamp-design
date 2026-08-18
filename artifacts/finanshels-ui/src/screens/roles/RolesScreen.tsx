@@ -21,6 +21,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -1157,7 +1158,27 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       <p className="mt-3 text-[12px] text-gray-400">
         {filtered.length} of {total} role{total !== 1 ? 's' : ''} shown
         {' · '}
-        <span className="text-violet-600">Super Admin</span> cannot be modified or deleted.
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Super Admin role information"
+                className="inline-flex items-center gap-1 text-violet-600 transition-colors hover:text-violet-700"
+              >
+                <span>Super Admin</span>
+                <Info size={12} strokeWidth={2} aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              sideOffset={6}
+              className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+            >
+              Super Admin cannot be modified or deleted.
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </p>
 
       {/* Create / Edit drawer */}
