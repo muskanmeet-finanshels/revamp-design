@@ -916,11 +916,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [activateRole,   setActivateRole]   = useState<AppRole | null>(null);
   const [deactivateRole, setDeactivateRole] = useState<AppRole | null>(null);
 
-  /* Stats */
-  const total        = roles.length;
-  const systemCount  = roles.filter(r => r.type === 'system').length;
-  const customCount  = roles.filter(r => r.type === 'custom').length;
-  const activeCustom = roles.filter(r => r.type === 'custom' && r.status === 'Active').length;
+  const total = roles.length;
 
   /* Filtered */
   const filtered = roles.filter(r => {
@@ -993,27 +989,6 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           </p>
         </div>
       )}
-
-      {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
-        {[
-          { label: 'Total Roles',    value: total,        click: () => setTab('all'),    active: tab === 'all',    color: 'text-gray-900', bg: 'bg-gray-100' },
-          { label: 'System Roles',   value: systemCount,  click: () => setTab('system'), active: tab === 'system', color: 'text-blue-700', bg: 'bg-blue-50'  },
-          { label: 'Custom Roles',   value: customCount,  click: () => setTab('custom'), active: tab === 'custom', color: 'text-brand',    bg: 'bg-orange-50'},
-          { label: 'Active Custom',  value: activeCustom, click: () => setTab('custom'), active: false,            color: 'text-emerald-700', bg: 'bg-emerald-50' },
-        ].map(({ label, value, click, active, color, bg }) => (
-          <button key={label} type="button" onClick={click}
-            className={cn(
-              'flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm text-left transition-colors hover:border-brand/40',
-              active && 'border-brand/50 ring-1 ring-brand/20',
-            )}>
-            <span className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-[18px] font-bold', bg, color)}>
-              {value}
-            </span>
-            <span className="text-[12.5px] font-medium text-gray-600">{label}</span>
-          </button>
-        ))}
-      </div>
 
       {/* Toolbar — line tabs on top, search + action below */}
       <Tabs value={tab} onValueChange={value => setTab(value as TabFilter)}>
