@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
 import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
+import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -493,7 +494,7 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
                     </div>
                   </TableCell>
                   <TableCell className="py-3.5 pr-4">
-                    <span className="line-clamp-1 text-[13px] text-gray-600">{dept.description || '—'}</span>
+                    <DescriptionTooltip value={dept.description} />
                   </TableCell>
                   <TableCell className="py-3.5 text-center text-[13px] font-medium text-gray-700">
                     {vertCount}
@@ -715,7 +716,7 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
                   </div>
                 </TableCell>
                 <TableCell className="py-3.5 pr-4">
-                  <span className="line-clamp-1 text-[13px] text-gray-600">{v.description || '—'}</span>
+                  <DescriptionTooltip value={v.description} />
                 </TableCell>
                 <TableCell className="py-3.5">
                   <div className="flex items-center gap-2">
@@ -939,7 +940,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
                   </div>
                 </TableCell>
                 <TableCell className="py-3.5 pr-4">
-                  <span className="line-clamp-1 text-[13px] text-gray-600">{t.description || '—'}</span>
+                  <DescriptionTooltip value={t.description} />
                 </TableCell>
                 <TableCell className="py-3.5">
                   <div className="flex items-center gap-2">

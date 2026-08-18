@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
@@ -18,6 +18,11 @@ import {
 } from '@/components/ui/dialog';
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
 import { SearchInput } from '@/components/ui/search-input';
+import { DescriptionTooltip } from '@/components/ui/description-tooltip';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
@@ -103,71 +108,69 @@ function RoleActionMenu({ role, onEdit, onClone, onActivate, onDeactivate }: {
   onDeactivate: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.right - 168 });
-    }
-    function close(e: MouseEvent) {
-      const t = e.target as Node;
-      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
-    }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
 
   const canEdit       = !role.isProtected;
   const canDeactivate = !role.isProtected;
 
   return (
-    <>
-      <button ref={btnRef} type="button" onClick={() => setOpen(o => !o)}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
-        <MoreHorizontal size={16} />
-      </button>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none"
+          aria-label="Role actions"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </DropdownMenuTrigger>
 
-      {open && typeof document !== 'undefined' && createPortal(
-        <div ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999, width: 168 }}
-          className="overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl">
-
-          {canEdit && (
-            <button type="button" onClick={() => { setOpen(false); onEdit(); }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors">
-              <Pencil size={13} className="text-gray-400" /> Edit Role
-            </button>
-          )}
-
-          <button type="button" onClick={() => { setOpen(false); onClone(); }}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors">
-            <Copy size={13} className="text-gray-400" /> Clone Role
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className="w-44 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl"
+      >
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onEdit(); }}
+            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            <Pencil size={13} className="text-gray-400" /> Edit Role
           </button>
+        )}
 
-          {canDeactivate && (
-            <>
-              <div className="my-1 border-t border-gray-100" />
-              {role.status === 'Active' ? (
-                <button type="button" onClick={() => { setOpen(false); onDeactivate(); }}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-600 hover:bg-red-50 transition-colors">
-                  <PowerOff size={13} className="text-red-400" /> Deactivate
-                </button>
-              ) : (
-                <button type="button" onClick={() => { setOpen(false); onActivate(); }}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-emerald-600 hover:bg-emerald-50 transition-colors">
-                  <Power size={13} className="text-emerald-500" /> Activate
-                </button>
-              )}
-            </>
-          )}
-        </div>,
-        document.body,
-      )}
-    </>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onClone(); }}
+          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          <Copy size={13} className="text-gray-400" /> Clone Role
+        </button>
+
+        {canDeactivate && (
+          <>
+            <div className="my-1 border-t border-gray-100" />
+            {role.status === 'Active' ? (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onDeactivate(); }}
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                <PowerOff size={13} className="text-red-400" /> Deactivate
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onActivate(); }}
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
+              >
+                <Power size={13} className="text-emerald-500" /> Activate
+              </button>
+            )}
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1012,22 +1015,22 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="mb-4 flex items-center gap-3">
-        {/* Tab pills */}
-        <div className="flex rounded-lg border border-gray-200 bg-gray-100 p-0.5">
+      {/* Toolbar — line tabs on top, search + action below */}
+      <Tabs value={tab} onValueChange={value => setTab(value as TabFilter)}>
+        <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0">
           {(['all', 'system', 'custom'] as TabFilter[]).map(t => (
-            <button key={t} type="button" onClick={() => setTab(t)}
-              className={cn(
-                'rounded-md px-3.5 py-1.5 text-[12.5px] font-medium capitalize transition-colors',
-                tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              )}>
+            <TabsTrigger
+              key={t}
+              value={t}
+              className="relative rounded-none border-b-2 border-transparent px-4 py-3 text-[13px] font-medium capitalize text-gray-500 shadow-none transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none"
+            >
               {t}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
+      </Tabs>
 
-        {/* Shared platform search */}
+      <div className="mb-4 mt-4 flex items-center gap-3">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -1035,7 +1038,6 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           aria-label="Search roles"
           className="w-full sm:w-80"
         />
-
         <div className="ml-auto">
           <button type="button" onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
@@ -1050,6 +1052,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           <TableHeader>
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
               <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Role</TableHead>
+              <TableHead className="min-w-[260px] text-[10px] font-semibold uppercase tracking-widest text-gray-500">Description</TableHead>
               <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[110px]">Type</TableHead>
               <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[130px]">Permissions</TableHead>
               <TableHead className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 w-[80px] text-center">Users</TableHead>
@@ -1060,7 +1063,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-0">
+                <TableCell colSpan={7} className="py-0">
                   <Empty
                     icon={search ? SearchX : Shield}
                     title={search ? 'No matching roles' : 'No roles yet'}
@@ -1078,7 +1081,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   role.status === 'Inactive' && 'opacity-55',
                 )}>
 
-                {/* Role name + description */}
+                {/* Role name */}
                 <TableCell className="pl-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <span className={cn(
@@ -1099,11 +1102,13 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                           Cloned from {MOCK_ROLES.find(r => r.id === role.clonedFromId)?.name ?? role.clonedFromId}
                         </p>
                       )}
-                      {role.description && (
-                        <p className="text-[12px] text-gray-400 line-clamp-1 max-w-[260px]">{role.description}</p>
-                      )}
                     </div>
                   </div>
+                </TableCell>
+
+                {/* Description */}
+                <TableCell className="py-3.5">
+                  <DescriptionTooltip value={role.description} className="text-[12.5px]" />
                 </TableCell>
 
                 {/* Type */}

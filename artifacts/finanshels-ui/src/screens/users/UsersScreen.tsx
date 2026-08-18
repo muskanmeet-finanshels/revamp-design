@@ -105,18 +105,6 @@ function UnassignedManager() {
   );
 }
 
-/* ─── Role text ───────────────────────────────────────────────────────── */
-
-const ROLE_ADMIN_STYLE   = 'text-violet-700';
-const ROLE_LEAD_STYLE    = 'text-blue-700';
-const ROLE_DEFAULT_STYLE = 'text-gray-700';
-
-function roleTextStyle(role: UserRole) {
-  if (role === 'Admin') return ROLE_ADMIN_STYLE;
-  if (role === 'Team Lead' || role === 'Finance Manager') return ROLE_LEAD_STYLE;
-  return ROLE_DEFAULT_STYLE;
-}
-
 /* ─── Avatar ──────────────────────────────────────────────────────────── */
 
 function UserAvatar({ user, size = 32 }: { user: AppUser; size?: number }) {
@@ -818,7 +806,6 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
             </button>
             <div>
               <span className="text-[15px] font-semibold text-gray-900">Deactivate User</span>
-              <p className="mt-0.5 text-[12px] text-gray-400">{user.firstName} {user.lastName}</p>
             </div>
           </div>
           {/* Action button in header — same pattern as DeleteProjectDrawer */}
@@ -877,11 +864,10 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
 
                 {/* Exit date */}
                 <DrawerField label="Last Working Date" required>
-                  <DrawerInput
-                    type="date"
+                  <DatePicker
                     value={exitDate}
-                    onChange={e => setExitDate(e.target.value)}
-                    className=""
+                    onChange={setExitDate}
+                    placeholder="dd/mm/yyyy"
                   />
                   {!exitDate && <p className="mt-1 text-[11.5px] text-gray-400">Required to proceed</p>}
                 </DrawerField>
@@ -953,14 +939,6 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
 
             {/* ── SINGLE VIEW: Final confirmation and notes ── */}
             <>
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4">
-                  <p className="text-[14px] font-bold text-red-800">Final Confirmation</p>
-                  <p className="mt-1 text-[13px] text-red-700 leading-relaxed">
-                    You are about to deactivate <strong>{user.firstName} {user.lastName}</strong>.
-                    Their account will be disabled immediately and they will no longer be able to log in.
-                  </p>
-                </div>
-
                 {hasDeps && projComplete && taskComplete && (
                   <div className="space-y-2">
                     <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">Transfers Summary</p>
@@ -1353,8 +1331,8 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     <div className="text-[13px] font-normal leading-relaxed text-gray-700">
                       {u.roles.map((role, index) => (
                         <span key={role}>
-                          <span className={roleTextStyle(role)}>{role}</span>
-                          {index < u.roles.length - 1 && <span className="text-gray-400">, </span>}
+                          {index > 0 && ', '}
+                          {role}
                         </span>
                       ))}
                     </div>
