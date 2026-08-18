@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Plus, MoreHorizontal, Pencil, Power, PowerOff,
-  KeyRound, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
+  X, Plus, MoreHorizontal,
+  ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
   AlertTriangle, UserCheck, UserRound, Users, Users2, Building2, Layers, SearchX,
   Mail,
 } from 'lucide-react';
@@ -26,6 +26,9 @@ import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -75,7 +78,7 @@ function UnassignedManager() {
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div aria-label="Unassigned" className="flex cursor-default items-center gap-2">
+          <div aria-label="Unassigned" className="inline-flex cursor-default items-center gap-2">
             <div className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 ring-[1.5px] ring-white">
               <UserRound size={11} className="text-gray-400" />
             </div>
@@ -272,74 +275,59 @@ function UserActionMenu({
   onDeactivate: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.right - 188 });
-    }
-    function close(e: MouseEvent) {
-      const t = e.target as Node;
-      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
-    }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
 
   const isActive   = user.status === 'Active';
   const isInactive = user.status === 'Inactive';
 
   return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-      >
-        <MoreHorizontal size={16} />
-      </button>
-
-      {open && typeof document !== 'undefined' && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999, width: 188 }}
-          className="overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl"
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none"
+          aria-label="User actions"
         >
-          <button type="button" onClick={() => { setOpen(false); onEdit(); }}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors">
-            <Pencil size={13} className="text-gray-400" /> Edit User
+          <MoreHorizontal size={14} />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className="w-44 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl"
+      >
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onEdit(); }}
+          className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          Edit User
+        </button>
+
+        {!isInactive && (
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onResetPassword(); }}
+            className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            Reset Password
           </button>
+        )}
 
-          {!isInactive && (
-            <button type="button" onClick={() => { setOpen(false); onResetPassword(); }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors">
-              <KeyRound size={13} className="text-gray-400" /> Reset Password
-            </button>
+        <div className="my-1 border-t border-gray-100" />
+
+        <button
+          type="button"
+          onClick={() => { setOpen(false); isActive ? onDeactivate() : onActivate(); }}
+          className={cn(
+            'w-full rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors',
+            isActive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100',
           )}
-
-          <div className="my-1 border-t border-gray-100" />
-
-          {!isActive ? (
-            <button type="button" onClick={() => { setOpen(false); onActivate(); }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-emerald-600 hover:bg-emerald-50 transition-colors">
-              <Power size={13} className="text-emerald-500" />
-              {isInactive ? 'Reactivate User' : 'Activate User'}
-            </button>
-          ) : (
-            <button type="button" onClick={() => { setOpen(false); onDeactivate(); }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-600 hover:bg-red-50 transition-colors">
-              <PowerOff size={13} className="text-red-400" /> Deactivate User
-            </button>
-          )}
-        </div>,
-        document.body,
-      )}
-    </>
+        >
+          {isActive ? 'Deactivate User' : 'Reactivate User'}
+        </button>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1374,7 +1362,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   key={u.id}
                   className={cn(
                     'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
-                    isInactive && 'opacity-55',
+                    isInactive && 'bg-gray-50',
                   )}
                 >
                   {/* User */}

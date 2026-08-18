@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Plus, MoreHorizontal, Pencil, PowerOff, Power,
+  Plus, MoreHorizontal,
   ArrowLeft, Building2, Layers, Users, SearchX, CircleAlert, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
 import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
   type Department, type Vertical, type Team, type OrgStatus,
@@ -59,7 +62,7 @@ function StatusBadge({ status }: { status: OrgStatus }) {
   );
 }
 
-/* ─── Tiny action-menu popover ─────────────────────────────────────────── */
+/* ─── Table action menu ─────────────────────────────────────────────────── */
 
 function ActionMenu({ onEdit, onToggle, isActive }: {
   onEdit: () => void;
@@ -67,66 +70,44 @@ function ActionMenu({ onEdit, onToggle, isActive }: {
   isActive: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.right - 152 });
-    }
-    function close(e: MouseEvent) {
-      const t = e.target as Node;
-      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
-    }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
 
   return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-      >
-        <MoreHorizontal size={16} />
-      </button>
-
-      {open && typeof document !== 'undefined' && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999, width: 152 }}
-          className="overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl"
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none"
+          aria-label="Organisation actions"
         >
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onEdit(); }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            <Pencil size={13} className="text-gray-400" />
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onToggle(); }}
-            className={cn(
-              'flex w-full items-center gap-2.5 px-3 py-2 text-[13px] transition-colors hover:bg-gray-50',
-              isActive ? 'text-red-600' : 'text-emerald-600',
-            )}
-          >
-            {isActive
-              ? <PowerOff size={13} className="text-red-400" />
-              : <Power size={13} className="text-emerald-500" />}
-            {isActive ? 'Deactivate' : 'Reactivate'}
-          </button>
-        </div>,
-        document.body,
-      )}
-    </>
+          <MoreHorizontal size={14} />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className="w-44 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl"
+      >
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onEdit(); }}
+          className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          Edit
+        </button>
+        <div className="my-1 border-t border-gray-100" />
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onToggle(); }}
+          className={cn(
+            'w-full rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors',
+            isActive ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50',
+          )}
+        >
+          {isActive ? 'Deactivate' : 'Reactivate'}
+        </button>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
