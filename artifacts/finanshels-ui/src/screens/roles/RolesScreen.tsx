@@ -1149,7 +1149,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                                 <button
                                   type="button"
                                   aria-label="Super Admin role information"
-                                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-violet-400 transition-colors hover:bg-violet-50 hover:text-violet-600"
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-black transition-colors hover:bg-transparent hover:text-black"
                                 >
                                   <Info size={12} strokeWidth={2.25} aria-hidden />
                                 </button>
