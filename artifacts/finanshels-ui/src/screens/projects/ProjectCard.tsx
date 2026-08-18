@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Pencil, Tag, CalendarDays, PlayCircle } from 'lucide-react';
+import { Check, Pencil, Tag, CalendarDays, PlayCircle, PauseCircle, ArrowLeftRight, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Project, ProjectStatus } from './mock-data';
@@ -61,6 +61,22 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
   const [severity, setSeverity]           = useState<SeverityValue>('');
   const [tagsOpen, setTagsOpen]           = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
+
+  const [holdNote,     setHoldNote]     = useState('');
+  const [deleteNote,   setDeleteNote]   = useState('');
+  const [reassignNote, setReassignNote] = useState('');
+
+  useEffect(() => {
+    setHoldNote(
+      localStorage.getItem(`fh_hold_reason_${project.id}`) || project.holdReason || ''
+    );
+    setDeleteNote(
+      localStorage.getItem(`fh_delete_reason_${project.id}`) || project.deleteReason || ''
+    );
+    setReassignNote(
+      localStorage.getItem(`fh_reassign_reason_${project.id}`) || project.reassignReason || ''
+    );
+  }, [project.id, project.holdReason, project.deleteReason, project.reassignReason]);
 
   const hasTags = Boolean(priority || severity);
 
@@ -173,6 +189,34 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
           )}
         </div>
 
+        {/* ── Notes: hold / reassign / delete ── */}
+        {reassignNote && (
+          <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+            <ArrowLeftRight size={12} className="mt-0.5 flex-shrink-0 text-blue-500" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-500">Reason for Reassignment</p>
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-blue-800">{reassignNote}</p>
+            </div>
+          </div>
+        )}
+        {holdNote && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <PauseCircle size={12} className="mt-0.5 flex-shrink-0 text-amber-500" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">Reason for Hold</p>
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-amber-900">{holdNote}</p>
+            </div>
+          </div>
+        )}
+        {deleteNote && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+            <Trash2 size={12} className="mt-0.5 flex-shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-red-500">Reason for Deletion</p>
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-red-800">{deleteNote}</p>
+            </div>
+          </div>
+        )}
 
       </div>
 
