@@ -500,7 +500,7 @@ function DepartmentsTab({ departments, verticals, teams, onDepartmentsChange }: 
                   key={dept.id}
                   className={cn(
                     'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
-                    isInactive && 'opacity-60',
+                    isInactive && 'bg-gray-50',
                   )}
                 >
                   <TableCell className="pl-5 py-3.5">
@@ -722,7 +722,7 @@ function VerticalsTab({ departments, verticals, onVerticalsChange }: VerticalsTa
                 key={v.id}
                 className={cn(
                   'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
-                  v.status === 'Inactive' && 'opacity-60',
+                  v.status === 'Inactive' && 'bg-gray-50',
                 )}
               >
                 <TableCell className="pl-5 py-3.5">
@@ -946,7 +946,7 @@ function TeamsTab({ departments, teams, onTeamsChange }: TeamsTabProps) {
                 key={t.id}
                 className={cn(
                   'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
-                  t.status === 'Inactive' && 'opacity-60',
+                  t.status === 'Inactive' && 'bg-gray-50',
                 )}
               >
                 <TableCell className="pl-5 py-3.5">
