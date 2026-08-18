@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Search, Download, CheckSquare, SlidersHorizontal, X, TriangleAlert, Clock3,
   CheckCircle2, PauseCircle, CalendarDays, CalendarClock, Archive,
-  CirclePause, PlayCircle, Columns3, Check,
+  PlayCircle, Columns3, Check,
 } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -445,6 +445,7 @@ export function TasksScreen() {
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TaskStatus>>({});
   const [changeStatusDrawerOpen, setChangeStatusDrawerOpen] = useState(false);
   const [holdDrawerOpen, setHoldDrawerOpen] = useState(false);
+  const [holdTasks, setHoldTasks] = useState<TaskItem[]>([]);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const [holdResumeReason, setHoldResumeReason] = useState('');
   const [deleteTasks, setDeleteTasks] = useState<TaskItem[]>([]);
@@ -521,19 +522,25 @@ export function TasksScreen() {
   }
 
   function handleHoldConfirmed(reason: string) {
-    const count = selectedIds.size;
+    const count = holdTasks.length;
     if (count === 0 || !reason.trim()) return;
 
     setStatusOverrides(prev => {
       const next = { ...prev };
-      selectedIds.forEach(id => { next[id] = 'On Hold'; });
+      holdTasks.forEach(task => { next[task.id] = 'On Hold'; });
       return next;
     });
-    selectedIds.forEach(id => {
-      localStorage.setItem(`fh_task_hold_reason_${id}`, reason.trim());
+    holdTasks.forEach(task => {
+      localStorage.setItem(`fh_task_hold_reason_${task.id}`, reason.trim());
+    });
+    const heldIds = new Set(holdTasks.map(task => task.id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      heldIds.forEach(id => next.delete(id));
+      return next;
     });
     setHoldDrawerOpen(false);
-    clearSelection();
+    setHoldTasks([]);
     toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} put on hold`, {
       description: `Reason: ${reason.trim()}`,
       duration: 3500,
@@ -990,6 +997,10 @@ export function TasksScreen() {
                 });
               }}
               onDelete={openDeleteTask}
+              onHold={task => {
+                setHoldTasks([task]);
+                setHoldDrawerOpen(true);
+              }}
               onChangeAssignee={setReassignTask}
               sortKey={sortKey}
               sortDir={sortDir}
@@ -1029,7 +1040,10 @@ export function TasksScreen() {
         count={selectedIds.size}
         onHold={() => {
           if (allSelectedOnHold) setResumeDialogOpen(true);
-          else setHoldDrawerOpen(true);
+          else {
+            setHoldTasks(selectedTasks);
+            setHoldDrawerOpen(true);
+          }
         }}
         showOnHold={!hasArchivedSelected}
         showResume={allSelectedOnHold && !hasArchivedSelected}
@@ -1109,8 +1123,11 @@ export function TasksScreen() {
       {/* ── Hold tasks drawer ── */}
       <TaskReasonDrawer
         open={holdDrawerOpen}
-        onClose={() => setHoldDrawerOpen(false)}
-        tasks={selectedTasks}
+        onClose={() => {
+          setHoldDrawerOpen(false);
+          setHoldTasks([]);
+        }}
+        tasks={holdTasks}
         mode="hold"
         onConfirm={handleHoldConfirmed}
       />

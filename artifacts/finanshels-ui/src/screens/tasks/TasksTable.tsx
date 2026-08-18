@@ -512,11 +512,13 @@ function SortableHead({
 function ActionMenu({
   taskName,
   onDelete,
+  onHold,
   onChangeAssignee,
   onMarkComplete,
 }: {
   taskName: string;
   onDelete: () => void;
+  onHold: () => void;
   onChangeAssignee: () => void;
   onMarkComplete: () => void;
 }) {
@@ -554,7 +556,7 @@ function ActionMenu({
           type="button"
           onClick={() => {
             setOpen(false);
-            toast.success(`"${taskName}" put on hold`);
+            onHold();
           }}
           className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 hover:bg-gray-100 transition-colors"
         >
@@ -958,6 +960,7 @@ interface Props {
   onToggle:       (id: string) => void;
   onSelectAll:    () => void;
   onDelete:       (id: string) => void;
+  onHold?:         (task: TaskItem) => void;
   onChangeAssignee?: (task: TaskItem) => void;
   sortKey:        SortKey;
   sortDir:        'asc' | 'desc';
@@ -975,6 +978,7 @@ export function TasksTable({
   onToggle,
   onSelectAll,
   onDelete,
+  onHold,
   onChangeAssignee,
   sortKey,
   sortDir,
@@ -1250,6 +1254,7 @@ export function TasksTable({
             <ActionMenu
               taskName={task.name}
                onDelete={() => onDelete(task.id)}
+              onHold={() => onHold?.(task)}
               onChangeAssignee={() => onChangeAssignee?.(task)}
               onMarkComplete={() => setCompleteTask({ id: task.id, name: task.name })}
             />
