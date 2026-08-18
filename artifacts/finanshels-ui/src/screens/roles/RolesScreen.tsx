@@ -21,6 +21,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -53,17 +54,17 @@ function totalActions(): number {
 function TypeLabel({ type, isProtected }: { type: RoleType; isProtected?: boolean }) {
   if (isProtected) {
     return (
-      <span className="text-[12px] font-semibold leading-4 text-violet-700">
+      <span className="text-[12px] font-normal leading-4 text-violet-700">
         Super Admin
       </span>
     );
   }
   return type === 'system' ? (
-    <span className="text-[12px] font-medium text-blue-700">
+    <span className="text-[12px] font-normal text-blue-700">
       System
     </span>
   ) : (
-    <span className="text-[12px] font-medium text-brand">
+    <span className="text-[12px] font-normal text-brand">
       Custom
     </span>
   );
@@ -746,19 +747,30 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                       <label className="mb-1.5 block text-[12px] font-semibold text-gray-700">
                         Transfer {role.userCount} user{role.userCount !== 1 ? 's' : ''} to <span className="text-red-500">*</span>
                       </label>
-                      <select
+                      <Select
                         value={transferRoleId}
-                        onChange={e => setTransferRoleId(e.target.value)}
-                        className={cn(
-                          'h-11 w-full appearance-none rounded-xl border bg-white px-3.5 text-[13px] transition-colors focus:outline-none focus:ring-1 focus:ring-brand/20',
-                          !transferRoleId ? 'border-red-300 text-gray-400' : 'border-brand text-gray-800',
-                        )}
+                        onValueChange={setTransferRoleId}
                       >
-                        <option value="">— Select replacement role —</option>
-                        {transferOptions.map(r => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          className={cn(
+                            'h-11 w-full rounded-xl border bg-white px-3.5 text-left text-[13px] transition-colors focus:outline-none focus:ring-1 focus:ring-brand/20',
+                            !transferRoleId ? 'border-red-300 text-gray-400' : 'border-brand text-gray-800',
+                          )}
+                        >
+                          <SelectValue placeholder="— Select replacement role —" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[200] w-[var(--radix-select-trigger-width)] rounded-xl border border-gray-100 bg-white shadow-xl">
+                          {transferOptions.map(r => (
+                            <SelectItem
+                              key={r.id}
+                              value={r.id}
+                              className="cursor-pointer rounded-lg py-2.5 pl-3 pr-8 text-[13px] text-gray-800 focus:bg-orange-50 focus:text-brand data-[state=checked]:font-medium"
+                            >
+                              {r.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {!transferRoleId && (
                         <p className="mt-1 text-[11.5px] text-red-500">
                           A replacement role is required before deactivating.
@@ -1006,47 +1018,44 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-              <TableHead className="pl-5">
-                <SortableTableHead label="Role" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="min-w-[260px]">
-                <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[110px]">
-                <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[130px]">
-                <SortableTableHead label="Permissions" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[80px] text-center">
-                <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
-              </TableHead>
-              <TableHead className="w-[100px]">
-                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[52px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-0">
-                  <Empty
-                    icon={search ? SearchX : Shield}
-                    title={search ? 'No matching roles' : 'No roles yet'}
-                    description={search
-                      ? 'Try adjusting your search to find what you’re looking for.'
-                      : 'Create a role to define access across your organisation.'}
-                    className="py-16"
-                  />
-                </TableCell>
+      {filtered.length === 0 ? (
+        <Empty
+          icon={roles.length === 0 ? Shield : SearchX}
+          title={roles.length === 0 ? 'No roles yet' : 'No matching roles'}
+          description={roles.length === 0
+            ? 'Create a role to define access across your organisation.'
+            : 'Try adjusting your search or filters to find what you’re looking for.'}
+          className="mt-6"
+        />
+      ) : (
+        /* Table */
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
+                <TableHead className="pl-5">
+                  <SortableTableHead label="Role" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="min-w-[260px]">
+                  <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="w-[110px]">
+                  <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="w-[130px]">
+                  <SortableTableHead label="Permissions" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="w-[80px] text-center">
+                  <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
+                </TableHead>
+                <TableHead className="w-[100px]">
+                  <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="w-[52px]" />
               </TableRow>
-            ) : paginatedRoles.map(role => (
+            </TableHeader>
+            <TableBody>
+              {paginatedRoles.map(role => (
               <TableRow key={role.id}
                 className={cn(
                   'border-b border-gray-100 transition-colors hover:bg-gray-50/70',
@@ -1150,10 +1159,11 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   />
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {filtered.length > 0 && (
         <ProjectsPagination
