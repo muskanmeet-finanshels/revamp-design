@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import {
   Search, Download, SlidersHorizontal, X, CirclePause, PlayCircle, Trash2, Columns3, Check,
   Home, Users2, CalendarDays, Banknote, CheckCircle2, ListTodo,
-  Tag, Pencil,
+  Tag, Pencil, ArrowLeftRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -716,6 +716,27 @@ export function ProjectTasksScreen() {
 
       {/* ── Project detail card ── */}
       {project && <ProjectDetailCard project={project} />}
+
+      {/* ── Reassignment note banner ── */}
+      {project && (() => {
+        const note =
+          (typeof window !== 'undefined' ? localStorage.getItem(`fh_reassign_reason_${project.id}`) ?? '' : '')
+          || (project.reassignReason ?? '');
+        if (!note) return null;
+        return (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3.5">
+            <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100">
+              <ArrowLeftRight size={15} className="text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-blue-600">
+                Reason for Reassignment
+              </p>
+              <p className="text-[13px] leading-snug text-blue-800">{note}</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Hold / Delete reason banner ── */}
       {project && (project.status === 'On Hold' || project.status === 'Archived') && (() => {

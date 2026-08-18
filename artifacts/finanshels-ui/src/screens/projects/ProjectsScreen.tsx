@@ -1300,8 +1300,13 @@ export function ProjectsScreen() {
         onClose={() => setReassignDrawerOpen(false)}
         count={selectedIds.size}
         projects={selectedProjects}
-        onConfirm={() => {
+        onConfirm={(reason) => {
           const n = selectedIds.size;
+          if (reason) {
+            [...selectedIds].forEach(id => {
+              localStorage.setItem(`fh_reassign_reason_${id}`, reason);
+            });
+          }
           setReassignDrawerOpen(false);
           clearSelection();
           toast.success(`${n} ${n === 1 ? 'project' : 'projects'} reassigned`, {

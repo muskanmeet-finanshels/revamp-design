@@ -37,6 +37,8 @@ export interface Project {
   holdReason?: string;
   /** Reason provided when the project was deleted / archived */
   deleteReason?: string;
+  /** Reason provided when the project team was reassigned */
+  reassignReason?: string;
 }
 
 const SEED_PROJECTS: Project[] = [
@@ -55,6 +57,7 @@ const SEED_PROJECTS: Project[] = [
     badge: 1,
     invoiceType: 'bundled' as const,
     revenue: 4500,
+    reassignReason: 'Arjun Kumar has moved to a different client portfolio. Ivan Xavier has been assigned as the new Account Manager effective immediately.',
   },
   {
     id: '2',

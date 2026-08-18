@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { DrawerField, DrawerTextarea } from '@/components/ui/drawer-fields';
 
 /* ── Team member options ── */
 const TEAM_MEMBERS = [
@@ -118,7 +119,7 @@ interface Props {
   onClose:   () => void;
   count:     number;
   projects:  SelectedProject[];
-  onConfirm: () => void;
+  onConfirm: (reason: string) => void;
 }
 
 const PREVIEW_COUNT = 3;
@@ -129,6 +130,7 @@ export function BulkReassignDrawer({ open, onClose, count, projects, onConfirm }
   /* Step 1 */
   const [newAM, setNewAM] = useState('');
   const [newTL, setNewTL] = useState('');
+  const [reason, setReason] = useState('');
 
   /* Step 2 */
   const [expanded,      setExpanded]      = useState<Set<string>>(new Set(['am']));
@@ -154,9 +156,9 @@ export function BulkReassignDrawer({ open, onClose, count, projects, onConfirm }
   }
 
   function handleConfirm() {
-    onConfirm();
+    onConfirm(reason.trim());
     /* reset */
-    setNewAM(''); setNewTL('');
+    setNewAM(''); setNewTL(''); setReason('');
     setExpanded(new Set(['am']));
     setShowAllGroup(new Set());
     setTaskAssignees({});
@@ -164,7 +166,7 @@ export function BulkReassignDrawer({ open, onClose, count, projects, onConfirm }
     onClose();
   }
 
-  const canConfirm = Boolean(newAM || newTL);
+  const canConfirm = Boolean((newAM || newTL) && reason.trim());
 
   /* count adhoc tasks without an assignee */
   const adhocGroup           = TASK_GROUPS.find(g => g.id === 'am-adhoc');
@@ -393,6 +395,16 @@ export function BulkReassignDrawer({ open, onClose, count, projects, onConfirm }
               </div>
 
             </div>
+
+            {/* ── Reason for Reassignment ── */}
+            <DrawerField label="Reason for Reassignment" required>
+              <DrawerTextarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Describe why the project(s) are being reassigned..."
+                rows={4}
+              />
+            </DrawerField>
 
             {/* ── Info banners ── */}
             <div className="space-y-2">
