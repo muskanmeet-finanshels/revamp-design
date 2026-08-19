@@ -92,7 +92,6 @@ export const FILTER_OPTIONS = {
   services:    ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
   revenueTypes: ['Main Revenue', 'Internal Revenue'],
   revenueConditions: [
-    'No revenue filter',
     'Equals',
     'Not Equals',
     'Greater Than',
@@ -1139,7 +1138,7 @@ export function FilterDrawer({
               <SingleSelectDropdown
                 label="Condition"
                 options={FILTER_OPTIONS.revenueConditions}
-                value={revenueCondition}
+                value={revenueCondition === REVENUE_NO_FILTER ? 'Select condition' : revenueCondition}
                 onChange={value => {
                   onChange({
                     ...pending,
@@ -1324,7 +1323,9 @@ export function sanitizeSavedFilter(
     removedByField['Revenue Type'] = 1;
     sanitized.revenueType = 'Main Revenue';
   }
-  if (!(FILTER_OPTIONS.revenueConditions as readonly string[]).includes(sanitized.revenueCondition)) {
+  const hasValidRevenueCondition = sanitized.revenueCondition === REVENUE_NO_FILTER
+    || (FILTER_OPTIONS.revenueConditions as readonly string[]).includes(sanitized.revenueCondition);
+  if (!hasValidRevenueCondition) {
     removedByField['Revenue'] = 1;
     sanitized.revenueCondition = REVENUE_NO_FILTER;
     sanitized.revenueValue = '';
