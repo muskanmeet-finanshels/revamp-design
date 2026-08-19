@@ -600,8 +600,8 @@ export function EmployeeManagementScreen() {
       {visibleGroups.length ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <Table className="w-full min-w-[760px] table-auto">
-            <TableHeader>
-              <TableRow className="border-gray-100 bg-gray-50/70 hover:bg-gray-50/70">
+            <TableHeader className="[&_tr]:border-0">
+              <TableRow className="border-0 bg-gray-50/70 hover:bg-gray-50/70">
                 <TableHead aria-sort={sortKey === 'name' ? sortDirection : 'none'} className="h-11 px-5">
                   <SortableGroupHead label="Employee Group" sortKey="name" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
                 </TableHead>
@@ -657,15 +657,14 @@ export function EmployeeManagementScreen() {
           </Table>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <Empty
-            icon={query || filter !== 'All' ? SearchX : UsersRound}
-            title={query || filter !== 'All' ? 'No employee groups found' : 'No employee groups yet'}
-            description={query || filter !== 'All'
-              ? 'Try adjusting your search or status filter.'
-              : 'Create a group to manage cross-functional teams and group-based permissions.'}
-          />
-        </div>
+        <Empty
+          icon={query.trim() || filter !== 'All' ? SearchX : UsersRound}
+          title={query.trim() || filter !== 'All' ? 'No employee groups found' : 'No employee groups yet'}
+          description={query.trim() || filter !== 'All'
+            ? 'Try adjusting your search or status filter.'
+            : 'Create a group to manage cross-functional teams and group-based permissions.'}
+          className="mt-6"
+        />
       )}
 
       <GroupDrawer
