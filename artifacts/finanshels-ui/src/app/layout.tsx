@@ -4,6 +4,7 @@ import { JetBrains_Mono, Poppins } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { TimerProvider } from '@/contexts/TimerContext';
 import { OrgProvider } from '@/contexts/OrgContext';
+import { EmployeeGroupsProvider } from '@/contexts/EmployeeGroupsContext';
 import { TimerWidget } from '@/components/TimerWidget';
 
 import './globals.css';
@@ -35,11 +36,13 @@ export default function RootLayout({
     <html lang="en" className={`${poppins.variable} ${jetbrainsMono.variable}`}>
       <body>
         <OrgProvider>
-          <TimerProvider>
-            {children}
-            <TimerWidget />
-            <Toaster position="bottom-right" richColors />
-          </TimerProvider>
+          <EmployeeGroupsProvider>
+            <TimerProvider>
+              {children}
+              <TimerWidget />
+              <Toaster position="bottom-right" richColors />
+            </TimerProvider>
+          </EmployeeGroupsProvider>
         </OrgProvider>
       </body>
     </html>

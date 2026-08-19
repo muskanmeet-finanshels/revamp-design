@@ -33,12 +33,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
-  MOCK_USERS, MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
+  MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
   MOCK_USER_DEPENDENCIES,
-  ALLOW_MULTIPLE_ROLES, ROLE_OPTIONS, EMPLOYEE_GROUP_OPTIONS,
-  type AppUser, type UserStatus, type UserRole, type UserDependency,
+  ALLOW_MULTIPLE_ROLES, ROLE_OPTIONS,
+  type AppUser, type EmployeeGroup, type UserStatus, type UserRole, type UserDependency,
 } from './mock-data';
 import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
+import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 
 const PROJECTS_BY_TITLE = new Map(MOCK_PROJECTS.map(project => [project.title, project]));
 const getDependencyProjectDisplayName = (title: string) => {
@@ -133,12 +134,14 @@ function MultiSelectField({
   onChange,
   placeholder,
   error,
+  summaryNoun = 'roles',
 }: {
   options: Array<{ value: string; label: string }>;
   selected: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
   error?: boolean;
+  summaryNoun?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selectedLabels = options
@@ -173,7 +176,7 @@ function MultiSelectField({
               ? placeholder
               : selectedLabels.length === 1
                 ? selectedLabels[0]
-                : `${selectedLabels.length} roles selected`}
+                : `${selectedLabels.length} ${summaryNoun} selected`}
           </span>
           <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
         </button>
@@ -337,10 +340,11 @@ interface UserDrawerProps {
   onClose: () => void;
   editUser: AppUser | null;
   allUsers: AppUser[];
+  groups: EmployeeGroup[];
   onSave: (data: Partial<AppUser>) => void;
 }
 
-function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerProps) {
+function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserDrawerProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -356,7 +360,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
   const [verticalId,        setVerticalId]        = useState('');
   const [reportingManagerId, setReportingManagerId] = useState('');
   const [roles,             setRoles]             = useState<UserRole[]>([]);
-  const [employeeGroup,     setEmployeeGroup]     = useState('');
+  const [employeeGroups,    setEmployeeGroups]    = useState<string[]>([]);
   const [joiningDate,       setJoiningDate]       = useState('');
   const [showErrors,        setShowErrors]        = useState(false);
 
@@ -376,13 +380,13 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
         setVerticalId(editUser.verticalId ?? '');
         setReportingManagerId(editUser.reportingManagerId ?? '');
         setRoles([...editUser.roles]);
-        setEmployeeGroup(editUser.employeeGroups[0] ?? '');
+        setEmployeeGroups([...editUser.employeeGroups]);
         setJoiningDate(editUser.joiningDate ?? '');
       } else {
         setFirstName(''); setLastName(''); setEmail(''); setPhone('');
         setJobTitle(''); setEmployeeId(''); setDepartmentId('');
         setTeamId(''); setVerticalId(''); setReportingManagerId('');
-        setRoles([]); setEmployeeGroup(''); setJoiningDate('');
+        setRoles([]); setEmployeeGroups([]); setJoiningDate('');
       }
     }
   }, [open, editUser]);
@@ -427,7 +431,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
       verticalId: verticalId || undefined,
       reportingManagerId: reportingManagerId || undefined,
       roles,
-      employeeGroups: employeeGroup ? [employeeGroup] : [],
+      employeeGroups,
       joiningDate: joiningDate || undefined,
     });
   }
@@ -606,11 +610,14 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
 
             {/* Employee Groups */}
             <DrawerField label="Assign Employee Groups">
-              <DrawerSelectField
-                value={employeeGroup}
-                onChange={setEmployeeGroup}
+              <MultiSelectField
+                selected={employeeGroups}
+                onChange={setEmployeeGroups}
                 placeholder="Select employee group…"
-                options={EMPLOYEE_GROUP_OPTIONS.map(group => ({ value: group, label: group }))}
+                summaryNoun="groups"
+                options={groups
+                  .filter(group => group.status === 'Active')
+                  .map(group => ({ value: group.name, label: group.name }))}
               />
             </DrawerField>
 
@@ -1017,7 +1024,7 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const [users, setUsers] = useState<AppUser[]>(MOCK_USERS);
+  const { users, groups, saveUser, updateUserStatus } = useEmployeeGroupsContext();
 
   /* Filters */
   const [search,       setSearch]       = useState('');
@@ -1105,7 +1112,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   function handleSave(data: Partial<AppUser>) {
     if (editUser) {
-      setUsers(us => us.map(u => u.id === editUser.id ? { ...u, ...data } : u));
+      saveUser({ ...editUser, ...data });
       toast.success(`${data.firstName} ${data.lastName} updated`);
     } else {
       const newUser: AppUser = {
@@ -1121,7 +1128,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         departmentId: '',
         ...data,
       };
-      setUsers(us => [...us, newUser]);
+      saveUser(newUser);
       toast.success(`${newUser.firstName} ${newUser.lastName} added`);
     }
     setDrawerOpen(false);
@@ -1132,13 +1139,13 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   function openEdit(u: AppUser) { setEditUser(u); setDrawerOpen(true); }
 
   function handleActivate(u: AppUser) {
-    setUsers(us => us.map(x => x.id === u.id ? { ...x, status: 'Active' } : x));
+    updateUserStatus(u.id, 'Active');
     toast.success(`${u.firstName} ${u.lastName} is now Active`);
     setActivateTarget(null);
   }
 
   function handleDeactivate(u: AppUser) {
-    setUsers(us => us.map(x => x.id === u.id ? { ...x, status: 'Inactive' } : x));
+    updateUserStatus(u.id, 'Inactive');
   }
 
   return (
@@ -1404,6 +1411,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onClose={() => { setDrawerOpen(false); setEditUser(null); }}
         editUser={editUser}
         allUsers={users}
+        groups={groups}
         onSave={handleSave}
       />
 

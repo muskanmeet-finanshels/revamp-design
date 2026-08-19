@@ -42,14 +42,24 @@ export const ROLE_OPTIONS: UserRole[] = [
   'Viewer',
 ];
 
-export const EMPLOYEE_GROUP_OPTIONS: string[] = [
-  'Management',
-  'Senior Staff',
-  'Junior Staff',
-  'Contractor',
-  'Part-time',
-  'Remote Team',
-  'Probation',
+export type EmployeeGroupStatus = 'Active' | 'Inactive';
+
+export interface EmployeeGroup {
+  id: string;
+  name: string;
+  description: string;
+  status: EmployeeGroupStatus;
+  createdAt: string;
+}
+
+export const MOCK_EMPLOYEE_GROUPS: EmployeeGroup[] = [
+  { id: 'group-management', name: 'Management', description: 'Senior leaders and people managers.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-senior-staff', name: 'Senior Staff', description: 'Experienced specialists and senior contributors.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-junior-staff', name: 'Junior Staff', description: 'Early-career professionals and associates.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-remote-team', name: 'Remote Team', description: 'Employees who work remotely across departments.', status: 'Active', createdAt: '2021-04-12' },
+  { id: 'group-probation', name: 'Probation', description: 'New employees in their probationary period.', status: 'Active', createdAt: '2022-01-10' },
+  { id: 'group-contractors', name: 'Contractor', description: 'External or temporary contracted team members.', status: 'Inactive', createdAt: '2020-01-01' },
+  { id: 'group-part-time', name: 'Part-time', description: 'Employees on reduced working-hour arrangements.', status: 'Inactive', createdAt: '2020-01-01' },
 ];
 
 export interface AppUser {
