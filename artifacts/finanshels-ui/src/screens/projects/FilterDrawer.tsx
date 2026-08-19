@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle, ArrowLeft, Bookmark, Building2, CalendarRange, Check, ChevronDown, ChevronUp, CircleAlert,
+  DollarSign,
   Pencil, RotateCcw, Search, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -89,6 +90,17 @@ function useSavedFilters(storageKey: string) {
 export const FILTER_OPTIONS = {
   departments: ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
   services:    ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
+  revenueTypes: ['Main Revenue', 'Internal Revenue'],
+  revenueConditions: [
+    'No revenue filter',
+    'Equals',
+    'Not Equals',
+    'Greater Than',
+    'Greater Than or Equal To',
+    'Less Than',
+    'Less Than or Equal To',
+    'Between',
+  ],
   revenueRanges: ['AED 0–5,000', 'AED 5,001–10,000', 'AED 10,001–15,000', 'AED 15,001+'],
   dueDays:     ['Today', '1–7 Days', '8–14 Days', '15–30 Days', '30–60 Days', '60+ Days'],
   overdueDays: ['1–10 Days', '10–30 Days', '30–60 Days', '60+ Days'],
@@ -106,11 +118,18 @@ export const FILTER_OPTIONS = {
   dueDatePresets: ['All dates', 'Today', 'This Week', 'This Month', 'Custom Date Range'],
 } as const;
 
+export const REVENUE_NO_FILTER = 'No revenue filter';
+
 /* ─────────────────────────────── filter state ───────────────────────────── */
 
 export interface FilterState {
   departments:    string[];
   services:       string[];
+  revenueType:    string;
+  revenueCondition: string;
+  revenueValue:   string;
+  revenueValueTo: string;
+  /** Legacy saved-filter field; new filters use revenueCondition instead. */
   revenueRanges:  string[];
   dueDays:        string[];
   overdueDays:    string[];
@@ -123,18 +142,40 @@ export interface FilterState {
 }
 
 export const EMPTY_FILTERS: FilterState = {
-  departments: [], services: [], revenueRanges: [], dueDays: [], overdueDays: [],
+  departments: [], services: [], revenueType: 'Main Revenue', revenueCondition: REVENUE_NO_FILTER,
+  revenueValue: '', revenueValueTo: '',
+  revenueRanges: [], dueDays: [], overdueDays: [],
   clients: [], assignees: [], tags: [], dueDatePresets: [],
   periodFrom: '', periodTo: '',
 };
 
+function isValidRevenueValue(value: string | undefined): boolean {
+  if (!value?.trim()) return false;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0;
+}
+
+export function isRevenueFilterComplete(f: FilterState): boolean {
+  const legacyRanges = Array.isArray(f.revenueRanges) ? f.revenueRanges : [];
+  const condition = f.revenueCondition || (legacyRanges.length > 0 ? legacyRanges[0] : REVENUE_NO_FILTER);
+
+  if (condition === REVENUE_NO_FILTER) return true;
+  if (legacyRanges.length > 0 && !f.revenueValue) return true;
+  if (!isValidRevenueValue(f.revenueValue)) return false;
+  if (condition !== 'Between') return true;
+
+  return isValidRevenueValue(f.revenueValueTo)
+    && Number(f.revenueValueTo) >= Number(f.revenueValue);
+}
+
 export function countActiveFilters(f: FilterState): number {
   const revenueRanges = Array.isArray(f.revenueRanges) ? f.revenueRanges : [];
+  const revenueCondition = f.revenueCondition || revenueRanges[0] || REVENUE_NO_FILTER;
 
   return (
     (f.departments.length > 0 ? 1 : 0) +
     (f.services.length > 0 ? 1 : 0) +
-    (revenueRanges.length > 0 ? 1 : 0) +
+    (revenueCondition !== REVENUE_NO_FILTER && isRevenueFilterComplete(f) ? 1 : 0) +
     (f.dueDays.length > 0 ? 1 : 0) +
     (f.overdueDays.length > 0 ? 1 : 0) +
     (f.clients.length > 0 ? 1 : 0) +
@@ -407,13 +448,14 @@ function MultiSelectDropdown({
 }
 
 function SingleSelectDropdown({
-  label, options, value, onChange, drawerOpen,
+  label, options, value, onChange, drawerOpen, active,
 }: {
   label: string;
   options: readonly string[];
   value: string;
   onChange: (value: string) => void;
   drawerOpen: boolean;
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
@@ -498,6 +540,7 @@ function SingleSelectDropdown({
       </ul>
     </div>
   ) : null;
+  const hasActiveValue = active ?? value !== 'All dates';
 
   return (
     <div>
@@ -508,12 +551,12 @@ function SingleSelectDropdown({
         onClick={() => setOpen(current => !current)}
         className={cn(
           'flex h-11 w-full items-center justify-between rounded-xl border bg-white px-4 text-[13px] transition-colors focus:outline-none',
-          open || value !== 'All dates' ? 'border-brand' : 'border-gray-200 hover:border-gray-300',
+          open || hasActiveValue ? 'border-brand' : 'border-gray-200 hover:border-gray-300',
         )}
       >
         <span className={cn(
           'truncate text-left',
-          value !== 'All dates' ? 'text-gray-900' : 'text-gray-600',
+          hasActiveValue ? 'text-gray-900' : 'text-gray-600',
         )}>
           {value}
         </span>
@@ -563,6 +606,10 @@ export function FilterDrawer({
   const nameToId = Object.fromEntries(activeDepts.map(d => [d.name, d.id]));
   const idToName = Object.fromEntries(activeDepts.map(d => [d.id, d.name]));
   const hasPendingFilters = countActiveFilters(pending) > 0;
+  const revenueFilterComplete = isRevenueFilterComplete(pending);
+  const canApply = hasPendingFilters && revenueFilterComplete;
+  const revenueCondition = pending.revenueCondition || REVENUE_NO_FILTER;
+  const isBetweenRevenueCondition = revenueCondition === 'Between';
 
   function set<K extends keyof FilterState>(key: K, value: FilterState[K]) {
     onChange({ ...pending, [key]: value });
@@ -613,7 +660,7 @@ export function FilterDrawer({
   }, [dropdownOpen]);
 
   function handleSave() {
-    if (!hasPendingFilters) return;
+    if (!canApply) return;
     if (atCap) { setSaveCapWarning(true); return; }
     saveFilter(saveName, pending);
     setActiveSavedFilterId(null);
@@ -623,6 +670,10 @@ export function FilterDrawer({
   }
 
   function handleUpdate(sf: SavedFilter) {
+    if (!revenueFilterComplete) {
+      toast.error('Enter a complete revenue condition before updating the saved filter.');
+      return;
+    }
     updateFilter(sf.id, pending);
     if (onApplyDirect) { onApplyDirect(pending); }
     else { onChange(pending); onApply(); }
@@ -917,12 +968,12 @@ export function FilterDrawer({
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      onClick={() => { if (hasPendingFilters) setSavePanelOpen(v => !v); }}
+                      onClick={() => { if (canApply) setSavePanelOpen(v => !v); }}
                       className={cn(
                         'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
                         savePanelOpen
                           ? 'bg-orange-50 text-brand'
-                          : hasPendingFilters
+                          : canApply
                             ? 'text-gray-500 hover:bg-gray-100 hover:text-brand'
                             : 'cursor-not-allowed text-gray-300',
                       )}
@@ -934,7 +985,7 @@ export function FilterDrawer({
                     side="bottom"
                     className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
                   >
-                    {hasPendingFilters ? 'Save current filters' : 'Set filters to save'}
+                     {canApply ? 'Save current filters' : 'Complete filters to save'}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -943,14 +994,14 @@ export function FilterDrawer({
               <button
                 type="button"
                 onClick={() => {
-                  if (!hasPendingFilters) return;
+                  if (!canApply) return;
                   onApply();
                   onClose();
                 }}
-                disabled={!hasPendingFilters}
+                  disabled={!canApply}
                 className={cn(
                   'min-w-[106px] rounded-lg px-4 py-2 text-[13px] font-bold text-white shadow-[0_2px_5px_rgba(234,88,12,0.18)] transition-colors',
-                  hasPendingFilters
+                  canApply
                     ? 'bg-brand hover:bg-brand-hover'
                     : 'cursor-not-allowed bg-orange-200',
                 )}
@@ -977,7 +1028,7 @@ export function FilterDrawer({
                   value={saveName}
                   onChange={e => { setSaveName(e.target.value); setSaveCapWarning(false); }}
                   onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setSavePanelOpen(false); }}
-                  disabled={atCap}
+                   disabled={atCap || !canApply}
                   className="h-8 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-800 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <button
@@ -1026,15 +1077,6 @@ export function FilterDrawer({
                 drawerOpen={open}
               />
               <MultiSelectDropdown
-                label="Revenue"
-                placeholder="Any Revenue"
-                options={FILTER_OPTIONS.revenueRanges}
-                selected={pending.revenueRanges}
-                onChange={v => set('revenueRanges', v)}
-                searchPlaceholder="Search revenue..."
-                drawerOpen={open}
-              />
-              <MultiSelectDropdown
                 label="Due Days"
                 placeholder="Any"
                 options={FILTER_OPTIONS.dueDays}
@@ -1080,6 +1122,80 @@ export function FilterDrawer({
                 drawerOpen={open}
               />
             </div>
+          </div>
+
+          {/* Revenue Filters */}
+          <div className="border-t border-gray-100 px-5 py-5">
+            <SectionHeader icon={<DollarSign size={20} strokeWidth={1.8} />} label="Revenue Filters" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <SingleSelectDropdown
+                label="Revenue Type"
+                options={FILTER_OPTIONS.revenueTypes}
+                value={pending.revenueType || 'Main Revenue'}
+                onChange={value => set('revenueType', value)}
+                active
+                drawerOpen={open}
+              />
+              <SingleSelectDropdown
+                label="Condition"
+                options={FILTER_OPTIONS.revenueConditions}
+                value={revenueCondition}
+                onChange={value => {
+                  onChange({
+                    ...pending,
+                    revenueCondition: value,
+                    revenueValue: value === REVENUE_NO_FILTER ? '' : pending.revenueValue,
+                    revenueValueTo: value === REVENUE_NO_FILTER ? '' : pending.revenueValueTo,
+                    revenueRanges: [],
+                  });
+                }}
+                active={revenueCondition !== REVENUE_NO_FILTER}
+                drawerOpen={open}
+              />
+            </div>
+            {revenueCondition !== REVENUE_NO_FILTER && (
+              <div className="mt-4">
+                <div className={cn('grid gap-3', isBetweenRevenueCondition ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <div>
+                    <p className="mb-1.5 text-[13px] font-medium text-gray-900">
+                      {isBetweenRevenueCondition ? 'Minimum Amount (AED)' : 'Amount (AED)'}
+                    </p>
+                    <DrawerInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Enter amount"
+                      value={pending.revenueValue ?? ''}
+                      onChange={event => set('revenueValue', event.target.value)}
+                      aria-label={isBetweenRevenueCondition ? 'Minimum revenue amount' : 'Revenue amount'}
+                    />
+                  </div>
+                  {isBetweenRevenueCondition && (
+                    <div>
+                      <p className="mb-1.5 text-[13px] font-medium text-gray-900">Maximum Amount (AED)</p>
+                      <DrawerInput
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="Enter amount"
+                        value={pending.revenueValueTo ?? ''}
+                        onChange={event => set('revenueValueTo', event.target.value)}
+                        aria-label="Maximum revenue amount"
+                      />
+                    </div>
+                  )}
+                </div>
+                {!revenueFilterComplete && (
+                  <p className="mt-2 text-[12px] text-amber-600">
+                    {isBetweenRevenueCondition
+                      ? 'Enter both amounts, with the maximum greater than or equal to the minimum.'
+                      : 'Enter an amount to apply this revenue condition.'}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Project Timeline */}
@@ -1155,6 +1271,10 @@ export function sanitizeSavedFilter(
   const sanitized: FilterState = {
     ...filters,
     revenueRanges: Array.isArray(filters.revenueRanges) ? filters.revenueRanges : [],
+    revenueType: filters.revenueType || 'Main Revenue',
+    revenueCondition: filters.revenueCondition || REVENUE_NO_FILTER,
+    revenueValue: filters.revenueValue ?? '',
+    revenueValueTo: filters.revenueValueTo ?? '',
   };
   const removedByField: Record<string, number> = {};
 
@@ -1180,6 +1300,37 @@ export function sanitizeSavedFilter(
       (sanitized as any)[key] = valid;
     }
   }
+
+  /* Convert the old multi-select revenue ranges into the new operator + amount shape. */
+  const legacyCondition = (FILTER_OPTIONS.revenueRanges as readonly string[]).includes(sanitized.revenueCondition)
+    ? sanitized.revenueCondition
+    : undefined;
+  const legacyRange = sanitized.revenueRanges[0] ?? legacyCondition;
+  if (legacyRange) {
+    const legacyRangeMap: Record<string, { condition: string; value: string; valueTo: string }> = {
+      'AED 0–5,000':       { condition: 'Between', value: '0',     valueTo: '5000' },
+      'AED 5,001–10,000':  { condition: 'Between', value: '5001',  valueTo: '10000' },
+      'AED 10,001–15,000': { condition: 'Between', value: '10001', valueTo: '15000' },
+      'AED 15,001+':       { condition: 'Greater Than or Equal To', value: '15001', valueTo: '' },
+    };
+    const migrated = legacyRangeMap[legacyRange];
+    if (migrated) {
+      sanitized.revenueCondition = migrated.condition;
+      sanitized.revenueValue = migrated.value;
+      sanitized.revenueValueTo = migrated.valueTo;
+    }
+  }
+  if (!(FILTER_OPTIONS.revenueTypes as readonly string[]).includes(sanitized.revenueType)) {
+    removedByField['Revenue Type'] = 1;
+    sanitized.revenueType = 'Main Revenue';
+  }
+  if (!(FILTER_OPTIONS.revenueConditions as readonly string[]).includes(sanitized.revenueCondition)) {
+    removedByField['Revenue'] = 1;
+    sanitized.revenueCondition = REVENUE_NO_FILTER;
+    sanitized.revenueValue = '';
+    sanitized.revenueValueTo = '';
+  }
+  sanitized.revenueRanges = [];
 
   return { sanitized, removedByField };
 }

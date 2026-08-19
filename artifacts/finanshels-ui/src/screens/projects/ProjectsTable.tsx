@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import type { Project, ProjectStatus } from './mock-data';
+import { getProjectDisplayName, type Project, type ProjectStatus } from './mock-data';
 import { getDateIndicator } from './date-utils';
 import { AvatarGroup } from './AvatarGroup';
 import {
@@ -513,6 +513,7 @@ export function ProjectsTable({
             {projects.map(p => {
               const isSelected = selectedIds.has(p.id);
               const isSelectionDisabled = disableAllSelection || p.status === 'Completed' || p.status === 'Archived';
+              const displayName = getProjectDisplayName(p);
               return (
                 <TableRow
                   key={p.id}
@@ -545,9 +546,25 @@ export function ProjectsTable({
 
                   {/* Project title — fixed */}
                   <TableCell className="max-w-0 py-3">
-                    <span className="block max-w-full truncate whitespace-nowrap text-[13px] font-semibold leading-snug text-gray-900">
-                      {p.title}
-                    </span>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            tabIndex={0}
+                            className="block max-w-full cursor-default truncate whitespace-nowrap text-[13px] font-semibold leading-snug text-gray-900 outline-none"
+                          >
+                            {displayName}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          sideOffset={6}
+                          className="max-w-[360px] whitespace-normal break-words rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                        >
+                          {displayName}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
 
                   {/* Data cells in user-specified order */}
@@ -568,7 +585,7 @@ export function ProjectsTable({
             open={openId === p.id}
             onClose={() => setOpenId(null)}
             onSave={(priority, severity) => saveTag(p.id, priority, severity)}
-            projectTitle={p.title}
+            projectTitle={getProjectDisplayName(p)}
             initialPriority={tag.priority}
             initialSeverity={tag.severity}
           />

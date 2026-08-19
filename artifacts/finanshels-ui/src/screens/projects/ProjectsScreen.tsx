@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   ActiveFilterChips,
+  makeActiveFilterChipKey,
   parseActiveFilterChipKey,
   type ActiveFilterChip,
 } from '@/components/ActiveFilterChips';
@@ -19,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
 import { ProjectCard } from './ProjectCard';
 import {
   ProjectsTable,
@@ -28,7 +29,14 @@ import {
   type ProjectSortKey,
 } from './ProjectsTable';
 import { ProjectsPagination } from './ProjectsPagination';
-import { FilterDrawer, EMPTY_FILTERS, countActiveFilters, type FilterState } from './FilterDrawer';
+import {
+  FilterDrawer,
+  EMPTY_FILTERS,
+  REVENUE_NO_FILTER,
+  countActiveFilters,
+  isRevenueFilterComplete,
+  type FilterState,
+} from './FilterDrawer';
 import { BulkActionBar } from './BulkActionBar';
 import { HoldProjectDrawer } from './HoldProjectDrawer';
 import { BulkReassignDrawer } from './BulkReassignDrawer';
@@ -253,7 +261,6 @@ type SortByOption = ProjectSortKey;
 
 const SORT_OPTIONS: Array<{ value: SortByOption; label: string }> = [
   { value: 'project-name', label: 'Project Name' },
-  { value: 'client-name',  label: 'Client Name'  },
   { value: 'department',   label: 'Department'   },
   { value: 'progress',     label: 'Progress'     },
   { value: 'task-count',   label: 'Task Count'   },
@@ -404,7 +411,7 @@ export function ProjectsScreen() {
 
   const selectedProjects = selectedProjectRecords
     .map(p => ({
-      title: `${p.client.name} – ${p.title}`,
+      title: getProjectDisplayName(p),
       dueDate: p.dueDate.replace(/^Due\s+/i, ''),
     }));
 
@@ -493,16 +500,36 @@ export function ProjectsScreen() {
     const deptMatch   = af.departments.length === 0
       || (selectedDeptIds.length > 0 && selectedDeptIds.includes(p.serviceType.departmentId));
     const svcMatch    = af.services.length === 0    || af.services.includes(p.serviceType.label);
-    const revenueRanges = Array.isArray(af.revenueRanges) ? af.revenueRanges : [];
-    const revenueMatch = revenueRanges.length === 0 || (
-      p.revenue != null && revenueRanges.some(range => {
-        if (range === 'AED 0–5,000')      return p.revenue >= 0 && p.revenue <= 5000;
-        if (range === 'AED 5,001–10,000') return p.revenue >= 5001 && p.revenue <= 10000;
-        if (range === 'AED 10,001–15,000')return p.revenue >= 10001 && p.revenue <= 15000;
-        if (range === 'AED 15,001+')      return p.revenue >= 15001;
+    const legacyRevenueRanges = Array.isArray(af.revenueRanges) ? af.revenueRanges : [];
+    const revenueCondition = af.revenueCondition || legacyRevenueRanges[0] || REVENUE_NO_FILTER;
+    const revenueTypeMatch = af.revenueType === 'Internal Revenue'
+      ? p.invoiceType === 'bundled'
+      : p.invoiceType === 'individual';
+    const revenueConditionMatch = revenueCondition === REVENUE_NO_FILTER || (
+      p.revenue != null
+      && isRevenueFilterComplete(af)
+      && (() => {
+        const amount = Number(af.revenueValue);
+        const maximum = Number(af.revenueValueTo);
+
+        if (revenueCondition === 'Equals') return p.revenue === amount;
+        if (revenueCondition === 'Not Equals') return p.revenue !== amount;
+        if (revenueCondition === 'Greater Than') return p.revenue > amount;
+        if (revenueCondition === 'Greater Than or Equal To') return p.revenue >= amount;
+        if (revenueCondition === 'Less Than') return p.revenue < amount;
+        if (revenueCondition === 'Less Than or Equal To') return p.revenue <= amount;
+        if (revenueCondition === 'Between') return p.revenue >= amount && p.revenue <= maximum;
+
+        /* Preserve older saved range filters while they are being migrated. */
+        if (revenueCondition === 'AED 0–5,000') return p.revenue >= 0 && p.revenue <= 5000;
+        if (revenueCondition === 'AED 5,001–10,000') return p.revenue >= 5001 && p.revenue <= 10000;
+        if (revenueCondition === 'AED 10,001–15,000') return p.revenue >= 10001 && p.revenue <= 15000;
+        if (revenueCondition === 'AED 15,001+') return p.revenue >= 15001;
         return true;
-      })
+      })()
     );
+    const revenueMatch = revenueCondition === REVENUE_NO_FILTER
+      || (revenueTypeMatch && revenueConditionMatch);
     const clientMatch = af.clients.length === 0     || af.clients.includes(p.client.name);
 
     const allMembers  = [...p.teamLeads, ...p.assignees].map(m => m.name);
@@ -974,7 +1001,7 @@ export function ProjectsScreen() {
         const chips: ActiveFilterChip[] = [];
 
         const arrayChip = (
-          key: keyof Pick<FilterState, 'departments'|'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>,
+          key: keyof Pick<FilterState, 'departments'|'services'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>,
           label: string,
         ) => {
           const vals = af[key] as string[];
@@ -992,7 +1019,23 @@ export function ProjectsScreen() {
           chips.push({ key: makeActiveFilterChipKey('departments', deptId), label: 'Department', value: name });
         });
         arrayChip('services',       'Service');
-        arrayChip('revenueRanges',  'Revenue');
+        const revenueCondition = appliedFilters.revenueCondition
+          || appliedFilters.revenueRanges?.[0]
+          || REVENUE_NO_FILTER;
+        if (revenueCondition !== REVENUE_NO_FILTER) {
+          const revenueValue = appliedFilters.revenueValue?.trim();
+          const revenueValueTo = appliedFilters.revenueValueTo?.trim();
+          const amountLabel = revenueCondition === 'Between'
+            ? `${revenueValue}–${revenueValueTo} AED`
+            : revenueValue
+              ? `${revenueValue} AED`
+              : '';
+          chips.push({
+            key: 'revenueCondition',
+            label: 'Revenue',
+            value: `${appliedFilters.revenueType || 'Main Revenue'} · ${revenueCondition}${amountLabel ? ` (${amountLabel})` : ''}`,
+          });
+        }
         arrayChip('dueDays',        'Due Days');
         arrayChip('overdueDays',    'Overdue');
         arrayChip('clients',        'Client');
@@ -1003,7 +1046,7 @@ export function ProjectsScreen() {
         if (af.periodTo)   chips.push({ key: 'periodTo',   label: 'To',   value: af.periodTo });
 
         function removeChip(key: string) {
-          const arrayKeys = ['departments','services','revenueRanges','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
+          const arrayKeys = ['departments','services','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
           const parsed = parseActiveFilterChipKey(key);
           if ((arrayKeys as readonly string[]).includes(parsed.filterKey)) {
             const arrayKey = parsed.filterKey as typeof arrayKeys[number];
@@ -1012,6 +1055,16 @@ export function ProjectsScreen() {
               [arrayKey]: parsed.value === null
                 ? []
                 : appliedFilters[arrayKey].filter(value => value !== parsed.value),
+            };
+            setAppliedFilters(next);
+            setPendingFilters(next);
+          } else if (parsed.filterKey === 'revenueCondition') {
+            const next = {
+              ...appliedFilters,
+              revenueCondition: REVENUE_NO_FILTER,
+              revenueValue: '',
+              revenueValueTo: '',
+              revenueRanges: [],
             };
             setAppliedFilters(next);
             setPendingFilters(next);
@@ -1217,7 +1270,7 @@ export function ProjectsScreen() {
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         projects={selectedProjectRecords.map(p => ({
-          title:        `${p.client.name} – ${p.title}`,
+          title:        getProjectDisplayName(p),
           dueDate:      p.dueDate.replace(/^Due\s+/i, ''),
           clientName:   p.client.name,
           serviceOpted: p.serviceType.label,

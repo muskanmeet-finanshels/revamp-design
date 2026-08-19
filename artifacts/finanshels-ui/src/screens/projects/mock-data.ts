@@ -41,6 +41,20 @@ export interface Project {
   reassignReason?: string;
 }
 
+export function getProjectDisplayName(project: Pick<Project, 'client' | 'title'>): string {
+  const clientName = project.client.name.trim();
+  const rawTitle = project.title.trim();
+  if (!clientName) return rawTitle;
+
+  const escapedClientName = clientName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const titleWithoutClientPrefix = rawTitle.replace(
+    new RegExp(`^${escapedClientName}\\s*[-–—:]\\s*`, 'i'),
+    '',
+  );
+
+  return `${clientName}- ${titleWithoutClientPrefix}`;
+}
+
 const SEED_PROJECTS: Project[] = [
   {
     id: '1',

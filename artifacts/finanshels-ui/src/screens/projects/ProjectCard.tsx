@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, Pencil, Tag, CalendarDays, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { Project, ProjectStatus } from './mock-data';
+import { getProjectDisplayName, type Project, type ProjectStatus } from './mock-data';
 import { getDateIndicator } from './date-utils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -55,6 +55,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
   const router    = useRouter();
   const chip      = STATUS_CHIP[project.status];
   const indicator = getDateIndicator(project);
+  const displayName = getProjectDisplayName(project);
   const isSelectionDisabled = disableAllSelection || project.status === 'Completed' || project.status === 'Archived';
 
   const [priority, setPriority]           = useState<PriorityValue>('');
@@ -104,7 +105,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="block min-w-0 max-w-full truncate whitespace-nowrap text-[15px] font-semibold leading-snug text-gray-900">
-                    {project.title}
+                    {displayName}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent
@@ -112,7 +113,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
                   sideOffset={6}
                   className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
                 >
-                  {project.title}
+                  {displayName}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -247,7 +248,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
             </DialogTitle>
             <DialogDescription className="text-[13.5px] text-gray-500 leading-relaxed">
               Are you sure you want to resume{' '}
-              <span className="font-medium text-gray-700">{project.title}</span>?
+              <span className="font-medium text-gray-700">{displayName}</span>?
               It will be moved back to <span className="font-medium text-emerald-700">Current</span>.
             </DialogDescription>
           </DialogHeader>
@@ -264,7 +265,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
                 setResumeDialogOpen(false);
                 onResume?.();
                 toast.success('Project resumed', {
-                  description: `${project.title} is now active.`,
+                  description: `${displayName} is now active.`,
                   duration: 4000,
                 });
               }}
@@ -280,7 +281,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
         open={tagsOpen}
         onClose={() => setTagsOpen(false)}
         onSave={(p, s) => { setPriority(p); setSeverity(s); }}
-        projectTitle={project.title}
+        projectTitle={displayName}
         initialPriority={priority}
         initialSeverity={severity}
       />

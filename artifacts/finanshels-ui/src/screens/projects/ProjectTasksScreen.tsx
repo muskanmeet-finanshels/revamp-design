@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from '../tasks/mock-data';
-import { MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
 import {
   TaskFilterDrawer, EMPTY_TASK_FILTERS, countActiveTaskFilters, type TaskFilterState,
 } from '../tasks/TaskFilterDrawer';
@@ -103,6 +103,7 @@ function ProgressRing({ pct }: { pct: number }) {
 
 function ProjectDetailCard({ project }: { project: Project }) {
   const chip      = STATUS_CHIP[project.status];
+  const displayName = getProjectDisplayName(project);
 
   const [tagsOpen,  setTagsOpen]  = useState(false);
   const [priority,  setPriority]  = useState<PriorityValue>('');
@@ -135,7 +136,7 @@ function ProjectDetailCard({ project }: { project: Project }) {
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Project</p>
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="min-w-0 truncate text-[19px] font-bold leading-snug text-gray-900">
-                  {project.title}
+                  {displayName}
                 </h2>
                 <span className={cn(
                   'flex flex-shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium',
@@ -253,7 +254,7 @@ function ProjectDetailCard({ project }: { project: Project }) {
         open={tagsOpen}
         onClose={() => setTagsOpen(false)}
         onSave={(p, s) => { setPriority(p); setSeverity(s); }}
-        projectTitle={project.title}
+        projectTitle={displayName}
         initialPriority={priority}
         initialSeverity={severity}
       />
@@ -394,6 +395,7 @@ function buildProjectTaskList(project: (typeof MOCK_PROJECTS)[number]): TaskItem
     Math.min(additionalCount, project.tasksCompleted - linkedCompletedCount),
   );
   const dueDate = projectDueDate(project.dueDate);
+  const displayName = getProjectDisplayName(project);
   const assignee = project.assignees[0]
     ? { initials: project.assignees[0].initials, name: project.assignees[0].name }
     : null;
@@ -401,10 +403,10 @@ function buildProjectTaskList(project: (typeof MOCK_PROJECTS)[number]): TaskItem
   for (let index = 0; index < additionalCount; index += 1) {
     tasks.push({
       id: `${project.id}-task-${index + 1}`,
-      name: `${project.title} — Task ${index + 1}`,
+      name: `${displayName} — Task ${index + 1}`,
       projects: [{
         id: project.id,
-        title: project.title,
+        title: displayName,
         clientName: project.client.name,
         clientColor: project.client.color,
       }],
@@ -429,7 +431,9 @@ export function ProjectTasksScreen() {
 
   /* resolve project metadata */
   const project = MOCK_PROJECTS.find(p => p.id === projectId);
-  const projectTitle = project?.title ?? (projectId ? `Project ${projectId}` : '');
+  const projectTitle = project
+    ? getProjectDisplayName(project)
+    : (projectId ? `Project ${projectId}` : '');
 
   /* base task list scoped to this project */
   const baseTasks = useMemo(
