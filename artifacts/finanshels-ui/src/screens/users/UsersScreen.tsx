@@ -38,6 +38,13 @@ import {
   ALLOW_MULTIPLE_ROLES, ROLE_OPTIONS, EMPLOYEE_GROUP_OPTIONS,
   type AppUser, type UserStatus, type UserRole, type UserDependency,
 } from './mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
+
+const PROJECTS_BY_TITLE = new Map(MOCK_PROJECTS.map(project => [project.title, project]));
+const getDependencyProjectDisplayName = (title: string) => {
+  const project = PROJECTS_BY_TITLE.get(title);
+  return project ? getProjectDisplayName(project) : title;
+};
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 
@@ -896,7 +903,9 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                     <div className="space-y-2.5">
                       {deps.projects.map(proj => (
                         <div key={proj.id} className="rounded-xl border border-gray-200 bg-white p-3.5">
-                          <p className="mb-2 text-[13px] font-medium text-gray-900 line-clamp-1">{proj.title}</p>
+                          <p className="mb-2 text-[13px] font-medium text-gray-900 line-clamp-1">
+                            {getDependencyProjectDisplayName(proj.title)}
+                          </p>
                           <p className="mb-2 text-[11.5px] text-gray-400">Role: {proj.role}</p>
                           <DrawerSelectField
                             value={projTransfers[proj.id] ?? ''}
@@ -932,7 +941,9 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                             <Check size={12} className={cn('mt-0.5 flex-shrink-0', taskTransferTo ? 'text-emerald-500' : 'text-gray-300')} strokeWidth={3} />
                             <div>
                               <p className="text-[12.5px] font-medium text-gray-800">{task.title}</p>
-                              <p className="text-[11.5px] text-gray-400">{task.project}</p>
+                               <p className="text-[11.5px] text-gray-400">
+                                 {getDependencyProjectDisplayName(task.project)}
+                               </p>
                             </div>
                           </div>
                         ))}
@@ -958,7 +969,9 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
                       const toUser = activeUsersExcluding.find(u => u.id === projTransfers[p.id]);
                       return (
                         <div key={p.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-                          <p className="text-[12.5px] text-gray-700 truncate flex-1 mr-3">{p.title}</p>
+                           <p className="text-[12.5px] text-gray-700 truncate flex-1 mr-3">
+                             {getDependencyProjectDisplayName(p.title)}
+                           </p>
                           <p className="text-[12px] font-medium text-emerald-600 flex-shrink-0">→ {toUser?.firstName} {toUser?.lastName}</p>
                         </div>
                       );

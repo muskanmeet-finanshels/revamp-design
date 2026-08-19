@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from './mock-data';
-import { MOCK_PROJECTS } from '../projects/mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 import { useOrgContext } from '@/contexts/OrgContext';
 import {
   TaskFilterDrawer,
@@ -209,7 +209,7 @@ function includesSelectedValue(values: string[], candidates: string[]): boolean 
 }
 
 function taskText(task: TaskItem): string {
-  return `${task.name} ${task.projects.map(project => project.title).join(' ')}`.toLowerCase();
+  return `${task.name} ${task.projects.map(getProjectDisplayName).join(' ')}`.toLowerCase();
 }
 
 function matchesTaskFrequency(task: TaskItem, frequency: string): boolean {
@@ -277,7 +277,7 @@ function filterTasksByAppliedFilters(
   if (q) {
     list = list.filter(task =>
       task.name.toLowerCase().includes(q) ||
-      task.projects.some(project => project.title.toLowerCase().includes(q)) ||
+      task.projects.some(project => getProjectDisplayName(project).toLowerCase().includes(q)) ||
       (task.assignee?.name ?? '').toLowerCase().includes(q),
     );
   }
@@ -285,7 +285,7 @@ function filterTasksByAppliedFilters(
   if (appliedFilters.taskNames.length > 0) {
     list = list.filter(task => includesSelectedValue(
       appliedFilters.taskNames,
-      [task.name, ...task.projects.map(project => project.title)],
+      [task.name, ...task.projects.map(getProjectDisplayName)],
     ));
   }
   if (appliedFilters.frequencies.length > 0) {
@@ -301,7 +301,7 @@ function filterTasksByAppliedFilters(
   if (appliedFilters.projectNames.length > 0) {
     list = list.filter(task =>
       task.projects.some(project =>
-        includesSelectedValue(appliedFilters.projectNames, [project.title]),
+        includesSelectedValue(appliedFilters.projectNames, [getProjectDisplayName(project)]),
       ),
     );
   }

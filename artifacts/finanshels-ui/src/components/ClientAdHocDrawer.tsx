@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
+import { getProjectDisplayName } from '@/screens/projects/mock-data';
 
 /* ── Mock data ─────────────────────────────────────────────────────────── */
 
@@ -290,7 +291,9 @@ export function ClientAdHocDrawer({ open, onClose }: Props) {
   useEffect(() => { setAssignee(''); }, [project]);
 
   const projectsForClient = client ? (PROJECTS_BY_CLIENT[client] ?? []) : [];
-  const selectedProject   = projectsForClient.find(p => p.label === project);
+  const getProjectLabel = (item: { label: string }) =>
+    getProjectDisplayName({ title: item.label, clientName: client });
+  const selectedProject   = projectsForClient.find(p => getProjectLabel(p) === project);
 
   const step1Complete = Boolean(client && project && assignee);
   const step2Complete = Boolean(taskName.trim() && frequency);
@@ -409,7 +412,7 @@ export function ClientAdHocDrawer({ open, onClose }: Props) {
                   label="Starting Project"
                   required
                   placeholder={client ? 'Select project' : 'Select client first'}
-                  options={projectsForClient.map(p => p.label)}
+                  options={projectsForClient.map(getProjectLabel)}
                   value={project}
                   onChange={setProject}
                   disabled={!client}

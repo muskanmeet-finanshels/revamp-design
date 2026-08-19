@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { AvatarStack, DueDate, StatusChip } from '@/components/ui';
 import type { Project } from '@/lib/data';
+import { getProjectDisplayName } from '@/lib/project-name';
 
 export function ProjectCard({ project }: { project: Project }) {
   const colors = useColors();
@@ -24,7 +25,7 @@ export function ProjectCard({ project }: { project: Project }) {
       <View style={styles.topRow}>
         <View style={styles.titleWrap}>
           <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
-            {project.title}
+            {getProjectDisplayName(project)}
           </Text>
           <View style={styles.metaRow}>
             <View style={[styles.clientDot, { backgroundColor: project.client.color }]} />

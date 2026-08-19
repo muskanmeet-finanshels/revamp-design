@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useOrgContext } from '@/contexts/OrgContext';
+import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 
 /* ─────────────────────────────── option lists ───────────────────────────── */
 
@@ -28,9 +29,7 @@ export const TASK_FILTER_OPTIONS = {
   frequencies:  ['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Annually'] as const,
   clients:      ['Nexora', 'Finovo', 'Lumo', 'Talvo', 'Orvix', 'Stratco'] as const,
   projectNames: [
-    'VAT Filing Jul 2025 – Sep 2025', 'Book Keeping – Sep 2025',
-    'CT Registration – June 2026', 'Payroll Management – Q4 2025',
-    'Bookkeeping – Oct 2025', 'CT Registration – Nov 2025',
+    ...MOCK_PROJECTS.slice(0, 6).map(getProjectDisplayName),
   ] as const,
   services:  ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'] as const,
   assignees: [
@@ -52,6 +51,15 @@ export interface SavedTaskFilter {
   isDefault?:   boolean;
 }
 
+function normalizeProjectFilterNames(values: string[] | undefined): string[] {
+  return (values ?? []).map(value => {
+    const project = MOCK_PROJECTS.find(
+      candidate => candidate.title === value || getProjectDisplayName(candidate) === value,
+    );
+    return project ? getProjectDisplayName(project) : value;
+  });
+}
+
 function useSavedFilters(storageKey: string) {
   const [saved, setSaved]       = useState<SavedTaskFilter[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -60,7 +68,18 @@ function useSavedFilters(storageKey: string) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) setSaved(JSON.parse(raw) as SavedTaskFilter[]);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedTaskFilter[];
+        const normalized = parsed.map(filter => ({
+          ...filter,
+          filters: {
+            ...filter.filters,
+            projectNames: normalizeProjectFilterNames(filter.filters?.projectNames),
+          },
+        }));
+        setSaved(normalized);
+        localStorage.setItem(storageKey, JSON.stringify(normalized));
+      }
     } catch { /* ignore */ }
     setHydrated(true);
   }, [storageKey]);

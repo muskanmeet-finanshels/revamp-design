@@ -1,4 +1,4 @@
-import { MOCK_PROJECTS } from '../projects/mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 
 export type TaskStatus   = 'To Do' | 'In Progress' | 'Done' | 'Overdue' | 'On Hold' | 'Archived' | 'In Review' | 'Completed';
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
@@ -502,7 +502,7 @@ const GENERATED_TASKS: TaskItem[] = Array.from({ length: 110 }, (_, index) => {
       'Upload final evidence pack',
       'Complete quality review',
       'Send progress update to client',
-    ][index % 6] + ` – ${project.title}`,
+    ][index % 6] + ` – ${getProjectDisplayName(project)}`,
     projects: [{
       id: project.id,
       title: project.title,

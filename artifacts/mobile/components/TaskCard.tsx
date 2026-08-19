@@ -5,6 +5,7 @@ import { Avatar, DueDate, StatusChip } from '@/components/ui';
 import { Feather } from '@expo/vector-icons';
 import { useTimer } from '@/contexts/TimerContext';
 import type { Task } from '@/lib/data';
+import { getProjectDisplayName } from '@/lib/project-name';
 
 export function TaskCard({ task }: { task: Task }) {
   const colors = useColors();
@@ -61,7 +62,7 @@ export function TaskCard({ task }: { task: Task }) {
         <View style={styles.metaRow}>
           <View style={[styles.clientDot, { backgroundColor: task.client.color }]} />
           <Text style={[styles.metaText, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {task.client.name} · {task.projectTitle}
+            {getProjectDisplayName({ title: task.projectTitle, client: task.client })}
           </Text>
         </View>
         <View style={styles.bottomRow}>

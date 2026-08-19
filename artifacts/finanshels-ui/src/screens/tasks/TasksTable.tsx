@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { TaskCommentsDrawer, type TaskComment } from './TaskCommentsDrawer';
 import { MOCK_TASKS, type TaskItem, type TaskStatus } from './mock-data';
+import { getProjectDisplayName } from '@/screens/projects/mock-data';
 import { StopTimerDialog } from '@/components/StopTimerDialog';
 
 /* ── task tags ── */
@@ -1072,7 +1073,7 @@ export function TasksTable({
   function renderTaskCell(key: TaskColumnKey, task: TaskItem) {
     const dueFmt       = new Date(task.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const dueIndicator = getDueDateIndicator(task.dueDate, task.status);
-    const projectLabel = task.projects.map(p => p.title).join(', ');
+    const projectLabel = task.projects.map(getProjectDisplayName).join(', ');
     const tag          = getTag(task.id);
     const hasTags      = Boolean(tag.priority);
     switch (key) {

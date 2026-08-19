@@ -44,7 +44,7 @@ import {
   MOCK_TIMESHEETS, MOCK_ATTENDANCE,
   type TimesheetRecord, type TimesheetStatus, type AttendanceStatus,
 } from './mock-data';
-import { MOCK_PROJECTS } from '@/screens/projects/mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS } from '@/screens/projects/mock-data';
 import { MOCK_TASKS } from '@/screens/tasks/mock-data';
 import { AttendanceCalendar } from './AttendanceCalendar';
 import { toast } from 'sonner';
@@ -792,14 +792,14 @@ function AddTimesheetDrawer({ open, onClose }: { open: boolean; onClose: () => v
 
   const projectOptions = MOCK_PROJECTS
     .filter(item => !client || item.client.name === client)
-    .map(item => item.title)
+    .map(getProjectDisplayName)
     .filter((item, index, items) => items.indexOf(item) === index)
     .sort();
 
   const taskOptions = MOCK_TASKS
     .filter(item => item.projects.some(itemProject =>
       (!client || itemProject.clientName === client) &&
-      (!project || itemProject.title === project),
+      (!project || getProjectDisplayName(itemProject) === project),
     ))
     .map(item => item.name)
     .filter((item, index, items) => items.indexOf(item) === index)
@@ -1583,14 +1583,14 @@ function seedEntriesFromRecord(record: TimesheetRecord): TimeEntry[] {
   function pickProject(clientName: string, offset: number) {
     const opts = MOCK_PROJECTS
       .filter(p => p.client.name === clientName)
-      .map(p => p.title)
+      .map(getProjectDisplayName)
       .filter((t, i, a) => a.indexOf(t) === i)
       .sort();
     return opts[(hash + offset) % Math.max(opts.length, 1)] ?? opts[0] ?? '';
   }
   function pickTask(clientName: string, projectTitle: string, offset: number) {
     const opts = MOCK_TASKS
-      .filter(t => t.projects.some(p => p.clientName === clientName && p.title === projectTitle))
+      .filter(t => t.projects.some(p => p.clientName === clientName && getProjectDisplayName(p) === projectTitle))
       .map(t => t.name)
       .filter((n, i, a) => a.indexOf(n) === i)
       .sort();
@@ -1713,14 +1713,14 @@ function EditTimesheetDrawer({
 
   const projectOptions = MOCK_PROJECTS
     .filter(item => !client || item.client.name === client)
-    .map(item => item.title)
+    .map(getProjectDisplayName)
     .filter((item, index, items) => items.indexOf(item) === index)
     .sort();
 
   const taskOptions = MOCK_TASKS
     .filter(item => item.projects.some(itemProject =>
       (!client || itemProject.clientName === client) &&
-      (!project || itemProject.title === project),
+      (!project || getProjectDisplayName(itemProject) === project),
     ))
     .map(item => item.name)
     .filter((item, index, items) => items.indexOf(item) === index)
