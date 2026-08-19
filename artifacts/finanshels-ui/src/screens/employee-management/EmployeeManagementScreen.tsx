@@ -3,20 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, MoreHorizontal, Pencil,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, CircleAlert, MoreHorizontal, Pencil,
   Plus, Power, PowerOff, Search, SearchX, Trash2, UsersRound, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
+import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import { SearchInput } from '@/components/ui/search-input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer-fields';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
@@ -24,6 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 import type { AppUser, EmployeeGroup, EmployeeGroupStatus } from '@/screens/users/mock-data';
+import { AvatarGroup } from '@/screens/projects/AvatarGroup';
 
 type GroupFilter = 'All' | EmployeeGroupStatus;
 
@@ -49,45 +47,16 @@ function StatusBadge({ status }: { status: EmployeeGroupStatus }) {
 }
 
 function MemberAvatars({ members }: { members: AppUser[] }) {
-  if (!members.length) return <span className="text-[12.5px] text-gray-400">No members</span>;
-
-  const visible = members.slice(0, 3);
-  const remaining = members.length - visible.length;
-  const hiddenNames = members.slice(3).map(userName).join(', ');
   return (
-    <div className="flex items-center">
-      {visible.map((member, index) => (
-        <span
-          key={member.id}
-          title={userName(member)}
-          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow-sm"
-          style={{ backgroundColor: member.avatarColor, marginLeft: index ? -7 : 0 }}
-        >
-          {initials(member)}
-        </span>
-      ))}
-      {remaining > 0 && (
-        <TooltipProvider delayDuration={150}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={`Show ${hiddenNames}`}
-                className="-ml-1 flex h-7 w-7 cursor-default items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[10px] font-semibold text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
-              >
-                +{remaining}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[280px] whitespace-normal rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-              {hiddenNames}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-      <span className="ml-2 text-[12px] text-gray-500">
-        {members.length} {members.length === 1 ? 'member' : 'members'}
-      </span>
-    </div>
+    <AvatarGroup
+      size={26}
+      max={2}
+      members={members.map(member => ({
+        initials: initials(member),
+        name: userName(member),
+        color: member.avatarColor,
+      }))}
+    />
   );
 }
 
@@ -169,6 +138,9 @@ function MemberPicker({
   const [query, setQuery] = useState('');
   const activeUsers = users.filter(user => user.status === 'Active');
   const visibleUsers = activeUsers.filter(user => userName(user).toLowerCase().includes(query.toLowerCase()));
+  const selectedNames = activeUsers
+    .filter(user => selected.includes(user.id))
+    .map(user => userName(user));
 
   function toggle(userId: string) {
     onChange(selected.includes(userId)
@@ -181,25 +153,34 @@ function MemberPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
+          aria-label="Select employee members"
+          aria-expanded={open}
           className={cn(
             'flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white px-3.5 text-left text-[13px] transition-colors',
-            selected.length ? 'border-brand' : 'border-gray-200 text-gray-400',
+            'focus:outline-none focus:ring-1 focus:ring-brand/20',
+            selected.length
+              ? 'border-brand focus:border-brand'
+              : 'border-gray-200 text-gray-400 focus:border-brand',
           )}
         >
           <span className="min-w-0 truncate">
-            {selected.length ? `${selected.length} ${selected.length === 1 ? 'member' : 'members'} selected` : 'Select active employees…'}
+            {selectedNames.length === 0
+              ? 'Select active employees…'
+              : selectedNames.length === 1
+                ? selectedNames[0]
+                : `${selectedNames.length} members selected`}
           </span>
           <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] rounded-xl p-1.5">
+      <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5">
         <div className="relative mb-1.5">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder="Search active employees…"
-            className="h-9 w-full rounded-lg bg-gray-50 pl-8 pr-2 text-[12.5px] text-gray-800 outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-brand/20"
+            className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-8 pr-2 text-[12.5px] text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand focus:ring-1 focus:ring-brand/20"
           />
         </div>
         <div className="max-h-60 overflow-y-auto">
@@ -210,6 +191,7 @@ function MemberPicker({
                 key={user.id}
                 type="button"
                 onClick={() => toggle(user.id)}
+                aria-pressed={checked}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
                   checked ? 'bg-orange-50 font-medium text-brand' : 'text-gray-700 hover:bg-gray-50',
@@ -220,9 +202,6 @@ function MemberPicker({
                   checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
                 )}>
                   {checked && <Check size={10} className="text-white" strokeWidth={3} />}
-                </span>
-                <span className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: user.avatarColor }}>
-                  {initials(user)}
                 </span>
                 <span className="min-w-0 truncate">{userName(user)}</span>
               </button>
@@ -351,44 +330,71 @@ function GroupConfirmationDialog({
 }) {
   const isDelete = kind === 'delete';
   return (
-    <Dialog open={Boolean(group)} onOpenChange={open => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-[440px] rounded-2xl p-0 overflow-hidden">
-        <DialogHeader className="border-b border-gray-100 px-5 pb-4 pt-5">
-          <DialogTitle className="flex items-center gap-2 text-[16px] text-gray-900">
-            <AlertTriangle size={17} className="text-red-500" />
-            {isDelete ? 'Delete Employee Group' : 'Deactivate Employee Group'}
-          </DialogTitle>
-          <DialogDescription className="mt-2 text-[13px] leading-relaxed text-gray-500">
-            {isDelete
-              ? <>Delete <strong className="text-gray-700">{group?.name}</strong> permanently?</>
-              : <>Deactivate <strong className="text-gray-700">{group?.name}</strong>?</>}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="px-5 py-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-[12.5px] leading-relaxed text-amber-800">
-              {memberCount
-                ? `${memberCount} ${memberCount === 1 ? 'employee is' : 'employees are'} currently in this group. Their membership will be removed and the group will no longer be available for assignment.`
-                : 'This group has no members and will no longer be available for assignment.'}
-              {!isDelete && ' Reactivating the group will not restore previous memberships.'}
-            </p>
+    <DialogPrimitive.Root
+      open={group !== null}
+      onOpenChange={open => { if (!open) onClose(); }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          className={cn(
+            'fixed inset-0 z-50 bg-black/50',
+            'data-[state=open]:animate-overlay-enter',
+            'data-[state=closed]:animate-overlay-leave',
+          )}
+        />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px]',
+            'rounded-2xl bg-white p-6 shadow-2xl outline-none',
+            'data-[state=open]:animate-dialog-enter',
+            'data-[state=closed]:animate-dialog-leave',
+          )}
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+            <CircleAlert size={20} className="text-red-500" />
           </div>
-        </div>
-        <DialogFooter className="border-t border-gray-100 px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-50">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            data-testid={`${kind}-employee-group`}
-            className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-red-700"
+          <DialogPrimitive.Title className="mt-4 text-[16px] font-semibold text-gray-900">
+            {isDelete ? 'Delete employee group?' : 'Deactivate employee group?'}
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="mt-2 text-[13.5px] leading-relaxed text-gray-500">
+            Are you sure you want to {isDelete ? 'delete' : 'deactivate'}{' '}
+            <span className="font-medium text-gray-700">
+              {group?.name ? `"${group.name}"` : 'this employee group'}
+            </span>
+            ?{' '}
+            {isDelete
+              ? 'This action cannot be undone.'
+              : 'The group will no longer be available for assignment.'}
+            {memberCount > 0 && (
+              <> This will remove the group from {memberCount} {memberCount === 1 ? 'employee' : 'employees'}.</>
+            )}
+          </DialogPrimitive.Description>
+          <div className="mt-6 flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              data-testid={`${kind}-employee-group`}
+              className="flex-1 rounded-lg bg-red-500 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-red-600"
+            >
+              {isDelete ? 'Delete Group' : 'Deactivate Group'}
+            </button>
+          </div>
+          <DialogPrimitive.Close
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           >
-            {isDelete ? 'Delete Group' : 'Deactivate Group'}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <X size={16} strokeWidth={2} />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -437,10 +443,10 @@ export function EmployeeManagementScreen() {
     const { group, kind } = confirmation;
     if (kind === 'deactivate') {
       setGroupStatus(group.id, 'Inactive');
-      toast.success(`${group.name} deactivated`);
+      toast.success(`Employee group "${group.name}" deactivated successfully`);
     } else {
       deleteGroup(group.id);
-      toast.success(`${group.name} deleted`);
+      toast.success(`Employee group "${group.name}" deleted successfully`);
     }
     setConfirmation(null);
   }
@@ -510,7 +516,13 @@ export function EmployeeManagementScreen() {
               {visibleGroups.map(group => {
                 const members = memberMap.get(group.id) ?? [];
                 return (
-                  <TableRow key={group.id} className="border-gray-100">
+                  <TableRow
+                    key={group.id}
+                    className={cn(
+                      'border-gray-100',
+                      group.status === 'Inactive' && 'bg-gray-50 hover:bg-gray-50',
+                    )}
+                  >
                     <TableCell className="px-5 py-4">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-brand">
@@ -520,7 +532,7 @@ export function EmployeeManagementScreen() {
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[300px] px-5 py-4 text-[12.5px] text-gray-500">
-                      <span className="block truncate" title={group.description}>{group.description || '—'}</span>
+                      <DescriptionTooltip value={group.description} />
                     </TableCell>
                     <TableCell className="px-5 py-4"><MemberAvatars members={members} /></TableCell>
                     <TableCell className="px-5 py-4"><StatusBadge status={group.status} /></TableCell>
