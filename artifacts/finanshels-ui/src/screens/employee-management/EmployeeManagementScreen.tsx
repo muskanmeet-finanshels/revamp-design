@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, CircleAlert, MoreHorizontal, Pencil,
-  Plus, Power, PowerOff, Search, SearchX, Trash2, UsersRound, X,
+  AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Check, ChevronDown, CircleAlert,
+  MoreHorizontal, Pencil, Plus, Power, PowerOff, Search, SearchX, Trash2, UsersRound, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,8 @@ import type { AppUser, EmployeeGroup, EmployeeGroupStatus } from '@/screens/user
 import { AvatarGroup } from '@/screens/projects/AvatarGroup';
 
 type GroupFilter = 'All' | EmployeeGroupStatus;
+type GroupSortKey = 'name' | 'description' | 'members' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 function userName(user: AppUser) {
   return `${user.firstName} ${user.lastName}`;
@@ -43,6 +45,41 @@ function StatusBadge({ status }: { status: EmployeeGroupStatus }) {
     )}>
       {status}
     </span>
+  );
+}
+
+function SortableGroupHead({
+  label,
+  sortKey,
+  currentKey,
+  direction,
+  onSort,
+}: {
+  label: string;
+  sortKey: GroupSortKey;
+  currentKey: GroupSortKey;
+  direction: SortDirection;
+  onSort: (key: GroupSortKey) => void;
+}) {
+  const active = currentKey === sortKey;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+      className={cn(
+        'flex items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider transition-colors',
+        active ? 'text-gray-800' : 'text-gray-500 hover:text-gray-700',
+      )}
+    >
+      {label}
+      {active
+        ? direction === 'asc'
+          ? <ArrowUp size={11} className="text-brand" />
+          : <ArrowDown size={11} className="text-brand" />
+        : <ArrowUpDown size={11} className="opacity-40" />}
+    </button>
   );
 }
 
@@ -402,6 +439,9 @@ export function EmployeeManagementScreen() {
   const { users, groups, saveGroup, setGroupStatus, deleteGroup } = useEmployeeGroupsContext();
   const [filter, setFilter] = useState<GroupFilter>('All');
   const [query, setQuery] = useState('');
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<GroupSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<EmployeeGroup | null>(null);
   const [confirmation, setConfirmation] = useState<{ group: EmployeeGroup; kind: 'deactivate' | 'delete' } | null>(null);
@@ -411,21 +451,40 @@ export function EmployeeManagementScreen() {
     users.filter(user => user.status === 'Active' && user.employeeGroups.includes(group.name)),
   ])), [groups, users]);
 
-  const counts = {
-    All: groups.length,
-    Active: groups.filter(group => group.status === 'Active').length,
-    Inactive: groups.filter(group => group.status === 'Inactive').length,
-  };
-  const visibleGroups = groups.filter(group => {
-    const matchesFilter = filter === 'All' || group.status === filter;
+  const visibleGroups = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();
-    const members = memberMap.get(group.id) ?? [];
-    const matchesQuery = !lowerQuery
-      || group.name.toLowerCase().includes(lowerQuery)
-      || group.description.toLowerCase().includes(lowerQuery)
-      || members.some(member => userName(member).toLowerCase().includes(lowerQuery));
-    return matchesFilter && matchesQuery;
-  });
+    const filteredGroups = groups.filter(group => {
+      const matchesFilter = filter === 'All' || group.status === filter;
+      const members = memberMap.get(group.id) ?? [];
+      const matchesQuery = !lowerQuery
+        || group.name.toLowerCase().includes(lowerQuery)
+        || group.description.toLowerCase().includes(lowerQuery)
+        || members.some(member => userName(member).toLowerCase().includes(lowerQuery));
+      return matchesFilter && matchesQuery;
+    });
+
+    return filteredGroups.sort((a, b) => {
+      let comparison = 0;
+      if (sortKey === 'name') comparison = a.name.localeCompare(b.name);
+      if (sortKey === 'description') comparison = a.description.localeCompare(b.description);
+      if (sortKey === 'members') {
+        comparison = (memberMap.get(a.id)?.length ?? 0) - (memberMap.get(b.id)?.length ?? 0);
+      }
+      if (sortKey === 'status') comparison = a.status.localeCompare(b.status);
+      return comparison === 0
+        ? a.name.localeCompare(b.name)
+        : sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filter, groups, memberMap, query, sortDirection, sortKey]);
+
+  function handleSort(key: GroupSortKey) {
+    if (sortKey === key) {
+      setSortDirection(current => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortKey(key);
+    setSortDirection('asc');
+  }
 
   function closeDrawer() {
     setDrawerOpen(false);
@@ -472,25 +531,7 @@ export function EmployeeManagementScreen() {
         </button>
       </div>
 
-      <div className="mb-5 border-b border-gray-200">
-        <div className="flex gap-6">
-          {(['All', 'Active', 'Inactive'] as GroupFilter[]).map(value => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={cn(
-                '-mb-px border-b-2 px-0.5 pb-3 text-[13px] font-medium transition-colors',
-                filter === value ? 'border-brand text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800',
-              )}
-            >
-              {value} <span className={filter === value ? 'ml-1 text-brand' : 'ml-1 text-gray-400'}>{counts[value]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput
           value={query}
           onChange={setQuery}
@@ -498,6 +539,62 @@ export function EmployeeManagementScreen() {
           aria-label="Search employee groups"
           className="w-full sm:w-80"
         />
+        <div className="ml-auto">
+          <Popover open={statusMenuOpen} onOpenChange={setStatusMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Filter employee groups by status"
+                aria-expanded={statusMenuOpen}
+                className={cn(
+                  'flex h-9 w-full items-center justify-between gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none sm:w-[132px]',
+                  filter !== 'All'
+                    ? 'border-brand text-brand hover:bg-orange-50/50'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >
+                {filter === 'All' ? 'Status' : filter}
+                <ChevronDown size={13} className={filter !== 'All' ? 'text-brand' : 'text-gray-500'} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="w-56 rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+            >
+              <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">Status</span>
+                {filter !== 'All' && (
+                  <button
+                    type="button"
+                    onClick={() => { setFilter('All'); setStatusMenuOpen(false); }}
+                    className="text-[11.5px] font-semibold text-brand transition-colors hover:text-brand/70"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                {(['All', 'Active', 'Inactive'] as GroupFilter[]).map(value => {
+                  const isSelected = filter === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setFilter(value); setStatusMenuOpen(false); }}
+                      className={cn(
+                        'flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium outline-none transition-colors',
+                        isSelected ? 'bg-orange-50 text-brand' : 'text-gray-700 hover:bg-gray-100',
+                      )}
+                    >
+                      <span>{value === 'All' ? 'All statuses' : value}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {visibleGroups.length ? (
@@ -505,10 +602,18 @@ export function EmployeeManagementScreen() {
           <Table className="w-full min-w-[760px] table-auto">
             <TableHeader>
               <TableRow className="border-gray-100 bg-gray-50/70 hover:bg-gray-50/70">
-                <TableHead className="h-11 px-5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Employee Group</TableHead>
-                <TableHead className="h-11 px-5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Description</TableHead>
-                <TableHead className="h-11 px-5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Members</TableHead>
-                <TableHead className="h-11 px-5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
+                <TableHead aria-sort={sortKey === 'name' ? sortDirection : 'none'} className="h-11 px-5">
+                  <SortableGroupHead label="Employee Group" sortKey="name" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead aria-sort={sortKey === 'description' ? sortDirection : 'none'} className="h-11 px-5">
+                  <SortableGroupHead label="Description" sortKey="description" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead aria-sort={sortKey === 'members' ? sortDirection : 'none'} className="h-11 px-5">
+                  <SortableGroupHead label="Members" sortKey="members" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead aria-sort={sortKey === 'status' ? sortDirection : 'none'} className="h-11 px-5">
+                  <SortableGroupHead label="Status" sortKey="status" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
                 <TableHead className="h-11 w-16 px-5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">Action</TableHead>
               </TableRow>
             </TableHeader>
