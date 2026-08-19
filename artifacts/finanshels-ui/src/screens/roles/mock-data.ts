@@ -117,6 +117,17 @@ export function fullPermissions(): Record<string, string[]> {
   return Object.fromEntries(MODULES.map(m => [m.id, m.actions.map(a => a.id)]));
 }
 
+/**
+ * Module access is all-or-nothing. This preserves existing access when
+ * converting historical action-level maps to the module-level model.
+ */
+export function normalizeModulePermissions(permissions: Record<string, string[]>): Record<string, string[]> {
+  return Object.fromEntries(MODULES.map(module => [
+    module.id,
+    (permissions[module.id] ?? []).length > 0 ? allPermissionsFor(module.id) : [],
+  ]));
+}
+
 /* ─── Role type ──────────────────────────────────────────────────────────── */
 
 export type RoleType   = 'system' | 'custom';
@@ -130,7 +141,7 @@ export interface AppRole {
   status: RoleStatus;
   /** Super Admin: cannot be edited, cloned differently, or deactivated */
   isProtected: boolean;
-  /** Record<moduleId, actionId[]> */
+  /** Record<moduleId, full action ids when module access is enabled> */
   permissions: Record<string, string[]>;
   userCount: number;
   createdAt: string;

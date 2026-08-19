@@ -24,6 +24,9 @@ export type UserRole =
   | 'Team Lead'
   | 'Viewer';
 
+/** Product setting: when false, the User drawer falls back to one role. */
+export const ALLOW_MULTIPLE_ROLES = true;
+
 export const ROLE_OPTIONS: UserRole[] = [
   'Admin',
   'Finance Manager',

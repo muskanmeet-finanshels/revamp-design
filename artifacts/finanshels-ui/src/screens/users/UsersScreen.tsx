@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 import {
   MOCK_USERS, MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
   MOCK_USER_DEPENDENCIES,
-  ROLE_OPTIONS, EMPLOYEE_GROUP_OPTIONS,
+  ALLOW_MULTIPLE_ROLES, ROLE_OPTIONS, EMPLOYEE_GROUP_OPTIONS,
   type AppUser, type UserStatus, type UserRole, type UserDependency,
 } from './mock-data';
 
@@ -118,7 +118,7 @@ function UserAvatar({ user, size = 32 }: { user: AppUser; size?: number }) {
   );
 }
 
-/* ─── Multi-select dropdown (roles) ────────────────────────────────────── */
+/* ─── Role selector ────────────────────────────────────────────────────── */
 
 function MultiSelectField({
   options,
@@ -138,8 +138,10 @@ function MultiSelectField({
     .filter(option => selected.includes(option.value))
     .map(option => option.label);
 
-  function toggle(opt: string) {
-    onChange(selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]);
+  function toggle(option: string) {
+    onChange(selected.includes(option)
+      ? selected.filter(value => value !== option)
+      : [...selected, option]);
   }
 
   return (
@@ -169,10 +171,7 @@ function MultiSelectField({
           <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5"
-      >
+      <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5">
         <div className="max-h-60 overflow-y-auto">
           {options.map(option => {
             const checked = selected.includes(option.value);
@@ -184,9 +183,7 @@ function MultiSelectField({
                 aria-pressed={checked}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
-                  checked
-                    ? 'bg-orange-50 font-medium text-brand'
-                    : 'text-gray-700 hover:bg-gray-50',
+                  checked ? 'bg-orange-50 font-medium text-brand' : 'text-gray-700 hover:bg-gray-50',
                 )}
               >
                 <span className={cn(
@@ -574,15 +571,30 @@ function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerPro
             <div className="border-t border-gray-100" />
 
             {/* Roles */}
-            <DrawerField label="Assign Multiple Roles" required>
+            <DrawerField label={ALLOW_MULTIPLE_ROLES ? 'Roles' : 'Role'} required>
               {rolesErr && <p className="mb-1 text-[11.5px] text-red-500">At least one role is required.</p>}
-              <MultiSelectField
-                selected={roles}
-                onChange={values => setRoles(values as UserRole[])}
-                placeholder="Select roles…"
-                options={ROLE_OPTIONS.map(role => ({ value: role, label: role }))}
-                error={rolesErr}
-              />
+              {ALLOW_MULTIPLE_ROLES ? (
+                <MultiSelectField
+                  selected={roles}
+                  onChange={values => setRoles(values as UserRole[])}
+                  placeholder="Select roles…"
+                  options={ROLE_OPTIONS.map(option => ({ value: option, label: option }))}
+                  error={rolesErr}
+                />
+              ) : (
+                <DrawerSelectField
+                  value={roles[0] ?? ''}
+                  onChange={value => setRoles([value as UserRole])}
+                  placeholder="Select role…"
+                  options={ROLE_OPTIONS.map(option => ({ value: option, label: option }))}
+                  error={rolesErr}
+                />
+              )}
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-gray-400">
+                {ALLOW_MULTIPLE_ROLES
+                  ? 'Users can be assigned multiple roles when this setting is enabled. Module access is inherited from all assigned roles.'
+                  : 'Each user can have one role. Module access is inherited from the assigned role.'}
+              </p>
             </DrawerField>
 
             {/* Employee Groups */}
@@ -1251,7 +1263,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-[150px]">
-                <SortableTableHead label="Roles" sortKey="roles" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHead label={ALLOW_MULTIPLE_ROLES ? 'Roles' : 'Role'} sortKey="roles" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-[140px]">
                 <SortableTableHead label="Reporting Manager" sortKey="manager" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
@@ -1329,12 +1341,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   {/* Roles */}
                   <TableCell className="py-3">
                     <div className="text-[13px] font-normal leading-relaxed text-gray-700">
-                      {u.roles.map((role, index) => (
-                        <span key={role}>
-                          {index > 0 && ', '}
-                          {role}
-                        </span>
-                      ))}
+                      {u.roles.length > 0 ? u.roles.join(', ') : '—'}
                     </div>
                   </TableCell>
 

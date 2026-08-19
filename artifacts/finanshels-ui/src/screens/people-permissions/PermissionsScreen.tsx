@@ -12,16 +12,15 @@ type PermissionMap = Record<string, string[]>;
 
 function clonePermissions(permissions: PermissionMap): PermissionMap {
   return Object.fromEntries(
-    MODULES.map(module => [module.id, [...(permissions[module.id] ?? [])]]),
+    MODULES.map(module => [
+      module.id,
+      (permissions[module.id] ?? []).length > 0 ? module.actions.map(action => action.id) : [],
+    ]),
   );
 }
 
-function countGranted(permissions: PermissionMap) {
-  return Object.values(permissions).reduce((total, actions) => total + actions.length, 0);
-}
-
-function totalActions() {
-  return MODULES.reduce((total, module) => total + module.actions.length, 0);
+function countGrantedModules(permissions: PermissionMap) {
+  return MODULES.filter(module => (permissions[module.id] ?? []).length > 0).length;
 }
 
 function RoleBadge({ role }: { role: AppRole }) {
@@ -58,32 +57,16 @@ export function PermissionsScreen() {
     setIsSaved(true);
   }, [selectedRole]);
 
-  const granted = countGranted(permissions);
-  const total = totalActions();
+  const granted = countGrantedModules(permissions);
+  const total = MODULES.length;
   const coverage = Math.round((granted / total) * 100);
   const readOnly = selectedRole.isProtected;
   const filteredModules = useMemo(() => {
     const query = permissionSearch.trim().toLowerCase();
     if (!query) return MODULES;
 
-    return MODULES.map(module => {
-      const moduleMatches = module.label.toLowerCase().includes(query);
-      const actions = moduleMatches
-        ? module.actions
-        : module.actions.filter(action => action.label.toLowerCase().includes(query));
-      return { ...module, actions };
-    }).filter(module => module.actions.length > 0);
+    return MODULES.filter(module => module.label.toLowerCase().includes(query));
   }, [permissionSearch]);
-
-  function toggleAction(moduleId: string, actionId: string) {
-    if (readOnly) return;
-    const current = permissions[moduleId] ?? [];
-    const next = current.includes(actionId)
-      ? current.filter(action => action !== actionId)
-      : [...current, actionId];
-    setPermissions({ ...permissions, [moduleId]: next });
-    setIsSaved(false);
-  }
 
   function toggleModule(moduleId: string) {
     if (readOnly) return;
@@ -116,8 +99,8 @@ export function PermissionsScreen() {
           <SearchInput
             value={permissionSearch}
             onChange={setPermissionSearch}
-            placeholder="Search permissions…"
-            aria-label="Search permissions"
+            placeholder="Search modules…"
+            aria-label="Search modules"
             className="w-full sm:w-80"
           />
           <div className="w-full sm:w-[260px]">
@@ -141,7 +124,7 @@ export function PermissionsScreen() {
       <div className="mb-6 grid grid-cols-3 gap-4">
         {[
           { label: 'Selected Role', value: selectedRole.name, icon: ShieldCheck, color: 'text-violet-600', bg: 'bg-violet-50' },
-          { label: 'Granted Actions', value: `${granted} / ${total}`, icon: Check, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Granted Modules', value: `${granted} / ${total}`, icon: Check, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Coverage', value: `${coverage}%`, icon: Save, color: 'text-brand', bg: 'bg-orange-50' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
@@ -164,7 +147,9 @@ export function PermissionsScreen() {
               <RoleBadge role={selectedRole} />
             </div>
             <p className="mt-1 text-[12px] text-gray-500">
-              {readOnly ? 'Protected roles cannot be modified.' : 'Select the actions this role can perform.'}
+              {readOnly
+                ? 'Protected roles cannot be modified.'
+                : 'Grant full module access. Individual actions are not configurable.'}
             </p>
           </div>
           <button
@@ -197,7 +182,12 @@ export function PermissionsScreen() {
                   'flex items-center justify-between border-b border-gray-100 px-4 py-3',
                   someGranted ? 'bg-orange-50/50' : 'bg-gray-50/60',
                 )}>
-                  <span className="text-[12.5px] font-semibold text-gray-800">{module.label}</span>
+                    <div>
+                      <span className="text-[12.5px] font-semibold text-gray-800">{module.label}</span>
+                      <p className={cn('mt-0.5 text-[11.5px]', grantedActions.length > 0 ? 'text-brand' : 'text-gray-400')}>
+                        {grantedActions.length > 0 ? 'Full module access' : 'No access'}
+                      </p>
+                    </div>
                   <button
                     type="button"
                     onClick={() => toggleModule(module.id)}
@@ -215,34 +205,8 @@ export function PermissionsScreen() {
                       {(allGranted || someGranted) && <Check size={8} className="text-white" strokeWidth={3} />}
                     </span>
                     All
+                    {allGranted ? 'Enabled' : 'Enable'}
                   </button>
-                </div>
-                <div className="flex flex-wrap gap-x-5 gap-y-2.5 px-4 py-3">
-                  {module.actions.map(action => {
-                    const checked = grantedActions.includes(action.id);
-                    return (
-                      <button
-                        key={action.id}
-                        type="button"
-                        onClick={() => toggleAction(module.id, action.id)}
-                        disabled={readOnly}
-                        aria-pressed={checked}
-                        className={cn(
-                          'flex items-center gap-1.5 text-[12.5px] transition-colors',
-                          readOnly ? 'cursor-not-allowed' : 'cursor-pointer',
-                          checked ? 'font-medium text-gray-900' : 'text-gray-500',
-                        )}
-                      >
-                        <span className={cn(
-                          'flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px]',
-                          checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                        )}>
-                          {checked && <Check size={9} className="text-white" strokeWidth={3} />}
-                        </span>
-                        {action.label}
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
             );

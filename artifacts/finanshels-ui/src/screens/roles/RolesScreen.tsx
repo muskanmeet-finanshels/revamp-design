@@ -31,7 +31,7 @@ import {
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
-  allPermissionsFor, fullPermissions,
+  allPermissionsFor, fullPermissions, normalizeModulePermissions,
   type AppRole, type RoleType, type RoleStatus,
 } from './mock-data';
 import { MOCK_USERS, type AppUser } from '@/screens/users/mock-data';
@@ -42,12 +42,8 @@ function makeId() { return `role-${Date.now()}-${Math.random().toString(36).slic
 
 type RoleSortKey = 'name' | 'description' | 'type' | 'permissions' | 'users' | 'status';
 
-function countGranted(perms: Record<string, string[]>): number {
-  return Object.values(perms).reduce((sum, arr) => sum + arr.length, 0);
-}
-
-function totalActions(): number {
-  return MODULES.reduce((sum, m) => sum + m.actions.length, 0);
+function countEnabledModules(perms: Record<string, string[]>): number {
+  return MODULES.filter(module => (perms[module.id] ?? []).length > 0).length;
 }
 
 /* ─── Type badge ──────────────────────────────────────────────────────── */
@@ -89,8 +85,8 @@ function StatusBadge({ status }: { status: RoleStatus }) {
 /* ─── Permission coverage bar ─────────────────────────────────────────── */
 
 function CoverageBar({ permissions }: { permissions: Record<string, string[]> }) {
-  const granted = countGranted(permissions);
-  const total   = totalActions();
+  const granted = countEnabledModules(permissions);
+  const total   = MODULES.length;
   const pct     = Math.round((granted / total) * 100);
   return (
     <div className="flex items-center gap-2">
@@ -182,7 +178,7 @@ function RoleActionMenu({ role, onEdit, onClone, onActivate, onDeactivate }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   PERMISSIONS GRID — module-by-module checkboxes
+   MODULE ACCESS GRID — full access is granted per module
    ═══════════════════════════════════════════════════════════════════════ */
 
 function PermissionsGrid({
@@ -194,41 +190,29 @@ function PermissionsGrid({
   onChange?: (p: Record<string, string[]>) => void;
   readOnly?: boolean;
 }) {
-  function toggle(moduleId: string, actionId: string) {
-    if (readOnly || !onChange) return;
-    const current = permissions[moduleId] ?? [];
-    const next = current.includes(actionId)
-      ? current.filter(a => a !== actionId)
-      : [...current, actionId];
-    onChange({ ...permissions, [moduleId]: next });
-  }
-
-  function toggleAll(moduleId: string) {
+  function toggleModule(moduleId: string) {
     if (readOnly || !onChange) return;
     const all = allPermissionsFor(moduleId);
     const current = permissions[moduleId] ?? [];
-    const allGranted = all.every(a => current.includes(a));
-    onChange({ ...permissions, [moduleId]: allGranted ? [] : all });
+    onChange({ ...permissions, [moduleId]: current.length > 0 ? [] : all });
   }
 
   function toggleGlobalAll() {
     if (readOnly || !onChange) return;
     const full = fullPermissions();
-    const currentTotal = countGranted(permissions);
-    const total = totalActions();
-    onChange(currentTotal === total ? Object.fromEntries(MODULES.map(m => [m.id, []])) : full);
+    const currentTotal = countEnabledModules(permissions);
+    onChange(currentTotal === MODULES.length ? Object.fromEntries(MODULES.map(m => [m.id, []])) : full);
   }
 
-  const currentTotal = countGranted(permissions);
-  const total = totalActions();
-  const allGranted = currentTotal === total;
+  const currentTotal = countEnabledModules(permissions);
+  const allGranted = currentTotal === MODULES.length;
 
   return (
     <div className="space-y-2">
       {/* Global select-all */}
       {!readOnly && (
         <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
-          <span className="text-[12.5px] font-semibold text-gray-700">All Modules</span>
+            <span className="text-[12.5px] font-semibold text-gray-700">All Modules</span>
           <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-gray-600">
             <span onClick={() => toggleGlobalAll()}
               className={cn(
@@ -245,62 +229,31 @@ function PermissionsGrid({
       {/* Per-module rows */}
       {MODULES.map(mod => {
         const granted  = permissions[mod.id] ?? [];
-        const allMod   = mod.actions.every(a => granted.includes(a.id));
-        const someMod  = mod.actions.some(a => granted.includes(a.id));
 
         return (
-          <div key={mod.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            {/* Module header */}
-            <div className={cn(
-              'flex items-center justify-between border-b border-gray-100 px-4 py-2.5',
-              (allMod || someMod) ? 'bg-orange-50/50' : 'bg-gray-50/60',
-            )}>
+          <div key={mod.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+             <div>
               <span className="text-[12.5px] font-semibold text-gray-800">{mod.label}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-gray-400">{granted.length}/{mod.actions.length}</span>
-                {!readOnly && (
-                  <label className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-gray-500">
-                    <span onClick={() => toggleAll(mod.id)}
-                      className={cn(
-                        'flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-[3px] border-[1.5px] cursor-pointer transition-colors',
-                        allMod ? 'bg-brand border-brand' : someMod ? 'bg-brand/30 border-brand/40' : 'border-gray-300 bg-white',
-                      )}>
-                      {(allMod || someMod) && <Check size={8} className="text-white" strokeWidth={3} />}
-                    </span>
-                    All
-                  </label>
-                )}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-3">
-              {mod.actions.map(action => {
-                const checked = granted.includes(action.id);
-                return (
-                  <label
-                    key={action.id}
-                    className={cn(
-                      'flex items-center gap-1.5 text-[12.5px] select-none',
-                      readOnly ? 'cursor-default' : 'cursor-pointer',
-                      checked ? 'font-medium text-gray-900' : 'text-gray-500',
-                    )}
-                  >
-                    <span
-                      onClick={() => toggle(mod.id, action.id)}
-                      className={cn(
-                        'flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-[3px] border-[1.5px] transition-colors',
-                        readOnly ? 'cursor-default' : 'cursor-pointer',
-                        checked ? 'bg-brand border-brand' : 'border-gray-300 bg-white',
-                      )}
-                    >
-                      {checked && <Check size={8} className="text-white" strokeWidth={3} />}
-                    </span>
-                    {action.label}
-                  </label>
-                );
-              })}
-            </div>
+               <p className={cn('mt-0.5 text-[11.5px]', granted.length > 0 ? 'text-brand' : 'text-gray-400')}>
+                 {granted.length > 0 ? 'Full module access' : 'No access'}
+               </p>
+             </div>
+             {!readOnly && (
+               <button
+                 type="button"
+                 onClick={() => toggleModule(mod.id)}
+                 aria-pressed={granted.length > 0}
+                 className="flex items-center gap-1.5 text-[11.5px] font-medium text-gray-500 transition-colors hover:text-brand"
+               >
+                 <span className={cn(
+                   'flex h-[15px] w-[15px] items-center justify-center rounded-[3px] border-[1.5px] transition-colors',
+                   granted.length > 0 ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
+                 )}>
+                   {granted.length > 0 && <Check size={8} className="text-white" strokeWidth={3} />}
+                 </span>
+                 Allow access
+               </button>
+             )}
           </div>
         );
       })}
@@ -387,7 +340,7 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
             <div>
               <p className="text-[15px] font-semibold text-gray-900">{title}</p>
               {isClone && (
-                <p className="text-[12px] text-gray-400">Permissions copied from "{cloneSource!.name}" — type: Custom</p>
+              <p className="text-[12px] text-gray-400">Module access copied from "{cloneSource!.name}" — type: Custom</p>
               )}
             </div>
           </div>
@@ -430,8 +383,8 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
                 <Info size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
                 <p className="text-[12.5px] text-blue-700 leading-relaxed">
                   {isClone
-                    ? 'This is a new Custom role cloned from a system role. All permissions have been copied — adjust as needed.'
-                    : 'Custom roles inherit no permissions unless explicitly configured below.'}
+                    ? 'This Custom role copied the selected module access. Adjust the modules as needed.'
+                    : 'Select the modules users assigned to this role can access.'}
                 </p>
               </div>
             )}
@@ -441,11 +394,12 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
             {/* Permissions */}
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">Module Permissions</p>
+                <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">Module Access</p>
                 <p className="text-[12px] text-gray-400">
-                  {countGranted(permissions)} of {totalActions()} permissions granted
+                  {countEnabledModules(permissions)} of {MODULES.length} modules enabled
                 </p>
               </div>
+              <p className="mb-3 text-[12px] text-gray-500">Access is granted to full modules. Individual actions cannot be configured.</p>
               <PermissionsGrid permissions={permissions} onChange={setPermissions} />
             </div>
           </div>
@@ -510,7 +464,7 @@ function ViewPermissionsModal({
           {/* Tab strip */}
           <div className="flex gap-0 border-t border-gray-100">
             {([
-              { value: 'permissions' as ViewTab, label: 'Permissions' },
+               { value: 'permissions' as ViewTab, label: 'Module Access' },
               { value: 'users' as ViewTab,       label: `Assigned Users (${assignedUsers.length})` },
             ] as { value: ViewTab; label: string }[]).map(({ value, label }) => (
               <button
@@ -673,8 +627,8 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
 
   const transferRole = transferOptions.find(r => r.id === transferRoleId);
   const canConfirm   = !hasUsers || Boolean(transferRoleId);
-  const granted      = countGranted(role.permissions);
-  const coverage     = Math.round((granted / totalActions()) * 100);
+  const granted      = countEnabledModules(role.permissions);
+  const coverage     = Math.round((granted / MODULES.length) * 100);
 
   function handleConfirm() {
     onConfirm(transferRoleId);
@@ -872,7 +826,10 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
 type TabFilter = 'all' | 'system' | 'custom';
 
 export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const [roles, setRoles] = useState<AppRole[]>(MOCK_ROLES);
+  const [roles, setRoles] = useState<AppRole[]>(() => MOCK_ROLES.map(role => ({
+    ...role,
+    permissions: normalizeModulePermissions(role.permissions),
+  })));
 
   const [tab,    setTab]    = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
@@ -907,7 +864,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       name: a.name,
       description: a.description,
       type: a.isProtected ? 'Super Admin' : a.type,
-      permissions: countGranted(a.permissions),
+      permissions: countEnabledModules(a.permissions),
       users: a.userCount,
       status: a.status,
     };
@@ -915,7 +872,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       name: b.name,
       description: b.description,
       type: b.isProtected ? 'Super Admin' : b.type,
-      permissions: countGranted(b.permissions),
+      permissions: countEnabledModules(b.permissions),
       users: b.userCount,
       status: b.status,
     };
@@ -1066,7 +1023,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
                 <TableHead className="w-[130px]">
-                  <SortableTableHead label="Permissions" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                  <SortableTableHead label="Module Access" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
                 <TableHead className="w-[80px] text-center">
                   <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
