@@ -26,6 +26,7 @@ import { AvatarGroup } from '@/screens/projects/AvatarGroup';
 type GroupFilter = 'All' | EmployeeGroupStatus;
 type GroupSortKey = 'name' | 'description' | 'members' | 'status';
 type SortDirection = 'asc' | 'desc';
+type AriaSort = 'ascending' | 'descending' | 'none';
 
 function userName(user: AppUser) {
   return `${user.firstName} ${user.lastName}`;
@@ -511,6 +512,11 @@ export function EmployeeManagementScreen() {
   }
 
   const targetMemberCount = confirmation ? (memberMap.get(confirmation.group.id) ?? []).length : 0;
+  const ariaSortFor = (key: GroupSortKey): AriaSort => (
+    sortKey !== key
+      ? 'none'
+      : sortDirection === 'asc' ? 'ascending' : 'descending'
+  );
 
   return (
     <div className="px-6 py-6 lg:px-8">
@@ -602,16 +608,16 @@ export function EmployeeManagementScreen() {
           <Table className="w-full min-w-[760px] table-auto">
             <TableHeader className="[&_tr]:border-0">
               <TableRow className="border-0 bg-gray-50/70 hover:bg-gray-50/70">
-                <TableHead aria-sort={sortKey === 'name' ? sortDirection : 'none'} className="h-11 px-5">
+                <TableHead aria-sort={ariaSortFor('name')} className="h-11 px-5">
                   <SortableGroupHead label="Employee Group" sortKey="name" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
                 </TableHead>
-                <TableHead aria-sort={sortKey === 'description' ? sortDirection : 'none'} className="h-11 px-5">
+                <TableHead aria-sort={ariaSortFor('description')} className="h-11 px-5">
                   <SortableGroupHead label="Description" sortKey="description" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
                 </TableHead>
-                <TableHead aria-sort={sortKey === 'members' ? sortDirection : 'none'} className="h-11 px-5">
+                <TableHead aria-sort={ariaSortFor('members')} className="h-11 px-5">
                   <SortableGroupHead label="Members" sortKey="members" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
                 </TableHead>
-                <TableHead aria-sort={sortKey === 'status' ? sortDirection : 'none'} className="h-11 px-5">
+                <TableHead aria-sort={ariaSortFor('status')} className="h-11 px-5">
                   <SortableGroupHead label="Status" sortKey="status" currentKey={sortKey} direction={sortDirection} onSort={handleSort} />
                 </TableHead>
                 <TableHead className="h-11 w-16 px-5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">Action</TableHead>
