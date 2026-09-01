@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Pencil, Tag, CalendarDays, PlayCircle } from 'lucide-react';
+import { ArrowRight, Check, Pencil, Tag, CalendarDays, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getProjectDisplayName, type Project, type ProjectStatus } from './mock-data';
@@ -67,7 +67,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
 
   return (
     <div
-      onClick={() => router.push(`/projects/${project.id}/tasks?from=grid`)}
+      onClick={() => router.push(`/projects/${project.id}`)}
       className={cn(
         'flex flex-col rounded-xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer',
         isSelected
@@ -223,15 +223,28 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
           </TooltipProvider>
         </div>
 
-        {onResume && (
+        <div className="flex items-center gap-2">
+          {onResume && (
+            <button
+              onClick={e => { e.stopPropagation(); setResumeDialogOpen(true); }}
+              className="group flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-gray-600 shadow-sm transition-colors hover:border-brand hover:text-brand"
+            >
+              <PlayCircle size={12} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
+              Resume
+            </button>
+          )}
           <button
-            onClick={e => { e.stopPropagation(); setResumeDialogOpen(true); }}
-            className="group flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-gray-600 shadow-sm transition-colors hover:border-brand hover:text-brand"
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              router.push(`/projects/${project.id}`);
+            }}
+            className="flex items-center gap-1 text-[12.5px] font-medium text-brand transition-colors hover:text-brand-hover"
           >
-            <PlayCircle size={12} className="flex-shrink-0 text-gray-500 transition-colors group-hover:text-brand" />
-            Resume
+            View All Tasks
+            <ArrowRight size={13} />
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── Resume confirmation dialog ── */}

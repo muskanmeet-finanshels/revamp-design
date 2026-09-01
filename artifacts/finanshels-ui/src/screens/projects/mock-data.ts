@@ -6,6 +6,19 @@ export interface TeamMember {
   color: string;
 }
 
+export type TaskStatus = 'Completed' | 'In Progress' | 'Pending' | 'Blocked';
+export type TaskPriority = 'High' | 'Medium' | 'Low';
+
+export interface ProjectTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee: TeamMember;
+  dueDate: string;
+  description?: string;
+}
+
 export type InvoiceType = 'bundled' | 'individual';
 
 export interface Project {
@@ -13,7 +26,7 @@ export interface Project {
   title: string;
   status: ProjectStatus;
   client: { name: string; color: string };
-  serviceType: { label: string; departmentId: string };
+  serviceType: { label: string; departmentId: string; color?: string };
   /** Optional account manager responsible for the client relationship. */
   accountManager?: TeamMember;
   teamLeads: TeamMember[];
@@ -39,6 +52,11 @@ export interface Project {
   deleteReason?: string;
   /** Reason provided when the project team was reassigned */
   reassignReason?: string;
+  /** Optional summary and labels shown on the project detail page. */
+  description?: string;
+  tags?: string[];
+  /** Task-level records shown on the project detail page. */
+  tasks?: ProjectTask[];
 }
 
 export function getProjectDisplayName(project: {
@@ -1001,4 +1019,65 @@ const GENERATED_PROJECTS: Project[] = Array.from({ length: 88 }, (_, index) => {
   };
 });
 
-export const MOCK_PROJECTS: Project[] = [...SEED_PROJECTS, ...GENERATED_PROJECTS];
+const TASK_TITLES = [
+  'Collect required documents',
+  'Review source records',
+  'Reconcile account balances',
+  'Prepare working papers',
+  'Complete compliance checks',
+  'Resolve review notes',
+  'Prepare client deliverables',
+  'Internal quality review',
+  'Obtain client approval',
+  'Submit final filing',
+  'Confirm submission receipt',
+  'Archive project records',
+];
+
+function buildProjectTasks(project: Project): ProjectTask[] {
+  const team = [...project.teamLeads, ...project.assignees];
+  const fallbackAssignee: TeamMember = {
+    initials: project.client.name.slice(0, 2).toUpperCase(),
+    name: project.client.name,
+    color: project.client.color,
+  };
+
+  return Array.from({ length: project.tasksTotal }, (_, index) => {
+    const isCompleted =
+      project.status === 'Completed' ||
+      project.status === 'Archived' ||
+      index < project.tasksCompleted;
+    const isBlocked = project.status === 'On Hold' && index === project.tasksCompleted;
+    const isInProgress =
+      !isCompleted &&
+      !isBlocked &&
+      project.progress > 0 &&
+      index === project.tasksCompleted;
+    const cycle = Math.floor(index / TASK_TITLES.length) + 1;
+    const baseTitle = TASK_TITLES[index % TASK_TITLES.length];
+
+    return {
+      id: `${project.id}-task-${index + 1}`,
+      title: cycle > 1 ? `${baseTitle} (${cycle})` : baseTitle,
+      status: isCompleted
+        ? 'Completed'
+        : isBlocked
+          ? 'Blocked'
+          : isInProgress
+            ? 'In Progress'
+            : 'Pending',
+      priority: index % 4 === 0 ? 'High' : index % 4 === 3 ? 'Low' : 'Medium',
+      assignee: team[index % Math.max(team.length, 1)] ?? fallbackAssignee,
+      dueDate: project.dueDate.replace(/^Due\s+/i, ''),
+    };
+  });
+}
+
+export const MOCK_PROJECTS: Project[] = [...SEED_PROJECTS, ...GENERATED_PROJECTS].map(project => ({
+  ...project,
+  description:
+    project.description ??
+    `${project.serviceType.label} work for ${project.client.name}, including review, completion, and final delivery.`,
+  tags: project.tags ?? [project.serviceType.label, project.status],
+  tasks: project.tasks ?? buildProjectTasks(project),
+}));
