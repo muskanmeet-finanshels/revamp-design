@@ -35,16 +35,7 @@ const NAV: NavEntry[] = [
   },
   { kind: 'leaf', label: 'Timesheets', href: '/timesheets', icon: <Timer size={16} /> },
   { kind: 'leaf', label: 'Audit Trail', href: '/audit-trail', icon: <ClipboardList size={16} /> },
-  {
-    kind: 'group', label: 'Admin', icon: <Shield size={16} />,
-    children: [
-      { kind: 'leaf', label: 'Organisation', href: '/settings/organisation', icon: <Building2 size={14} /> },
-      { kind: 'leaf', label: 'Users',        href: '/settings/users',        icon: <Users2    size={14} /> },
-      { kind: 'leaf', label: 'Employee Management', href: '/settings/employee-management', icon: <UsersRound size={14} /> },
-      { kind: 'leaf', label: 'Roles',        href: '/settings/roles',        icon: <Shield    size={14} /> },
-      { kind: 'leaf', label: 'Permissions', href: '/settings/permissions', icon: <KeyRound  size={14} /> },
-    ],
-  },
+  { kind: 'leaf', label: 'Admin', href: '/settings/admin', icon: <Shield size={16} /> },
 ];
 
 const BOTTOM: NavLeaf[] = [

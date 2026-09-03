@@ -121,14 +121,28 @@ export function fullPermissions(): Record<string, string[]> {
  * Module access is all-or-nothing. This preserves existing access when
  * converting historical action-level maps to the module-level model.
  */
-export function normalizeModulePermissions(permissions: Record<string, string[]>): Record<string, string[]> {
-  return Object.fromEntries(MODULES.map(module => [
-    module.id,
-    (permissions[module.id] ?? []).length > 0 ? allPermissionsFor(module.id) : [],
-  ]));
+export function normalizeModulePermissions(permissions: PermissionRule[]): PermissionRule[] {
+  return permissions;
 }
 
 /* ─── Role type ──────────────────────────────────────────────────────────── */
+
+export type DataScope = 'Own' | 'Team' | 'All';
+
+export interface ScopeException {
+  id: string;
+  type: 'department' | 'service' | 'account_manager';
+  targetId: string;
+  hierarchyApplies: boolean;
+}
+
+export interface PermissionRule {
+  moduleId: string;
+  actionId: string;
+  enabled: boolean;
+  scope: DataScope;
+  exceptions: ScopeException[];
+}
 
 export type RoleType   = 'system' | 'custom';
 export type RoleStatus = 'Active' | 'Inactive';
@@ -141,12 +155,30 @@ export interface AppRole {
   status: RoleStatus;
   /** Super Admin: cannot be edited, cloned differently, or deactivated */
   isProtected: boolean;
-  /** Record<moduleId, full action ids when module access is enabled> */
-  permissions: Record<string, string[]>;
+  /** List of permission rules per module and action */
+  permissions: PermissionRule[];
   userCount: number;
   createdAt: string;
   clonedFromId?: string;
 }
+
+export function convertLegacyPermissions(perms: Record<string, string[]>, defaultScope: DataScope = 'All'): PermissionRule[] {
+  const rules: PermissionRule[] = [];
+  for (const module of MODULES) {
+    const grantedActions = perms[module.id] || [];
+    for (const action of module.actions) {
+      rules.push({
+        moduleId: module.id,
+        actionId: action.id,
+        enabled: grantedActions.includes(action.id),
+        scope: defaultScope,
+        exceptions: [],
+      });
+    }
+  }
+  return rules;
+}
+
 
 /* ─── Seed data ──────────────────────────────────────────────────────────── */
 
@@ -159,7 +191,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: true,
-    permissions: fullPermissions(),
+    permissions: convertLegacyPermissions(fullPermissions(), 'All'),
     userCount: 1,
     createdAt: '2020-01-01',
   },
@@ -170,7 +202,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view', 'create', 'edit', 'delete', 'assign_team', 'approve'],
       tasks:        ['view', 'create', 'edit', 'delete', 'assign'],
       timesheets:   ['view', 'submit', 'approve', 'reject', 'manage'],
@@ -181,7 +213,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  ['view', 'export'],
       reports:      ['view', 'export'],
       settings:     ['view', 'manage'],
-    },
+    }, 'All'),
     userCount: 2,
     createdAt: '2020-01-01',
   },
@@ -192,7 +224,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view', 'create', 'edit', 'assign_team', 'approve'],
       tasks:        ['view', 'create', 'edit', 'assign'],
       timesheets:   ['view', 'approve'],
@@ -203,7 +235,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  ['view'],
       reports:      ['view', 'export'],
       settings:     ['view'],
-    },
+    }, 'Team'),
     userCount: 3,
     createdAt: '2020-01-01',
   },
@@ -214,7 +246,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view', 'edit', 'assign_team'],
       tasks:        ['view', 'create', 'edit', 'delete', 'assign'],
       timesheets:   ['view', 'submit', 'approve'],
@@ -225,7 +257,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  [],
       reports:      ['view'],
       settings:     ['view'],
-    },
+    }, 'Team'),
     userCount: 4,
     createdAt: '2020-01-01',
   },
@@ -236,7 +268,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view', 'create', 'edit'],
       timesheets:   ['view', 'submit'],
@@ -247,7 +279,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  [],
       reports:      ['view'],
       settings:     ['view'],
-    },
+    }, 'Own'),
     userCount: 8,
     createdAt: '2020-01-01',
   },
@@ -259,7 +291,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view', 'edit'],
       tasks:        ['view', 'create', 'edit', 'assign'],
       timesheets:   ['view', 'submit'],
@@ -270,7 +302,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  ['view'],
       reports:      ['view'],
       settings:     ['view'],
-    },
+    }, 'Own'),
     userCount: 2,
     createdAt: '2024-03-15',
     clonedFromId: 'role-team-member',
@@ -282,7 +314,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Active',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view'],
       timesheets:   ['view', 'approve', 'manage'],
@@ -293,7 +325,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  ['view'],
       reports:      ['view', 'export'],
       settings:     ['view'],
-    },
+    }, 'All'),
     userCount: 1,
     createdAt: '2024-06-01',
   },
@@ -304,7 +336,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Inactive',
     isProtected: false,
-    permissions: {
+    permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view'],
       timesheets:   ['view'],
@@ -315,7 +347,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  [],
       reports:      ['view'],
       settings:     ['view'],
-    },
+    }, 'All'),
     userCount: 0,
     createdAt: '2024-09-20',
   },

@@ -10,24 +10,14 @@ export { MOCK_DEPARTMENTS, MOCK_VERTICALS, MOCK_TEAMS };
 
 export type UserStatus = 'Active' | 'Inactive' | 'Pending';
 
-export type UserRole =
-  | 'Admin'
-  | 'Finance Manager'
-  | 'Senior Accountant'
-  | 'Accountant'
-  | 'Tax Consultant'
-  | 'Senior Auditor'
-  | 'Auditor'
-  | 'HR Specialist'
-  | 'IT Support'
-  | 'Compliance Officer'
-  | 'Team Lead'
-  | 'Viewer';
+export type UserRole = string;
 
 /** Product setting: when false, the User drawer falls back to one role. */
 export const ALLOW_MULTIPLE_ROLES = true;
 
-export const ROLE_OPTIONS: UserRole[] = [
+// ROLE_OPTIONS is no longer statically defining valid roles; it is only kept for backwards-compat if needed,
+// but UI should now read active roles from AccessControlContext.
+export const ROLE_OPTIONS: string[] = [
   'Admin',
   'Finance Manager',
   'Senior Accountant',
@@ -49,17 +39,18 @@ export interface EmployeeGroup {
   name: string;
   description: string;
   status: EmployeeGroupStatus;
+  roles: UserRole[];
   createdAt: string;
 }
 
 export const MOCK_EMPLOYEE_GROUPS: EmployeeGroup[] = [
-  { id: 'group-management', name: 'Management', description: 'Senior leaders and people managers.', status: 'Active', createdAt: '2020-01-01' },
-  { id: 'group-senior-staff', name: 'Senior Staff', description: 'Experienced specialists and senior contributors.', status: 'Active', createdAt: '2020-01-01' },
-  { id: 'group-junior-staff', name: 'Junior Staff', description: 'Early-career professionals and associates.', status: 'Active', createdAt: '2020-01-01' },
-  { id: 'group-remote-team', name: 'Remote Team', description: 'Employees who work remotely across departments.', status: 'Active', createdAt: '2021-04-12' },
-  { id: 'group-probation', name: 'Probation', description: 'New employees in their probationary period.', status: 'Active', createdAt: '2022-01-10' },
-  { id: 'group-contractors', name: 'Contractor', description: 'External or temporary contracted team members.', status: 'Inactive', createdAt: '2020-01-01' },
-  { id: 'group-part-time', name: 'Part-time', description: 'Employees on reduced working-hour arrangements.', status: 'Inactive', createdAt: '2020-01-01' },
+  { id: 'group-management', name: 'Management', description: 'Senior leaders and people managers.', status: 'Active', roles: ['Admin', 'Team Lead'], createdAt: '2020-01-01' },
+  { id: 'group-senior-staff', name: 'Senior Staff', description: 'Experienced specialists and senior contributors.', status: 'Active', roles: [], createdAt: '2020-01-01' },
+  { id: 'group-junior-staff', name: 'Junior Staff', description: 'Early-career professionals and associates.', status: 'Active', roles: [], createdAt: '2020-01-01' },
+  { id: 'group-remote-team', name: 'Remote Team', description: 'Employees who work remotely across departments.', status: 'Active', roles: [], createdAt: '2021-04-12' },
+  { id: 'group-probation', name: 'Probation', description: 'New employees in their probationary period.', status: 'Active', roles: [], createdAt: '2022-01-10' },
+  { id: 'group-contractors', name: 'Contractor', description: 'External or temporary contracted team members.', status: 'Inactive', roles: [], createdAt: '2020-01-01' },
+  { id: 'group-part-time', name: 'Part-time', description: 'Employees on reduced working-hour arrangements.', status: 'Inactive', roles: [], createdAt: '2020-01-01' },
 ];
 
 export interface AppUser {

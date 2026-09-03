@@ -1,10 +1,10 @@
 ---
 name: Role access model
-description: The product decision governing user-role assignment and role permission granularity.
+description: The product decision governing role sources, action permissions, scopes, and reporting hierarchy.
 ---
 
-Users may have one or more assigned roles when the multiple-role setting is enabled. A role grants or denies access at the module level; individual actions within a module are not independently configurable.
+Users can receive access from both direct roles and active employee-group roles. Roles grant individual actions within modules, and each granted action has an Own, Team, or All data scope. Team includes active direct and indirect reports. All may be narrowed by department, service, or account-manager exceptions, optionally retaining reporting-hierarchy behavior. Effective access combines every active source without one assignment replacing another.
 
-**Why:** This is the agreed access-control model for the Admin experience. Optional multi-role assignment supports organisations that need combined access while keeping permission management module-based.
+**Why:** Admins need to explain not only whether a user can enter a module, but which action is allowed, which records it covers, and whether access came directly or through a group. Reporting relationships are part of scope evaluation, so circular hierarchies must be prevented.
 
-**How to apply:** User-management flows must switch between single- and multi-role selection based on the multiple-role setting. New or revised role and permission flows must present whole-module enablement only. When converting historical action-level access, preserve a module if it had any granted action.
+**How to apply:** New Admin flows must preserve direct and inherited role sources, ignore inactive roles/groups for new effective access, expose action and scope details, and explain exceptions and reporting-derived reach. Reporting-manager changes must reject inactive managers and direct or indirect cycles.

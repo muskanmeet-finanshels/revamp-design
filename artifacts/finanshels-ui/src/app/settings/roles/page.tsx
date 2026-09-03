@@ -1,15 +1,10 @@
-import { AppShell } from '@/components/AppShell';
+import { AdminShell } from '@/screens/admin/AdminShell';
 import { RolesScreen } from '@/screens/roles/RolesScreen';
 
 export default function RolesPage() {
   return (
-    <AppShell
-      breadcrumbs={[
-        { label: 'Admin' },
-        { label: 'Role Management' },
-      ]}
-    >
+    <AdminShell breadcrumbLabel="Role Management">
       <RolesScreen />
-    </AppShell>
+    </AdminShell>
   );
 }

@@ -40,6 +40,8 @@ import {
 } from './mock-data';
 import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
+import { useAccessControlContext } from '@/contexts/AccessControlContext';
+import { EffectiveAccessDrawer } from './EffectiveAccessDrawer';
 
 const PROJECTS_BY_TITLE = new Map(MOCK_PROJECTS.map(project => [project.title, project]));
 const getDependencyProjectDisplayName = (title: string) => {
@@ -63,6 +65,22 @@ function getInitials(u: AppUser) {
 
 function isValidEmail(e: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+
+function wouldCreateCycle(userId: string, potentialManagerId: string, users: AppUser[]): boolean {
+  let currentId: string | undefined = potentialManagerId;
+  const visited = new Set<string>();
+
+  while (currentId) {
+    if (currentId === userId) return true;
+    if (visited.has(currentId)) return true; // prevent infinite loop if existing cycle
+    visited.add(currentId);
+
+    const manager = users.find(u => u.id === currentId);
+    currentId = manager?.reportingManagerId;
+  }
+  return false;
 }
 
 /* ─── Status badge ────────────────────────────────────────────────────── */
@@ -263,12 +281,14 @@ function DrawerSelectField({
 
 function UserActionMenu({
   user,
+  onViewAccess,
   onEdit,
   onResetPassword,
   onActivate,
   onDeactivate,
 }: {
   user: AppUser;
+  onViewAccess: () => void;
   onEdit: () => void;
   onResetPassword: () => void;
   onActivate: () => void;
@@ -302,6 +322,13 @@ function UserActionMenu({
           className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
         >
           Edit User
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onViewAccess(); }}
+          className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          View Effective Access
         </button>
 
         {!isInactive && (
@@ -345,6 +372,7 @@ interface UserDrawerProps {
 }
 
 function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserDrawerProps) {
+  const { roles: allRolesContext } = useAccessControlContext();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -400,7 +428,12 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
   const deptTeams     = MOCK_TEAMS.filter(t => t.departmentId === departmentId);
   const deptVerticals = MOCK_VERTICALS.filter(v => v.departmentId === departmentId);
   const managerOptions = allUsers
-    .filter(u => u.status === 'Active' && u.id !== editUser?.id)
+    .filter(u => {
+      if (u.status !== 'Active') return false;
+      if (editUser && u.id === editUser.id) return false;
+      if (editUser && wouldCreateCycle(editUser.id, u.id, allUsers)) return false;
+      return true;
+    })
     .map(u => ({ value: u.id, label: `${u.firstName} ${u.lastName}` }));
 
   /* Validation */
@@ -589,7 +622,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
                   selected={roles}
                   onChange={values => setRoles(values as UserRole[])}
                   placeholder="Select roles…"
-                  options={ROLE_OPTIONS.map(option => ({ value: option, label: option }))}
+                  options={allRolesContext.filter(r => r.status === 'Active').map(role => ({ value: role.name, label: role.name }))}
                   error={rolesErr}
                 />
               ) : (
@@ -597,7 +630,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
                   value={roles[0] ?? ''}
                   onChange={value => setRoles([value as UserRole])}
                   placeholder="Select role…"
-                  options={ROLE_OPTIONS.map(option => ({ value: option, label: option }))}
+                  options={allRolesContext.filter(r => r.status === 'Active').map(role => ({ value: role.name, label: role.name }))}
                   error={rolesErr}
                 />
               )}
@@ -1039,6 +1072,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   /* Drawer state */
   const [drawerOpen,  setDrawerOpen]  = useState(false);
   const [editUser,    setEditUser]    = useState<AppUser | null>(null);
+  const [accessUser,  setAccessUser]  = useState<AppUser | null>(null);
 
   /* Dialog state */
   const [resetTarget,    setResetTarget]    = useState<AppUser | null>(null);
@@ -1161,7 +1195,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       )}
 
       {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
           { label: 'Total Users',    count: total,    color: 'text-gray-900',    bg: 'bg-gray-100',    click: () => setStatusFilter('All') },
           { label: 'Active',         count: active,   color: 'text-emerald-700', bg: 'bg-emerald-50',  click: () => setStatusFilter('Active') },
@@ -1379,6 +1413,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   <TableCell className="py-3 pr-3">
                     <UserActionMenu
                       user={u}
+                      onViewAccess={() => setAccessUser(u)}
                       onEdit={() => openEdit(u)}
                       onResetPassword={() => setResetTarget(u)}
                       onActivate={() => setActivateTarget(u)}
@@ -1428,6 +1463,12 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onOpenChange={open => { if (!open) setActivateTarget(null); }}
         user={activateTarget}
         onConfirm={() => activateTarget && handleActivate(activateTarget)}
+      />
+
+      {/* Effective access explanation */}
+      <EffectiveAccessDrawer
+        onClose={() => setAccessUser(null)}
+        user={accessUser}
       />
 
       {/* Exit workflow drawer */}

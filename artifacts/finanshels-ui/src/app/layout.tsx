@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { TimerProvider } from '@/contexts/TimerContext';
 import { OrgProvider } from '@/contexts/OrgContext';
 import { EmployeeGroupsProvider } from '@/contexts/EmployeeGroupsContext';
+import { AccessControlProvider } from '@/contexts/AccessControlContext';
 import { TimerWidget } from '@/components/TimerWidget';
 
 import './globals.css';
@@ -35,15 +36,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable} ${jetbrainsMono.variable}`}>
       <body>
-        <OrgProvider>
-          <EmployeeGroupsProvider>
-            <TimerProvider>
-              {children}
-              <TimerWidget />
-              <Toaster position="bottom-right" richColors />
-            </TimerProvider>
-          </EmployeeGroupsProvider>
-        </OrgProvider>
+        <AccessControlProvider>
+          <OrgProvider>
+            <EmployeeGroupsProvider>
+              <TimerProvider>
+                {children}
+                <TimerWidget />
+                <Toaster position="bottom-right" richColors />
+              </TimerProvider>
+            </EmployeeGroupsProvider>
+          </OrgProvider>
+        </AccessControlProvider>
       </body>
     </html>
   );

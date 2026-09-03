@@ -1,5 +1,10 @@
-import { redirect } from 'next/navigation';
+import { AdminShell } from '@/screens/admin/AdminShell';
+import { AdminOverview } from '@/screens/admin/AdminOverview';
 
 export default function AdminPage() {
-  redirect('/settings/roles');
+  return (
+    <AdminShell breadcrumbLabel="Overview">
+      <AdminOverview />
+    </AdminShell>
+  );
 }

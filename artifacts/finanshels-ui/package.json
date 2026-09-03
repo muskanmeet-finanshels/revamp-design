@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -p $PORT -H 0.0.0.0",
     "build": "next build && rm -rf dist/public && mkdir -p dist && cp -r out dist/public",
+    "test:admin-storage": "node --test --experimental-strip-types src/contexts/employee-groups-storage.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
