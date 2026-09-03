@@ -16,7 +16,7 @@ const SUBMODULES: { value: AdminSection; label: string; description: string }[] 
   {
     value: 'permissions',
     label: 'Permissions',
-    description: 'Configure module actions and allowed data scopes for each role',
+    description: 'Configure module-level access for each role',
   },
 ];
 

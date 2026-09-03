@@ -1,10 +1,15 @@
-import { AdminShell } from '@/screens/admin/AdminShell';
+import { AppShell } from '@/components/AppShell';
 import { EmployeeManagementScreen } from '@/screens/employee-management/EmployeeManagementScreen';
 
 export default function EmployeeManagementPage() {
   return (
-    <AdminShell breadcrumbLabel="Employee Groups">
+    <AppShell
+      breadcrumbs={[
+        { label: 'Admin' },
+        { label: 'Employee Management' },
+      ]}
+    >
       <EmployeeManagementScreen />
-    </AdminShell>
+    </AppShell>
   );
 }

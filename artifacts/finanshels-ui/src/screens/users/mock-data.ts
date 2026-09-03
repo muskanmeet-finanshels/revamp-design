@@ -10,14 +10,24 @@ export { MOCK_DEPARTMENTS, MOCK_VERTICALS, MOCK_TEAMS };
 
 export type UserStatus = 'Active' | 'Inactive' | 'Pending';
 
-export type UserRole = string;
+export type UserRole =
+  | 'Admin'
+  | 'Finance Manager'
+  | 'Senior Accountant'
+  | 'Accountant'
+  | 'Tax Consultant'
+  | 'Senior Auditor'
+  | 'Auditor'
+  | 'HR Specialist'
+  | 'IT Support'
+  | 'Compliance Officer'
+  | 'Team Lead'
+  | 'Viewer';
 
-/** Each user has exactly one direct role. Employee-group roles remain separate inherited sources. */
-export const ALLOW_MULTIPLE_ROLES = false;
+/** Product setting: when false, the User drawer falls back to one role. */
+export const ALLOW_MULTIPLE_ROLES = true;
 
-// ROLE_OPTIONS is no longer statically defining valid roles; it is only kept for backwards-compat if needed,
-// but UI should now read active roles from AccessControlContext.
-export const ROLE_OPTIONS: string[] = [
+export const ROLE_OPTIONS: UserRole[] = [
   'Admin',
   'Finance Manager',
   'Senior Accountant',
@@ -39,18 +49,17 @@ export interface EmployeeGroup {
   name: string;
   description: string;
   status: EmployeeGroupStatus;
-  roles: UserRole[];
   createdAt: string;
 }
 
 export const MOCK_EMPLOYEE_GROUPS: EmployeeGroup[] = [
-  { id: 'group-management', name: 'Management', description: 'Senior leaders and people managers.', status: 'Active', roles: ['Admin', 'Team Lead'], createdAt: '2020-01-01' },
-  { id: 'group-senior-staff', name: 'Senior Staff', description: 'Experienced specialists and senior contributors.', status: 'Active', roles: [], createdAt: '2020-01-01' },
-  { id: 'group-junior-staff', name: 'Junior Staff', description: 'Early-career professionals and associates.', status: 'Active', roles: [], createdAt: '2020-01-01' },
-  { id: 'group-remote-team', name: 'Remote Team', description: 'Employees who work remotely across departments.', status: 'Active', roles: [], createdAt: '2021-04-12' },
-  { id: 'group-probation', name: 'Probation', description: 'New employees in their probationary period.', status: 'Active', roles: [], createdAt: '2022-01-10' },
-  { id: 'group-contractors', name: 'Contractor', description: 'External or temporary contracted team members.', status: 'Inactive', roles: [], createdAt: '2020-01-01' },
-  { id: 'group-part-time', name: 'Part-time', description: 'Employees on reduced working-hour arrangements.', status: 'Inactive', roles: [], createdAt: '2020-01-01' },
+  { id: 'group-management', name: 'Management', description: 'Senior leaders and people managers.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-senior-staff', name: 'Senior Staff', description: 'Experienced specialists and senior contributors.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-junior-staff', name: 'Junior Staff', description: 'Early-career professionals and associates.', status: 'Active', createdAt: '2020-01-01' },
+  { id: 'group-remote-team', name: 'Remote Team', description: 'Employees who work remotely across departments.', status: 'Active', createdAt: '2021-04-12' },
+  { id: 'group-probation', name: 'Probation', description: 'New employees in their probationary period.', status: 'Active', createdAt: '2022-01-10' },
+  { id: 'group-contractors', name: 'Contractor', description: 'External or temporary contracted team members.', status: 'Inactive', createdAt: '2020-01-01' },
+  { id: 'group-part-time', name: 'Part-time', description: 'Employees on reduced working-hour arrangements.', status: 'Inactive', createdAt: '2020-01-01' },
 ];
 
 export interface AppUser {
@@ -64,9 +73,6 @@ export interface AppUser {
   status: UserStatus;
   departmentId: string;
   teamId?: string;
-  /** Classification only; does not grant permissions or change data access. */
-  verticalIds?: string[];
-  /** Legacy single-vertical field retained while older browser data migrates. */
   verticalId?: string;
   reportingManagerId?: string;
   roles: UserRole[];
@@ -92,7 +98,7 @@ export const MOCK_USERS: AppUser[] = [
     departmentId: 'dept-1',
     teamId: 'team-1',
     verticalId: 'vert-1',
-    roles: ['Finance Manager'],
+    roles: ['Finance Manager', 'Team Lead'],
     employeeGroups: ['Management', 'Senior Staff'],
     joiningDate: '2022-03-01',
     createdAt: '2022-03-01',
@@ -147,7 +153,7 @@ export const MOCK_USERS: AppUser[] = [
     teamId: 'team-6',
     verticalId: 'vert-7',
     reportingManagerId: 'u7',
-    roles: ['Tax Consultant'],
+    roles: ['Tax Consultant', 'Compliance Officer'],
     employeeGroups: ['Senior Staff'],
     joiningDate: '2021-11-20',
     createdAt: '2021-11-20',
@@ -166,7 +172,7 @@ export const MOCK_USERS: AppUser[] = [
     teamId: 'team-4',
     verticalId: 'vert-5',
     reportingManagerId: 'u1',
-    roles: ['Senior Auditor'],
+    roles: ['Senior Auditor', 'Team Lead'],
     employeeGroups: ['Management', 'Senior Staff'],
     joiningDate: '2020-08-01',
     createdAt: '2020-08-01',
@@ -202,7 +208,7 @@ export const MOCK_USERS: AppUser[] = [
     status: 'Active',
     departmentId: 'dept-4',
     teamId: 'team-7',
-    roles: ['Compliance Officer'],
+    roles: ['Compliance Officer', 'Team Lead'],
     employeeGroups: ['Management'],
     joiningDate: '2021-04-12',
     createdAt: '2021-04-12',

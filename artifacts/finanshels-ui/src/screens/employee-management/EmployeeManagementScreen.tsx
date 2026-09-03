@@ -20,8 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
-import { useAccessControlContext } from '@/contexts/AccessControlContext';
-import { ROLE_OPTIONS, type AppUser, type EmployeeGroup, type EmployeeGroupStatus, type UserRole } from '@/screens/users/mock-data';
+import type { AppUser, EmployeeGroup, EmployeeGroupStatus } from '@/screens/users/mock-data';
 import { AvatarGroup } from '@/screens/projects/AvatarGroup';
 
 type GroupFilter = 'All' | EmployeeGroupStatus;
@@ -253,91 +252,6 @@ function MemberPicker({
   );
 }
 
-
-function MultiSelectField({
-  options,
-  selected,
-  onChange,
-  placeholder,
-  error,
-  summaryNoun = 'roles',
-}: {
-  options: Array<{ value: string; label: string }>;
-  selected: string[];
-  onChange: (v: string[]) => void;
-  placeholder: string;
-  error?: boolean;
-  summaryNoun?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const selectedLabels = options
-    .filter(option => selected.includes(option.value))
-    .map(option => option.label);
-
-  function toggle(option: string) {
-    onChange(selected.includes(option)
-      ? selected.filter(value => value !== option)
-      : [...selected, option]);
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={placeholder}
-          aria-expanded={open}
-          className={cn(
-            'flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white px-3.5 text-left text-[13px] transition-colors',
-            'focus:outline-none focus:ring-1 focus:ring-brand/20',
-            error
-              ? 'border-red-400 focus:border-red-400'
-              : selected.length
-                ? 'border-brand focus:border-brand'
-                : 'border-gray-200 text-gray-400 focus:border-brand',
-          )}
-        >
-          <span className="min-w-0 truncate">
-            {selectedLabels.length === 0
-              ? placeholder
-              : selectedLabels.length === 1
-                ? selectedLabels[0]
-                : `${selectedLabels.length} ${summaryNoun} selected`}
-          </span>
-          <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5">
-        <div className="max-h-60 overflow-y-auto">
-          {options.map(option => {
-            const checked = selected.includes(option.value);
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => toggle(option.value)}
-                aria-pressed={checked}
-                className={cn(
-                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
-                  checked ? 'bg-orange-50 font-medium text-brand' : 'text-gray-700 hover:bg-gray-50',
-                )}
-              >
-                <span className={cn(
-                  'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
-                  checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                )}>
-                  {checked && <Check size={10} className="text-white" strokeWidth={3} />}
-                </span>
-                <span className="truncate">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function GroupDrawer({
   open,
   group,
@@ -351,13 +265,11 @@ function GroupDrawer({
   users: AppUser[];
   groups: EmployeeGroup[];
   onClose: () => void;
-  onSave: (draft: { name: string; description: string; roles: UserRole[]; memberIds: string[] }) => void;
+  onSave: (draft: { name: string; description: string; memberIds: string[] }) => void;
 }) {
-  const { roles: allRolesContext } = useAccessControlContext();
   const [mounted, setMounted] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [roles, setRoles] = useState<UserRole[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -369,7 +281,6 @@ function GroupDrawer({
     setSaving(false);
     setName(group?.name ?? '');
     setDescription(group?.description ?? '');
-    setRoles(group?.roles ?? []);
     setMemberIds(group
       ? users.filter(user => user.status === 'Active' && user.employeeGroups.includes(group.name)).map(user => user.id)
       : []);
@@ -384,7 +295,7 @@ function GroupDrawer({
     setShowErrors(true);
     if (!name.trim() || duplicateName) return;
     setSaving(true);
-    onSave({ name: name.trim(), description: description.trim(), roles, memberIds });
+    onSave({ name: name.trim(), description: description.trim(), memberIds });
   }
 
   if (!mounted) return null;
@@ -427,29 +338,11 @@ function GroupDrawer({
             <DrawerField label="Group Name" required>
               <DrawerInput value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Year-end audit team" className={nameError ? 'border-red-400' : ''} />
             </DrawerField>
-
             <DrawerField label="Description">
               <DrawerTextarea value={description} onChange={event => setDescription(event.target.value)} rows={3} placeholder="What is this group used for?" />
             </DrawerField>
-
-            <div className="border-t border-gray-100" />
-
-            <DrawerField label="Assigned Roles">
-              <MultiSelectField
-                selected={roles}
-                onChange={(values) => setRoles(values as UserRole[])}
-                placeholder="Select roles for this group..."
-                options={allRolesContext.filter(r => r.status === 'Active').map(role => ({ value: role.name, label: role.name }))}
-                summaryNoun="roles"
-              />
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-gray-400">
-                All members of this group will inherit module access from these roles.
-              </p>
-            </DrawerField>
-
             <div className="border-t border-gray-100" />
             <DrawerField label="Members">
-
               <MemberPicker users={users} selected={memberIds} onChange={setMemberIds} />
             </DrawerField>
           </div>
@@ -599,7 +492,7 @@ export function EmployeeManagementScreen() {
     setEditingGroup(null);
   }
 
-  function handleSave(draft: { name: string; description: string; roles: UserRole[]; memberIds: string[] }) {
+  function handleSave(draft: { name: string; description: string; memberIds: string[] }) {
     saveGroup(editingGroup?.id ?? null, draft);
     toast.success(editingGroup ? `${draft.name} updated` : `${draft.name} created`);
     closeDrawer();
