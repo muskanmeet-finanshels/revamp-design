@@ -6,7 +6,7 @@ import {
   X, Plus, MoreHorizontal,
   ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
   AlertTriangle, UserCheck, UserRound, Users, Users2, Building2, Layers, SearchX,
-  Mail, Search,
+  Mail, Search, Columns3, GripVertical,
 } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,45 @@ const getDependencyProjectDisplayName = (title: string) => {
 function makeId() { return `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
 type UserSortKey = 'name' | 'email' | 'jobTitle' | 'department' | 'verticals' | 'roles' | 'manager' | 'status';
+
+type UserColumnKey =
+  | 'email'
+  | 'jobTitle'
+  | 'department'
+  | 'verticals'
+  | 'roles'
+  | 'manager'
+  | 'status'
+  | 'actions';
+
+const USER_COLUMN_OPTIONS: Array<{
+  key: UserColumnKey;
+  label: string;
+  sortKey?: UserSortKey;
+  className: string;
+}> = [
+  { key: 'email',      label: 'Email',             sortKey: 'email',      className: 'w-[210px]' },
+  { key: 'jobTitle',   label: 'Job Title',         sortKey: 'jobTitle',   className: 'w-[150px]' },
+  { key: 'department', label: 'Department',        sortKey: 'department', className: 'w-[140px]' },
+  { key: 'verticals',  label: 'Verticals',         sortKey: 'verticals',  className: 'w-[150px]' },
+  { key: 'roles',      label: 'Role',              sortKey: 'roles',      className: 'w-[150px]' },
+  { key: 'manager',    label: 'Reporting Manager', sortKey: 'manager',    className: 'w-[160px]' },
+  { key: 'status',     label: 'Status',             sortKey: 'status',     className: 'w-[100px]' },
+  { key: 'actions',    label: 'Actions',                                    className: 'w-[76px]' },
+];
+
+const USER_COLUMN_ORDER_STORAGE_KEY = 'fh_users_column_order';
+
+function normalizeUserColumnOrder(value: unknown): UserColumnKey[] | null {
+  if (!Array.isArray(value)) return null;
+  const available = new Set(USER_COLUMN_OPTIONS.map(({ key }) => key));
+  const valid = [...new Set(value.filter(
+    (key): key is UserColumnKey =>
+      typeof key === 'string' && available.has(key as UserColumnKey),
+  ))];
+  const missing = USER_COLUMN_OPTIONS.map(({ key }) => key).filter(key => !valid.includes(key));
+  return valid.length ? [...valid, ...missing] : null;
+}
 
 function compareSortValues(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -1131,6 +1170,54 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [pageSize,     setPageSize]     = useState(20);
   const [sortKey,      setSortKey]      = useState<UserSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [visibleColumns, setVisibleColumns] = useState<Set<UserColumnKey>>(
+    () => new Set(USER_COLUMN_OPTIONS.map(({ key }) => key)),
+  );
+  const [columnOrder, setColumnOrder] = useState<UserColumnKey[]>(
+    () => USER_COLUMN_OPTIONS.map(({ key }) => key),
+  );
+  const [columnOrderHydrated, setColumnOrderHydrated] = useState(false);
+  const draggedColumn = useRef<UserColumnKey | null>(null);
+  const [dropTarget, setDropTarget] = useState<UserColumnKey | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(USER_COLUMN_ORDER_STORAGE_KEY);
+      if (stored) {
+        const saved = normalizeUserColumnOrder(JSON.parse(stored));
+        if (saved) setColumnOrder(saved);
+      }
+    } catch {
+      /* Ignore malformed or unavailable browser storage. */
+    }
+    setColumnOrderHydrated(true);
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== USER_COLUMN_ORDER_STORAGE_KEY) return;
+      if (!event.newValue) {
+        setColumnOrder(USER_COLUMN_OPTIONS.map(({ key }) => key));
+        return;
+      }
+      try {
+        const saved = normalizeUserColumnOrder(JSON.parse(event.newValue));
+        if (saved) setColumnOrder(saved);
+      } catch {
+        /* Ignore malformed cross-tab updates. */
+      }
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!columnOrderHydrated) return;
+    try {
+      localStorage.setItem(USER_COLUMN_ORDER_STORAGE_KEY, JSON.stringify(columnOrder));
+    } catch {
+      /* Ignore unavailable browser storage. */
+    }
+  }, [columnOrder, columnOrderHydrated]);
 
   /* Drawer state */
   const [drawerOpen,  setDrawerOpen]  = useState(false);
@@ -1248,6 +1335,53 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   function openAdd() { setEditUser(null); setDrawerOpen(true); }
   function openEdit(u: AppUser) { setEditUser(u); setDrawerOpen(true); }
 
+  function toggleColumn(column: UserColumnKey) {
+    setVisibleColumns(current => {
+      const next = new Set(current);
+      if (next.has(column)) next.delete(column);
+      else next.add(column);
+      return next;
+    });
+  }
+
+  function toggleAllColumns() {
+    setVisibleColumns(current =>
+      current.size === USER_COLUMN_OPTIONS.length
+        ? new Set<UserColumnKey>()
+        : new Set(USER_COLUMN_OPTIONS.map(({ key }) => key)),
+    );
+  }
+
+  function handleColumnDragStart(column: UserColumnKey) {
+    draggedColumn.current = column;
+  }
+
+  function handleColumnDragOver(event: React.DragEvent, column: UserColumnKey) {
+    event.preventDefault();
+    if (draggedColumn.current && draggedColumn.current !== column) setDropTarget(column);
+  }
+
+  function handleColumnDrop(column: UserColumnKey) {
+    const dragged = draggedColumn.current;
+    if (!dragged || dragged === column) {
+      setDropTarget(null);
+      return;
+    }
+    const next = [...columnOrder];
+    const fromIndex = next.indexOf(dragged);
+    const toIndex = next.indexOf(column);
+    next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, dragged);
+    setColumnOrder(next);
+    draggedColumn.current = null;
+    setDropTarget(null);
+  }
+
+  function handleColumnDragEnd() {
+    draggedColumn.current = null;
+    setDropTarget(null);
+  }
+
   function handleActivate(u: AppUser) {
     updateUserStatus(u.id, 'Active');
     toast.success(`${u.firstName} ${u.lastName} is now Active`);
@@ -1256,6 +1390,132 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   function handleDeactivate(u: AppUser) {
     updateUserStatus(u.id, 'Inactive');
+  }
+
+  const orderedVisibleColumns = columnOrder.filter(column => visibleColumns.has(column));
+
+  function renderColumnHeader(column: UserColumnKey) {
+    const option = USER_COLUMN_OPTIONS.find(item => item.key === column)!;
+    const isDropTarget = dropTarget === column;
+    return (
+      <TableHead
+        key={column}
+        draggable
+        onDragStart={() => handleColumnDragStart(column)}
+        onDragOver={event => handleColumnDragOver(event, column)}
+        onDrop={() => handleColumnDrop(column)}
+        onDragEnd={handleColumnDragEnd}
+        className={cn(
+          'group select-none transition-colors',
+          option.className,
+          isDropTarget && 'border-l-2 border-brand bg-orange-50/60',
+        )}
+      >
+        <div className="flex min-w-max items-center gap-1.5">
+          {option.sortKey ? (
+            <SortableTableHead
+              label={option.label}
+              sortKey={option.sortKey}
+              currentKey={sortKey}
+              currentDirection={sortDirection}
+              onSort={handleSort}
+            />
+          ) : (
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+              {option.label}
+            </span>
+          )}
+          <GripVertical
+            size={13}
+            aria-hidden="true"
+            className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing"
+          />
+        </div>
+      </TableHead>
+    );
+  }
+
+  function renderUserCell(column: UserColumnKey, user: AppUser) {
+    const verticalNames = (user.verticalIds ?? (user.verticalId ? [user.verticalId] : []))
+      .map(id => verticalMap[id])
+      .filter(Boolean);
+    const manager = user.reportingManagerId ? managerMap[user.reportingManagerId] : null;
+
+    switch (column) {
+      case 'email':
+        return (
+          <TableCell key={column} className="py-3">
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="block max-w-[190px] cursor-default truncate whitespace-nowrap text-[13px] text-gray-700">
+                    {user.email}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
+                  {user.email}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </TableCell>
+        );
+      case 'jobTitle':
+        return (
+          <TableCell key={column} className="py-3">
+            <p className="whitespace-nowrap text-[13px] text-gray-700">{user.jobTitle ?? '—'}</p>
+          </TableCell>
+        );
+      case 'department':
+        return (
+          <TableCell key={column} className="py-3">
+            <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+              <Users2 size={12} className="flex-shrink-0 text-gray-400" />
+              <span className="text-[12.5px] text-gray-700">{deptMap[user.departmentId] ?? '—'}</span>
+            </div>
+          </TableCell>
+        );
+      case 'verticals':
+        return (
+          <TableCell key={column} className="py-3">
+            <span className="block max-w-[145px] truncate whitespace-nowrap text-[12.5px] text-gray-700">
+              {verticalNames.length > 0 ? verticalNames.join(', ') : '—'}
+            </span>
+          </TableCell>
+        );
+      case 'roles':
+        return (
+          <TableCell key={column} className="py-3">
+            <div className="whitespace-nowrap text-[13px] font-normal leading-relaxed text-gray-700">
+              {user.roles[0] ?? '—'}
+            </div>
+          </TableCell>
+        );
+      case 'manager':
+        return (
+          <TableCell key={column} className="whitespace-nowrap py-3 text-[13px] text-gray-700">
+            {manager ?? <UnassignedManager />}
+          </TableCell>
+        );
+      case 'status':
+        return (
+          <TableCell key={column} className="py-3">
+            <StatusBadge status={user.status} />
+          </TableCell>
+        );
+      case 'actions':
+        return (
+          <TableCell key={column} className="py-3 pr-3">
+            <UserActionMenu
+              user={user}
+              onViewAccess={() => setAccessUser(user)}
+              onEdit={() => openEdit(user)}
+              onResetPassword={() => setResetTarget(user)}
+              onActivate={() => setActivateTarget(user)}
+              onDeactivate={() => setExitTarget(user)}
+            />
+          </TableCell>
+        );
+    }
   }
 
   return (
@@ -1270,6 +1530,27 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         </div>
       )}
 
+      {users.length === 0 ? (
+        <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <Empty
+            icon={Users}
+            title="No users yet"
+            description="Add your first user to start assigning roles, reporting managers, departments, and access."
+            className="pb-4 pt-20"
+          />
+          <div className="mb-20 flex justify-center">
+            <button
+              type="button"
+              onClick={openAdd}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:bg-brand-hover"
+            >
+              <Plus size={14} />
+              Add User
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
@@ -1431,6 +1712,96 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
             </PopoverContent>
           </Popover>
 
+          <TooltipProvider delayDuration={150}>
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Select columns"
+                      className={cn(
+                        'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
+                        visibleColumns.size < USER_COLUMN_OPTIONS.length
+                          ? 'border-brand text-brand hover:bg-orange-50/50'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                      )}
+                    >
+                      <Columns3
+                        size={13}
+                        className={visibleColumns.size < USER_COLUMN_OPTIONS.length ? 'text-brand' : 'text-gray-500'}
+                      />
+                      Columns
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={6}
+                  className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                >
+                  Select Columns
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" sideOffset={6} className="w-60 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+                <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                  <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
+                    Columns
+                  </span>
+                  <span className="text-[10px] text-gray-400">Drag table headers to reorder</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleAllColumns}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium transition-colors outline-none',
+                    visibleColumns.size === USER_COLUMN_OPTIONS.length
+                      ? 'bg-orange-50 text-brand'
+                      : 'text-gray-700 hover:bg-gray-100',
+                  )}
+                >
+                  Select All
+                  {visibleColumns.size === USER_COLUMN_OPTIONS.length && (
+                    <Check size={14} className="flex-shrink-0 text-brand" />
+                  )}
+                </button>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  type="button"
+                  disabled
+                  className="flex w-full cursor-not-allowed items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-400"
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded border border-brand bg-brand text-white">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  User
+                  <span className="ml-auto text-[10px] text-gray-400">Required</span>
+                </button>
+                {columnOrder.map(column => {
+                  const option = USER_COLUMN_OPTIONS.find(item => item.key === column);
+                  if (!option) return null;
+                  const checked = visibleColumns.has(column);
+                  return (
+                    <button
+                      key={column}
+                      type="button"
+                      onClick={() => toggleColumn(column)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <span className={cn(
+                        'flex h-4 w-4 items-center justify-center rounded border',
+                        checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
+                      )}>
+                        {checked && <Check size={11} strokeWidth={3} />}
+                      </span>
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </PopoverContent>
+            </Popover>
+          </TooltipProvider>
+
           <button type="button" onClick={openAdd}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
             <Plus size={14} /> Add User
@@ -1446,52 +1817,22 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
               <TableHead className="w-[150px] pl-5">
                 <SortableTableHead label="User" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
-              <TableHead className="w-[210px]">
-                <SortableTableHead label="Email" sortKey="email" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[150px]">
-                <SortableTableHead label="Job Title" sortKey="jobTitle" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[140px]">
-                <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[150px]">
-                <SortableTableHead label="Verticals" sortKey="verticals" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[150px]">
-                <SortableTableHead label={ALLOW_MULTIPLE_ROLES ? 'Roles' : 'Role'} sortKey="roles" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[140px]">
-                <SortableTableHead label="Reporting Manager" sortKey="manager" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[100px]">
-                <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="w-[52px]" />
+              {orderedVisibleColumns.map(renderColumnHeader)}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="py-0">
+                <TableCell colSpan={1 + orderedVisibleColumns.length} className="py-0">
                   <Empty
-                    icon={search || deptFilter || verticalFilter || statusFilter !== 'All' ? SearchX : Users}
-                    title={search || deptFilter || verticalFilter || statusFilter !== 'All'
-                      ? 'No matching users'
-                      : 'No users yet'}
-                    description={search || deptFilter || verticalFilter || statusFilter !== 'All'
-                      ? 'Try adjusting your search or filters to find what you’re looking for.'
-                      : 'Add a user to start managing access and assignments.'}
+                    icon={SearchX}
+                    title="No matching users"
+                    description="Try adjusting your search or filters to find what you’re looking for."
                     className="py-16"
                   />
                 </TableCell>
               </TableRow>
             ) : paginatedUsers.map(u => {
-              const deptName = deptMap[u.departmentId] ?? '—';
-              const verticalNames = (u.verticalIds ?? (u.verticalId ? [u.verticalId] : []))
-                .map(id => verticalMap[id])
-                .filter(Boolean);
-              const manager  = u.reportingManagerId ? managerMap[u.reportingManagerId] : null;
               const isInactive = u.status === 'Inactive';
               return (
                 <TableRow
@@ -1507,71 +1848,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                       {u.firstName} {u.lastName}
                     </p>
                   </TableCell>
-
-                  {/* Email */}
-                  <TableCell className="py-3">
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="block max-w-[190px] cursor-default truncate whitespace-nowrap text-[13px] text-gray-700">
-                            {u.email}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">
-                          {u.email}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-
-                  {/* Job title */}
-                  <TableCell className="py-3">
-                    <p className="truncate text-[13px] text-gray-700">{u.jobTitle ?? '—'}</p>
-                  </TableCell>
-
-                  {/* Department */}
-                  <TableCell className="py-3">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <Users2 size={12} className="flex-shrink-0 text-gray-400" />
-                      <span className="block min-w-0 truncate text-[12.5px] text-gray-700">{deptName}</span>
-                    </div>
-                  </TableCell>
-
-                  {/* Verticals */}
-                  <TableCell className="py-3">
-                    <span className="block max-w-[145px] truncate text-[12.5px] text-gray-700">
-                      {verticalNames.length > 0 ? verticalNames.join(', ') : '—'}
-                    </span>
-                  </TableCell>
-
-                  {/* Role */}
-                  <TableCell className="py-3">
-                    <div className="whitespace-nowrap text-[13px] font-normal leading-relaxed text-gray-700">
-                      {u.roles[0] ?? '—'}
-                    </div>
-                  </TableCell>
-
-                  {/* Manager */}
-                  <TableCell className="py-3 text-[13px] text-gray-700">
-                    {manager ?? <UnassignedManager />}
-                  </TableCell>
-
-                  {/* Status */}
-                  <TableCell className="py-3">
-                    <StatusBadge status={u.status} />
-                  </TableCell>
-
-                  {/* Actions */}
-                  <TableCell className="py-3 pr-3">
-                    <UserActionMenu
-                      user={u}
-                      onViewAccess={() => setAccessUser(u)}
-                      onEdit={() => openEdit(u)}
-                      onResetPassword={() => setResetTarget(u)}
-                      onActivate={() => setActivateTarget(u)}
-                      onDeactivate={() => setExitTarget(u)}
-                    />
-                  </TableCell>
+                  {orderedVisibleColumns.map(column => renderUserCell(column, u))}
                 </TableRow>
               );
             })}
@@ -1589,6 +1866,8 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />
+        </>
+      )}
         </>
       )}
 
