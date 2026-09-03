@@ -18,6 +18,7 @@ This artifact runs Next.js 14 inside a shell originally scaffolded as a react-vi
 ## Static export
 - `output: 'export'` in `next.config.mjs` — build copies `out/` → `dist/public`.
 - `images: { unoptimized: true }` required with static export.
+- Development uses a separate `.next-dev` `distDir`; keep it isolated from production `.next` so builds cannot invalidate live dev CSS/chunk manifests.
 
 ## App shell pattern
 - `AppShell` → `Sidebar` + `TopBar` (both in `src/components/`)

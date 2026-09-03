@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
   ArrowLeft, Lock, Shield, Check, X,
-  AlertTriangle, Info, Users, UserCheck, SearchX,
+  AlertTriangle, Info, Users, UserCheck, SearchX, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
@@ -31,10 +31,13 @@ import {
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
-  allPermissionsFor, fullPermissions, normalizeModulePermissions,
-  type AppRole, type RoleType, type RoleStatus,
+  allPermissionsFor, fullPermissions, inheritBasePermissions, normalizeModulePermissions,
+  resolveRolePermissions,
+  type AppRole, type RoleType, type RoleStatus, type PermissionRule, type DataScope,
 } from './mock-data';
-import { MOCK_USERS, type AppUser } from '@/screens/users/mock-data';
+import type { AppUser, EmployeeGroup } from '@/screens/users/mock-data';
+import { resolveEffectiveRoleNames, useAccessControlContext } from '@/contexts/AccessControlContext';
+import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 
@@ -42,8 +45,37 @@ function makeId() { return `role-${Date.now()}-${Math.random().toString(36).slic
 
 type RoleSortKey = 'name' | 'description' | 'type' | 'permissions' | 'users' | 'status';
 
-function countEnabledModules(perms: Record<string, string[]>): number {
-  return MODULES.filter(module => (perms[module.id] ?? []).length > 0).length;
+function countEnabledModules(perms: PermissionRule[]): number {
+  return new Set(perms.filter(p => p.enabled).map(p => p.moduleId)).size;
+}
+
+function clonePermissionRules(rules: PermissionRule[]): PermissionRule[] {
+  return rules.map(rule => ({
+    ...rule,
+    exceptions: rule.exceptions ? rule.exceptions.map(exception => ({ ...exception })) : [],
+  }));
+}
+
+function roleDefaultScope(role: AppRole): DataScope {
+  return role.defaultDataScope
+    ?? role.permissions.find(permission => permission.enabled)?.scope
+    ?? 'All';
+}
+
+function usersAssignedToRole(users: AppUser[], groups: EmployeeGroup[], roleName: string): AppUser[] {
+  const groupsGrantingRole = new Set(
+    groups
+      .filter(group => resolveEffectiveRoleNames(group.roles).includes(roleName))
+      .map(group => group.name),
+  );
+
+  return users.filter(user =>
+    resolveEffectiveRoleNames(user.roles).includes(roleName)
+    || user.employeeGroups.some(groupName => groupsGrantingRole.has(groupName)));
+}
+
+function groupsAssignedToRole(groups: EmployeeGroup[], roleName: string): EmployeeGroup[] {
+  return groups.filter(group => resolveEffectiveRoleNames(group.roles).includes(roleName));
 }
 
 /* ─── Type badge ──────────────────────────────────────────────────────── */
@@ -58,7 +90,7 @@ function TypeLabel({ type, isProtected }: { type: RoleType; isProtected?: boolea
   }
   return type === 'system' ? (
     <span className="text-[12px] font-normal text-blue-700">
-      System
+      Base role
     </span>
   ) : (
     <span className="text-[12px] font-normal text-brand">
@@ -84,7 +116,7 @@ function StatusBadge({ status }: { status: RoleStatus }) {
 
 /* ─── Permission coverage bar ─────────────────────────────────────────── */
 
-function CoverageBar({ permissions }: { permissions: Record<string, string[]> }) {
+function CoverageBar({ permissions }: { permissions: PermissionRule[] }) {
   const granted = countEnabledModules(permissions);
   const total   = MODULES.length;
   const pct     = Math.round((granted / total) * 100);
@@ -181,85 +213,7 @@ function RoleActionMenu({ role, onEdit, onClone, onActivate, onDeactivate }: {
    MODULE ACCESS GRID — full access is granted per module
    ═══════════════════════════════════════════════════════════════════════ */
 
-function PermissionsGrid({
-  permissions,
-  onChange,
-  readOnly = false,
-}: {
-  permissions: Record<string, string[]>;
-  onChange?: (p: Record<string, string[]>) => void;
-  readOnly?: boolean;
-}) {
-  function toggleModule(moduleId: string) {
-    if (readOnly || !onChange) return;
-    const all = allPermissionsFor(moduleId);
-    const current = permissions[moduleId] ?? [];
-    onChange({ ...permissions, [moduleId]: current.length > 0 ? [] : all });
-  }
 
-  function toggleGlobalAll() {
-    if (readOnly || !onChange) return;
-    const full = fullPermissions();
-    const currentTotal = countEnabledModules(permissions);
-    onChange(currentTotal === MODULES.length ? Object.fromEntries(MODULES.map(m => [m.id, []])) : full);
-  }
-
-  const currentTotal = countEnabledModules(permissions);
-  const allGranted = currentTotal === MODULES.length;
-
-  return (
-    <div className="space-y-2">
-      {/* Global select-all */}
-      {!readOnly && (
-        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
-            <span className="text-[12.5px] font-semibold text-gray-700">All Modules</span>
-          <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-gray-600">
-            <span onClick={() => toggleGlobalAll()}
-              className={cn(
-                'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] cursor-pointer transition-colors',
-                allGranted ? 'bg-brand border-brand' : 'border-gray-300 bg-white',
-              )}>
-              {allGranted && <Check size={9} className="text-white" strokeWidth={3} />}
-            </span>
-            Grant All
-          </label>
-        </div>
-      )}
-
-      {/* Per-module rows */}
-      {MODULES.map(mod => {
-        const granted  = permissions[mod.id] ?? [];
-
-        return (
-          <div key={mod.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
-             <div>
-              <span className="text-[12.5px] font-semibold text-gray-800">{mod.label}</span>
-               <p className={cn('mt-0.5 text-[11.5px]', granted.length > 0 ? 'text-brand' : 'text-gray-400')}>
-                 {granted.length > 0 ? 'Full module access' : 'No access'}
-               </p>
-             </div>
-             {!readOnly && (
-               <button
-                 type="button"
-                 onClick={() => toggleModule(mod.id)}
-                 aria-pressed={granted.length > 0}
-                 className="flex items-center gap-1.5 text-[11.5px] font-medium text-gray-500 transition-colors hover:text-brand"
-               >
-                 <span className={cn(
-                   'flex h-[15px] w-[15px] items-center justify-center rounded-[3px] border-[1.5px] transition-colors',
-                   granted.length > 0 ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                 )}>
-                   {granted.length > 0 && <Check size={8} className="text-white" strokeWidth={3} />}
-                 </span>
-                 Allow access
-               </button>
-             )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════════
    CREATE / EDIT ROLE DRAWER
@@ -271,20 +225,22 @@ interface RoleDrawerProps {
   editRole: AppRole | null;
   /** When set, pre-fills as a clone of this role */
   cloneSource: AppRole | null;
+  baseRoles: AppRole[];
   onSave: (data: Partial<AppRole>) => void;
 }
 
-function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawerProps) {
+function RoleDrawer({ open, onClose, editRole, cloneSource, baseRoles, onSave }: RoleDrawerProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const [name,        setName]        = useState('');
   const [description, setDescription] = useState('');
-  const [permissions, setPermissions] = useState<Record<string, string[]>>({});
+  const [permissions, setPermissions] = useState<PermissionRule[]>([]);
+  const [baseRoleId,  setBaseRoleId]  = useState('role-team-member');
   const [showErrors,  setShowErrors]  = useState(false);
 
   const isClone = Boolean(cloneSource) && !editRole;
-  const title   = editRole ? 'Edit Role' : isClone ? `Clone: ${cloneSource!.name}` : 'Create New Role';
+  const title   = editRole ? 'Edit Role' : isClone ? `Clone: ${cloneSource!.name}` : 'Create Specialized Role';
 
   useEffect(() => {
     if (!open) return;
@@ -292,18 +248,24 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
     if (editRole) {
       setName(editRole.name);
       setDescription(editRole.description);
-      setPermissions(JSON.parse(JSON.stringify(editRole.permissions)));
+      setPermissions(clonePermissionRules(editRole.permissions));
+      setBaseRoleId(editRole.baseRoleId ?? 'role-team-member');
     } else if (cloneSource) {
       setName(`Copy of ${cloneSource.name}`);
       setDescription(cloneSource.description);
-      setPermissions(JSON.parse(JSON.stringify(cloneSource.permissions)));
+      setPermissions(clonePermissionRules(cloneSource.permissions));
+      setBaseRoleId(
+        cloneSource.baseRoleId
+          ?? (cloneSource.type === 'system' ? cloneSource.id : 'role-team-member'),
+      );
     } else {
       setName('');
       setDescription('');
-      /* Custom roles inherit no permissions unless configured */
-      setPermissions(Object.fromEntries(MODULES.map(m => [m.id, []])));
+      setBaseRoleId('role-team-member');
+      const defaultBaseRole = baseRoles.find(role => role.id === 'role-team-member');
+      setPermissions(defaultBaseRole ? clonePermissionRules(defaultBaseRole.permissions) : []);
     }
-  }, [open, editRole, cloneSource]);
+  }, [open, editRole, cloneSource, baseRoles]);
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
@@ -313,7 +275,16 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
   function handleSave() {
     setShowErrors(true);
     if (!name.trim()) return;
-    onSave({ name: name.trim(), description: description.trim(), permissions });
+    const baseRole = baseRoles.find(role => role.id === baseRoleId);
+    onSave({
+      name: name.trim(),
+      description: description.trim(),
+      permissions,
+      ...(!editRole && {
+        baseRoleId,
+        defaultDataScope: baseRole ? roleDefaultScope(baseRole) : 'Reporting Team',
+      }),
+    });
   }
 
   if (!mounted) return null;
@@ -327,7 +298,7 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} />
 
       <div className={cn(
-        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[52rem]',
+        'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out sm:w-[480px]',
         open ? 'translate-x-0' : 'translate-x-full',
       )}>
         {/* Header */}
@@ -339,9 +310,6 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
             </button>
             <div>
               <p className="text-[15px] font-semibold text-gray-900">{title}</p>
-              {isClone && (
-              <p className="text-[12px] text-gray-400">Module access copied from "{cloneSource!.name}" — type: Custom</p>
-              )}
             </div>
           </div>
           <button
@@ -377,30 +345,54 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
               />
             </DrawerField>
 
-            {/* Custom role note */}
             {!editRole && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-                <Info size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
-                <p className="text-[12.5px] text-blue-700 leading-relaxed">
-                  {isClone
-                    ? 'This Custom role copied the selected module access. Adjust the modules as needed.'
-                    : 'Select the modules users assigned to this role can access.'}
+              <DrawerField label="Base role" required>
+                <Select
+                  value={baseRoleId}
+                  onValueChange={value => {
+                    setBaseRoleId(value);
+                    const selectedBaseRole = baseRoles.find(role => role.id === value);
+                    if (selectedBaseRole) {
+                      setPermissions(clonePermissionRules(selectedBaseRole.permissions));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 w-full rounded-xl border-gray-200 bg-white text-[13px]">
+                    <SelectValue placeholder="Select a base role" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[200] rounded-xl border border-gray-100 bg-white shadow-xl">
+                    {baseRoles.map(role => (
+                      <SelectItem key={role.id} value={role.id} className="cursor-pointer rounded-lg py-2.5 text-[13px]">
+                        <span className="flex items-center gap-2">
+                          {role.shortCode && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">{role.shortCode}</span>}
+                          {role.name}
+                          <span className="text-[11px] text-gray-400">· {roleDefaultScope(role)}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-gray-400">
+                  Examples: TM – Data Entry, TM – Support, TL – Operations, or AM – Sales.
+                </p>
+              </DrawerField>
+            )}
+
+            {editRole?.baseRoleId && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3">
+                <Shield size={14} className="mt-0.5 flex-shrink-0 text-brand" />
+                <p className="text-[12.5px] leading-relaxed text-orange-800">
+                  Specialized role based on <strong>{baseRoles.find(role => role.id === editRole.baseRoleId)?.name ?? 'a base role'}</strong>.
+                  Its current permissions can be broadened from the Permissions tab.
                 </p>
               </div>
             )}
 
-            <div className="border-t border-gray-100" />
-
-            {/* Permissions */}
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-[12px] font-semibold uppercase tracking-widest text-gray-400">Module Access</p>
-                <p className="text-[12px] text-gray-400">
-                  {countEnabledModules(permissions)} of {MODULES.length} modules enabled
-                </p>
-              </div>
-              <p className="mb-3 text-[12px] text-gray-500">Access is granted to full modules. Individual actions cannot be configured.</p>
-              <PermissionsGrid permissions={permissions} onChange={setPermissions} />
+            <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 mt-4">
+              <Info size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
+              <p className="text-[12.5px] text-blue-700 leading-relaxed">
+                This role inherits the selected base role. After creating it, use the <strong>Permissions</strong> tab to add actions or broaden individual data scopes.
+              </p>
             </div>
           </div>
         </div>
@@ -426,6 +418,7 @@ function ViewPermissionsModal({
   onClose: () => void;
   initialTab?: ViewTab;
 }) {
+  const { users, groups } = useEmployeeGroupsContext();
   const [tab, setTab] = useState<ViewTab>(initialTab);
 
   useEffect(() => {
@@ -434,10 +427,7 @@ function ViewPermissionsModal({
 
   if (!role) return null;
 
-  /* Match users by role name (case-insensitive) */
-  const assignedUsers: AppUser[] = MOCK_USERS.filter(u =>
-    u.roles.some(r => r.toLowerCase() === role.name.toLowerCase()),
-  );
+  const assignedUsers = usersAssignedToRole(users, groups, role.name);
 
   const STATUS_DOT: Record<string, string> = {
     Active:   'bg-emerald-400',
@@ -464,7 +454,7 @@ function ViewPermissionsModal({
           {/* Tab strip */}
           <div className="flex gap-0 border-t border-gray-100">
             {([
-               { value: 'permissions' as ViewTab, label: 'Module Access' },
+               { value: 'permissions' as ViewTab, label: 'Permission Access' },
               { value: 'users' as ViewTab,       label: `Assigned Users (${assignedUsers.length})` },
             ] as { value: ViewTab; label: string }[]).map(({ value, label }) => (
               <button
@@ -487,7 +477,21 @@ function ViewPermissionsModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {tab === 'permissions' && (
-            <PermissionsGrid permissions={role.permissions} readOnly />
+            <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+              <ShieldCheck size={32} className="text-brand" />
+              <div>
+                <p className="text-[14px] font-semibold text-gray-900">Detailed Action & Scope Matrix</p>
+                <p className="text-[12.5px] text-gray-500 mt-1 max-w-sm">
+                  Permissions are configured per module and action with Data Scopes (Own/Reporting Team/All).
+                </p>
+              </div>
+              <a
+                href={`/settings/permissions?roleId=${role.id}`}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-[12px] font-medium text-white hover:bg-gray-800"
+              >
+                Configure Permissions
+              </a>
+            </div>
           )}
 
           {tab === 'users' && (
@@ -519,11 +523,6 @@ function ViewPermissionsModal({
                     </div>
                   </div>
                 ))}
-                {role.userCount > assignedUsers.length && (
-                  <p className="pt-1 text-center text-[11.5px] text-gray-400">
-                    +{role.userCount - assignedUsers.length} more user{role.userCount - assignedUsers.length !== 1 ? 's' : ''} (not shown in seed data)
-                  </p>
-                )}
               </div>
             )
           )}
@@ -599,6 +598,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
   onClose: () => void;
   onConfirm: (transferToRoleId: string) => void;
 }) {
+  const { users, groups } = useEmployeeGroupsContext();
   const [mounted,        setMounted]        = useState(false);
   const [transferRoleId, setTransferRoleId] = useState('');
 
@@ -613,12 +613,10 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
 
   if (!mounted || !role) return null;
 
-  const hasUsers = role.userCount > 0;
-
-  /* Users currently assigned to this role (matched by name) */
-  const assignedUsers = MOCK_USERS.filter(u =>
-    u.roles.some(r => r.toLowerCase() === role.name.toLowerCase()),
-  );
+  const assignedUsers = usersAssignedToRole(users, groups, role.name);
+  const assignedUserCount = assignedUsers.length;
+  const assignedGroups = groupsAssignedToRole(groups, role.name);
+  const hasAssignments = assignedUserCount > 0 || assignedGroups.length > 0;
 
   /* Active roles the admin can transfer users to */
   const transferOptions = allRoles.filter(r =>
@@ -626,8 +624,8 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
   );
 
   const transferRole = transferOptions.find(r => r.id === transferRoleId);
-  const canConfirm   = !hasUsers || Boolean(transferRoleId);
-  const granted      = countEnabledModules(role.permissions);
+  const canConfirm   = !hasAssignments || Boolean(transferRoleId);
+  const granted      = countEnabledModules(resolveRolePermissions(role, allRoles));
   const coverage     = Math.round((granted / MODULES.length) * 100);
 
   function handleConfirm() {
@@ -680,9 +678,9 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                   <div className="text-[13px] text-amber-800">
                     <p className="font-semibold">Deactivation requires dependency transfer.</p>
                     <p className="mt-0.5 leading-snug text-amber-700">
-                      {hasUsers
-                        ? `${role.userCount} user${role.userCount !== 1 ? 's' : ''} are assigned this role. Select a replacement role before deactivating.`
-                        : 'No users are assigned to this role — you can proceed without transferring.'}
+                      {hasAssignments
+                        ? `${assignedUserCount} user${assignedUserCount !== 1 ? 's' : ''} and ${assignedGroups.length} group${assignedGroups.length !== 1 ? 's are' : ' is'} assigned this role. Select a replacement role before deactivating.`
+                        : 'No users or groups are assigned to this role — you can proceed without transferring.'}
                     </p>
                   </div>
                 </div>
@@ -708,7 +706,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm">
-                    <p className="text-[22px] font-bold text-gray-900">{role.userCount}</p>
+                    <p className="text-[22px] font-bold text-gray-900">{assignedUserCount}</p>
                     <p className="text-[12px] text-gray-500">Assigned Users</p>
                   </div>
                   <div className="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm">
@@ -717,12 +715,12 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                   </div>
                 </div>
 
-                {hasUsers ? (
+                {hasAssignments ? (
                   <>
                     {/* Transfer picker */}
                     <div>
                       <label className="mb-1.5 block text-[12px] font-semibold text-gray-700">
-                        Transfer {role.userCount} user{role.userCount !== 1 ? 's' : ''} to <span className="text-red-500">*</span>
+                        Transfer all user and group assignments to <span className="text-red-500">*</span>
                       </label>
                       <Select
                         value={transferRoleId}
@@ -784,11 +782,20 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                               )}
                             </div>
                           ))}
-                          {role.userCount > assignedUsers.length && (
-                            <p className="text-center text-[11px] text-gray-400 py-1">
-                              +{role.userCount - assignedUsers.length} more
-                            </p>
-                          )}
+                        </div>
+                      </div>
+                    )}
+                    {assignedGroups.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                          Affected Employee Groups
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {assignedGroups.map(group => (
+                            <span key={group.id} className="rounded-md bg-purple-50 px-2.5 py-1 text-[11.5px] font-medium text-purple-700">
+                              {group.name}{transferRole ? ` → ${transferRole.name}` : ''}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -797,7 +804,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                   <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
                     <UserCheck size={16} className="text-emerald-500 flex-shrink-0" />
                     <p className="text-[13px] text-emerald-700 font-medium">
-                      No users assigned — safe to deactivate without transfer.
+                      No users or groups assigned — safe to deactivate without transfer.
                     </p>
                   </div>
                 )}
@@ -824,12 +831,22 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
    ═══════════════════════════════════════════════════════════════════════ */
 
 type TabFilter = 'all' | 'system' | 'custom';
+const TAB_LABELS: Record<TabFilter, string> = {
+  all: 'All',
+  system: 'Base Roles',
+  custom: 'Specialized',
+};
 
 export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const [roles, setRoles] = useState<AppRole[]>(() => MOCK_ROLES.map(role => ({
-    ...role,
-    permissions: normalizeModulePermissions(role.permissions),
-  })));
+  const { roles, saveRole, setRoleStatus } = useAccessControlContext();
+  const { users, groups, replaceRoleAssignments } = useEmployeeGroupsContext();
+  const roleAssignmentCounts = new Map(
+    roles.map(role => [role.id, usersAssignedToRole(users, groups, role.name).length]),
+  );
+  const baseRoles = useMemo(
+    () => roles.filter(role => role.type === 'system' && role.status === 'Active'),
+    [roles],
+  );
 
   const [tab,    setTab]    = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
@@ -865,7 +882,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       description: a.description,
       type: a.isProtected ? 'Super Admin' : a.type,
       permissions: countEnabledModules(a.permissions),
-      users: a.userCount,
+      users: roleAssignmentCounts.get(a.id) ?? 0,
       status: a.status,
     };
     const otherValues: Record<RoleSortKey, string | number> = {
@@ -873,7 +890,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       description: b.description,
       type: b.isProtected ? 'Super Admin' : b.type,
       permissions: countEnabledModules(b.permissions),
-      users: b.userCount,
+      users: roleAssignmentCounts.get(b.id) ?? 0,
       status: b.status,
     };
     const first = values[sortKey];
@@ -909,9 +926,14 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   function handleSave(data: Partial<AppRole>) {
     if (editRole) {
-      setRoles(rs => rs.map(r => r.id === editRole.id ? { ...r, ...data } : r));
-      toast.success(`Role "${data.name}" updated`);
+      const nextRole = { ...editRole, ...data } as AppRole;
+      if (nextRole.name !== editRole.name) {
+        replaceRoleAssignments(editRole.name, nextRole.name);
+      }
+      saveRole(nextRole);
+      toast.success(`Role "${nextRole.name}" updated`);
     } else {
+      const inheritedBaseRole = roles.find(role => role.id === data.baseRoleId);
       const newRole: AppRole = {
         id: makeId(),
         name: data.name ?? '',
@@ -919,12 +941,16 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         type: 'custom',
         status: 'Active',
         isProtected: false,
-        permissions: data.permissions ?? {},
+        baseRoleId: data.baseRoleId,
+        defaultDataScope: data.defaultDataScope,
+        permissions: inheritedBaseRole
+          ? inheritBasePermissions(inheritedBaseRole.permissions, data.permissions ?? [])
+          : data.permissions ?? [],
         userCount: 0,
         createdAt: new Date().toISOString().slice(0, 10),
         clonedFromId: cloneSource?.id,
       };
-      setRoles(rs => [...rs, newRole]);
+      saveRole(newRole);
       toast.success(cloneSource ? `Cloned "${cloneSource.name}" → "${newRole.name}"` : `Role "${newRole.name}" created`);
     }
     setDrawerOpen(false);
@@ -933,26 +959,21 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   }
 
   function handleActivate(r: AppRole) {
-    setRoles(rs => rs.map(x => x.id === r.id ? { ...x, status: 'Active' as const } : x));
+    setRoleStatus(r.id, 'Active');
     toast.success(`"${r.name}" activated`);
   }
 
-  function handleDeactivate(r: AppRole, transferToRoleId: string) {
-    setRoles(rs => rs.map(x => {
-      if (x.id === r.id) return { ...x, status: 'Inactive' as const };
-      if (transferToRoleId && x.id === transferToRoleId) {
-        return { ...x, userCount: x.userCount + r.userCount };
-      }
-      return x;
-    }).map(x => x.id === r.id ? { ...x, userCount: 0 } : x));
-    const targetName = roles.find(x => x.id === transferToRoleId)?.name;
-    if (targetName && r.userCount > 0) {
-      toast.success(
-        `"${r.name}" deactivated — ${r.userCount} user${r.userCount !== 1 ? 's' : ''} transferred to "${targetName}"`,
-      );
-    } else {
-      toast.success(`"${r.name}" deactivated`);
+  function handleDeactivate(r: AppRole, transferToId: string) {
+    const replacementRole = roles.find(role => role.id === transferToId);
+    const assignedUserCount = roleAssignmentCounts.get(r.id) ?? 0;
+    const assignedGroupCount = groupsAssignedToRole(groups, r.name).length;
+    if ((assignedUserCount > 0 || assignedGroupCount > 0) && !replacementRole) {
+      toast.error('Select an active replacement role before deactivating');
+      return;
     }
+    if (replacementRole) replaceRoleAssignments(r.name, replacementRole.name);
+    setRoleStatus(r.id, 'Inactive');
+    toast.success(`Role "${r.name}" deactivated` + (replacementRole ? ` and assignments transferred to "${replacementRole.name}"` : ''));
   }
 
   return (
@@ -962,7 +983,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         <div className="mb-6">
           <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Role Management</h1>
           <p className="mt-0.5 text-[13.5px] text-gray-500">
-            Define system and custom roles with module-level permission control.
+            Manage five standard base roles and create specialized roles that inherit their access.
           </p>
         </div>
       )}
@@ -976,7 +997,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
               value={t}
               className="relative rounded-none border-b-2 border-transparent px-4 py-3 text-[13px] font-medium capitalize text-gray-500 shadow-none transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none"
             >
-              {t}
+              {TAB_LABELS[t]}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -993,7 +1014,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         <div className="ml-auto">
           <button type="button" onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
-            <Plus size={14} /> New Role
+            <Plus size={14} /> New Specialized Role
           </button>
         </div>
       </div>
@@ -1019,11 +1040,12 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 <TableHead className="min-w-[260px]">
                   <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
+                <TableHead className="w-[180px]">Base role / scope</TableHead>
                 <TableHead className="w-[110px]">
                   <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
                 <TableHead className="w-[130px]">
-                  <SortableTableHead label="Module Access" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+                  <SortableTableHead label="Access Coverage" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
                 <TableHead className="w-[80px] text-center">
                   <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
@@ -1059,6 +1081,11 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                           className="text-[13.5px] font-medium text-gray-900 transition-colors text-left">
                           {role.name}
                         </button>
+                        {role.shortCode && (
+                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+                            {role.shortCode}
+                          </span>
+                        )}
                         {role.isProtected && (
                           <TooltipProvider delayDuration={150}>
                             <Tooltip>
@@ -1097,6 +1124,25 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   <DescriptionTooltip value={role.description} className="text-[12.5px]" />
                 </TableCell>
 
+                {/* Base role and default scope */}
+                <TableCell className="py-3.5">
+                  {role.type === 'system' ? (
+                    <div>
+                      <p className="text-[12.5px] font-medium text-gray-700">Standard base role</p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">Default: {roleDefaultScope(role)}</p>
+                    </div>
+                  ) : role.baseRoleId ? (
+                    <div>
+                      <p className="text-[12.5px] font-medium text-gray-700">
+                        {roles.find(baseRole => baseRole.id === role.baseRoleId)?.name ?? 'Base role'}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-brand">Specialized · Default: {roleDefaultScope(role)}</p>
+                    </div>
+                  ) : (
+                    <span className="text-[12px] text-gray-400">Legacy custom role</span>
+                  )}
+                </TableCell>
+
                 {/* Type */}
                 <TableCell className="py-3.5">
                   <TypeLabel type={role.type} isProtected={role.isProtected} />
@@ -1104,19 +1150,19 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                 {/* Permissions coverage */}
                 <TableCell className="py-3.5">
-                  <CoverageBar permissions={role.permissions} />
+                  <CoverageBar permissions={resolveRolePermissions(role, roles)} />
                 </TableCell>
 
                 {/* User count — clickable to show assigned users */}
                 <TableCell className="py-3.5 text-center">
-                  {role.userCount > 0 ? (
+                  {(roleAssignmentCounts.get(role.id) ?? 0) > 0 ? (
                     <button
                       type="button"
                       onClick={() => { setViewInitialTab('users'); setViewRole(role); }}
                       className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-gray-700 transition-colors hover:text-brand"
                     >
                       <Users size={11} />
-                      {role.userCount}
+                      {roleAssignmentCounts.get(role.id) ?? 0}
                     </button>
                   ) : (
                     <span className="text-[13px] text-gray-400">—</span>
@@ -1161,6 +1207,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onClose={() => { setDrawerOpen(false); setEditRole(null); setCloneSource(null); }}
         editRole={editRole}
         cloneSource={cloneSource}
+        baseRoles={baseRoles}
         onSave={handleSave}
       />
 

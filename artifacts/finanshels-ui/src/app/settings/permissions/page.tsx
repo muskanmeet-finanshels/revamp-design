@@ -1,15 +1,13 @@
-import { AppShell } from '@/components/AppShell';
+import { Suspense } from 'react';
+import { AdminShell } from '@/screens/admin/AdminShell';
 import { PermissionsScreen } from '@/screens/people-permissions/PermissionsScreen';
 
 export default function PermissionsPage() {
   return (
-    <AppShell
-      breadcrumbs={[
-        { label: 'Admin' },
-        { label: 'Permissions' },
-      ]}
-    >
-      <PermissionsScreen />
-    </AppShell>
+    <AdminShell breadcrumbLabel="Permissions">
+      <Suspense fallback={<div className="px-6 py-12 text-[13px] text-gray-500">Loading permissions…</div>}>
+        <PermissionsScreen />
+      </Suspense>
+    </AdminShell>
   );
 }

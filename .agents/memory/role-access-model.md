@@ -1,10 +1,10 @@
 ---
 name: Role access model
-description: The product decision governing user-role assignment and role permission granularity.
+description: The product decision governing role sources, action permissions, scopes, and reporting hierarchy.
 ---
 
-Users may have one or more assigned roles when the multiple-role setting is enabled. A role grants or denies access at the module level; individual actions within a module are not independently configurable.
+Each user has exactly one direct role and may also receive inherited access from active employee-group roles. Roles grant individual actions within modules, and each granted action has an Own, Reporting Team, or All data scope. Reporting Team includes active direct and indirect reports. Each module declares which scopes are valid; organisation-wide modules may expose only All. All may be narrowed by department, service, or account-manager exceptions, optionally retaining reporting-hierarchy behavior. Department and vertical membership are classification data for filtering and reporting only; they never grant permissions or determine data access. Effective access combines every active role source without one assignment replacing another. Specialized roles are based on one standard role and must preserve its enabled actions and minimum scopes while allowing additional actions or broader scopes.
 
-**Why:** This is the agreed access-control model for the Admin experience. Optional multi-role assignment supports organisations that need combined access while keeping permission management module-based.
+**Why:** Admins need to explain not only whether a user can enter a module, but which action is allowed, which records it covers, and whether access came directly, through a group, or from a specialized role's base. Reporting relationships are part of scope evaluation, so circular hierarchies must be prevented.
 
-**How to apply:** User-management flows must switch between single- and multi-role selection based on the multiple-role setting. New or revised role and permission flows must present whole-module enablement only. When converting historical action-level access, preserve a module if it had any granted action.
+**How to apply:** New Admin flows must enforce one direct role per user, preserve inherited group-role sources, ignore inactive roles/groups for new effective access, expose Module + Action + Data Scope, and render only the scopes allowed by that module. Persist specialized roles with their base-role identity and merge the base minimum during creation and hydration, not only in display code. Migrate legacy Team values to Reporting Team and coerce unsupported scopes to a module-valid option. Never use a user's department or vertical memberships as access inputs. Reporting-manager changes must reject inactive managers and direct or indirect cycles.

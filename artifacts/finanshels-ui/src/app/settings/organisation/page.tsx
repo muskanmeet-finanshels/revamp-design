@@ -1,15 +1,10 @@
-import { AppShell } from '@/components/AppShell';
+import { AdminShell } from '@/screens/admin/AdminShell';
 import { OrgScreen } from '@/screens/organisation/OrgScreen';
 
 export default function OrganisationPage() {
   return (
-    <AppShell
-      breadcrumbs={[
-        { label: 'Admin' },
-        { label: 'Organisation' },
-      ]}
-    >
+    <AdminShell breadcrumbLabel="Organisation">
       <OrgScreen />
-    </AppShell>
+    </AdminShell>
   );
 }

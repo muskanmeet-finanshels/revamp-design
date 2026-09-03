@@ -7,12 +7,22 @@ import {
   type AppUser,
   type EmployeeGroup,
   type EmployeeGroupStatus,
+  type UserRole,
   type UserStatus,
 } from '@/screens/users/mock-data';
+import {
+  resolveEffectiveRoleNames,
+  storedAssignmentNamesForRole,
+} from '@/contexts/AccessControlContext';
+import {
+  normalizeEmployeeGroupsStorage,
+  replaceRoleAssignmentsInStorage,
+} from '@/contexts/employee-groups-storage';
 
 interface EmployeeGroupDraft {
   name: string;
   description: string;
+  roles: UserRole[];
   memberIds: string[];
 }
 
@@ -22,6 +32,7 @@ interface EmployeeGroupsContextValue {
   saveUser: (user: AppUser) => void;
   updateUserStatus: (userId: string, status: UserStatus) => void;
   saveGroup: (groupId: string | null, draft: EmployeeGroupDraft) => void;
+  replaceRoleAssignments: (sourceRoleName: string, targetRoleName: string) => void;
   setGroupStatus: (groupId: string, status: EmployeeGroupStatus) => void;
   deleteGroup: (groupId: string) => void;
 }
@@ -33,14 +44,16 @@ function makeGroupId() {
   return `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function removeNonActiveMemberships(users: AppUser[]): AppUser[] {
-  return users.map(user => user.status === 'Active'
-    ? user
-    : { ...user, employeeGroups: [] });
+function enforceSingleDirectRole(user: AppUser): AppUser {
+  const role = resolveEffectiveRoleNames(user.roles)[0] ?? 'Team Member';
+  return { ...user, roles: [role] };
 }
 
 export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState<AppUser[]>(() => removeNonActiveMemberships(MOCK_USERS));
+  const [users, setUsers] = useState<AppUser[]>(() => {
+    const normalized = normalizeEmployeeGroupsStorage({ users: MOCK_USERS, groups: MOCK_EMPLOYEE_GROUPS });
+    return (normalized?.users ?? MOCK_USERS).map(enforceSingleDirectRole);
+  });
   const [groups, setGroups] = useState<EmployeeGroup[]>(MOCK_EMPLOYEE_GROUPS);
   const [hydrated, setHydrated] = useState(false);
 
@@ -48,10 +61,10 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as { users?: AppUser[]; groups?: EmployeeGroup[] };
-        if (Array.isArray(parsed.users) && Array.isArray(parsed.groups)) {
-          setUsers(removeNonActiveMemberships(parsed.users));
-          setGroups(parsed.groups);
+        const normalized = normalizeEmployeeGroupsStorage(JSON.parse(stored));
+        if (normalized) {
+          setUsers(normalized.users.map(enforceSingleDirectRole));
+          setGroups(normalized.groups);
         }
       }
     } catch {
@@ -72,12 +85,12 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
 
   function saveUser(user: AppUser) {
     const activeNames = new Set(groups.filter(group => group.status === 'Active').map(group => group.name));
-    const nextUser = {
+    const nextUser = enforceSingleDirectRole({
       ...user,
       employeeGroups: user.status === 'Active'
         ? user.employeeGroups.filter(groupName => activeNames.has(groupName))
         : [],
-    };
+    });
     setUsers(current => current.some(item => item.id === nextUser.id)
       ? current.map(item => item.id === nextUser.id ? nextUser : item)
       : [...current, nextUser]);
@@ -97,12 +110,12 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
 
     if (existing) {
       setGroups(current => current.map(group => group.id === groupId
-        ? { ...group, name, description }
+        ? { ...group, name, description, roles: draft.roles }
         : group));
     } else {
       setGroups(current => [
         ...current,
-        { id: makeGroupId(), name, description, status: 'Active', createdAt: new Date().toISOString().slice(0, 10) },
+        { id: makeGroupId(), name, description, roles: draft.roles, status: 'Active', createdAt: new Date().toISOString().slice(0, 10) },
       ]);
     }
 
@@ -118,6 +131,14 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
           : withoutCurrentName,
       };
     }));
+  }
+
+  function replaceRoleAssignments(sourceRoleName: string, targetRoleName: string) {
+    const storedNames = storedAssignmentNamesForRole(sourceRoleName);
+    setUsers(current =>
+      replaceRoleAssignmentsInStorage(current, [], storedNames, targetRoleName).users);
+    setGroups(current =>
+      replaceRoleAssignmentsInStorage([], current, storedNames, targetRoleName).groups);
   }
 
   function setGroupStatus(groupId: string, status: EmployeeGroupStatus) {
@@ -149,6 +170,7 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
       saveUser,
       updateUserStatus,
       saveGroup,
+      replaceRoleAssignments,
       setGroupStatus,
       deleteGroup,
     }}>
