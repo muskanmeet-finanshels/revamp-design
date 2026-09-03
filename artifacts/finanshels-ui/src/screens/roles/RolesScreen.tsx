@@ -6,7 +6,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
   ArrowLeft, Lock, Shield, Check, X,
-  AlertTriangle, Info, Users, UserCheck, SearchX, ShieldCheck,
+  AlertTriangle, Info, Users, UserCheck, SearchX, ShieldCheck, ChevronDown,
   Columns3, GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,7 +22,6 @@ import { DrawerField, DrawerInput, DrawerTextarea } from '@/components/ui/drawer
 import { SearchInput } from '@/components/ui/search-input';
 import { DescriptionTooltip } from '@/components/ui/description-tooltip';
 import { SortableTableHead, type SortDirection } from '@/components/ui/sortable-table-head';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectsPagination } from '@/screens/projects/ProjectsPagination';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -869,13 +868,6 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
    MAIN SCREEN
    ═══════════════════════════════════════════════════════════════════════ */
 
-type TabFilter = 'all' | 'system' | 'custom';
-const TAB_LABELS: Record<TabFilter, string> = {
-  all: 'All',
-  system: 'Base Roles',
-  custom: 'Specialized',
-};
-
 export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const { roles, saveRole, setRoleStatus } = useAccessControlContext();
   const { users, groups, replaceRoleAssignments } = useEmployeeGroupsContext();
@@ -887,8 +879,9 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     [roles],
   );
 
-  const [tab,    setTab]    = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
+  const [roleTypeFilter, setRoleTypeFilter] = useState<'all' | 'system' | 'custom'>('all');
+  const [roleTypeMenuOpen, setRoleTypeMenuOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortKey, setSortKey] = useState<RoleSortKey>('name');
@@ -959,8 +952,8 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const filtered = roles.filter(r => {
     const q = search.toLowerCase();
     const matchSearch = r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q);
-    const matchTab = tab === 'all' || r.type === tab;
-    return matchSearch && matchTab;
+    const matchType = roleTypeFilter === 'all' || r.type === roleTypeFilter;
+    return matchSearch && matchType;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -990,7 +983,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   useEffect(() => {
     setPage(1);
-  }, [search, tab]);
+  }, [search, roleTypeFilter]);
 
   function handleSort(key: string) {
     const nextKey = key as RoleSortKey;
@@ -1243,21 +1236,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         </div>
       )}
 
-      {/* Toolbar — line tabs on top, search + action below */}
-      <Tabs value={tab} onValueChange={value => setTab(value as TabFilter)}>
-        <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0">
-          {(['all', 'system', 'custom'] as TabFilter[]).map(t => (
-            <TabsTrigger
-              key={t}
-              value={t}
-              className="relative rounded-none border-b-2 border-transparent px-4 py-3 text-[13px] font-medium capitalize text-gray-500 shadow-none transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none"
-            >
-              {TAB_LABELS[t]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
+      {/* Toolbar */}
       <div className="mb-4 mt-4 flex items-center gap-3">
         <SearchInput
           value={search}
@@ -1267,6 +1246,72 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           className="w-full sm:w-80"
         />
         <div className="ml-auto flex items-center gap-3">
+          <Popover open={roleTypeMenuOpen} onOpenChange={setRoleTypeMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Filter by role type"
+                aria-expanded={roleTypeMenuOpen}
+                className={cn(
+                  'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
+                  roleTypeFilter !== 'all'
+                    ? 'border-brand text-brand hover:bg-orange-50/50'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >
+                {roleTypeFilter === 'system'
+                  ? 'Base Roles'
+                  : roleTypeFilter === 'custom'
+                    ? 'Specialized'
+                    : 'Role Type'}
+                <ChevronDown size={13} className={roleTypeFilter !== 'all' ? 'text-brand' : 'text-gray-500'} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="w-56 rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+            >
+              <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
+                  Role Type
+                </span>
+                {roleTypeFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => { setRoleTypeFilter('all'); setRoleTypeMenuOpen(false); }}
+                    className="text-[11.5px] font-semibold text-brand transition-colors hover:text-brand/70"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                {[
+                  { value: 'all' as const, label: 'All Roles' },
+                  { value: 'system' as const, label: 'Base Roles' },
+                  { value: 'custom' as const, label: 'Specialized Roles' },
+                ].map(option => {
+                  const isSelected = roleTypeFilter === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => { setRoleTypeFilter(option.value); setRoleTypeMenuOpen(false); }}
+                      className={cn(
+                        'flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium outline-none transition-colors',
+                        isSelected ? 'bg-orange-50 text-brand' : 'text-gray-700 hover:bg-gray-100',
+                      )}
+                    >
+                      {option.label}
+                      {isSelected && <Check size={14} className="flex-shrink-0 text-brand" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <TooltipProvider delayDuration={150}>
             <Popover>
               <Tooltip>
