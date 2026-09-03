@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Plus, MoreHorizontal,
@@ -53,7 +53,7 @@ const getDependencyProjectDisplayName = (title: string) => {
 
 function makeId() { return `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
-type UserSortKey = 'name' | 'email' | 'jobTitle' | 'department' | 'roles' | 'manager' | 'status';
+type UserSortKey = 'name' | 'email' | 'jobTitle' | 'department' | 'verticals' | 'roles' | 'manager' | 'status';
 
 function compareSortValues(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -225,6 +225,15 @@ function MultiSelectField({
             );
           })}
         </div>
+        <div className="mt-1 border-t border-gray-100 pt-1">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="w-full rounded-md px-2.5 py-2 text-right text-[12px] font-semibold text-brand transition-colors hover:bg-orange-50"
+          >
+            Done
+          </button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -246,7 +255,7 @@ function DrawerSelectField({
   error?: boolean;
 }) {
   return (
-    <Select value={value || undefined} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={placeholder}
         className={cn(
@@ -296,8 +305,7 @@ function UserActionMenu({
 }) {
   const [open, setOpen] = useState(false);
 
-  const isActive   = user.status === 'Active';
-  const isInactive = user.status === 'Inactive';
+  const isActive = user.status === 'Active';
 
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
@@ -331,15 +339,13 @@ function UserActionMenu({
           View Effective Access
         </button>
 
-        {!isInactive && (
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onResetPassword(); }}
-            className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
-          >
-            Reset Password
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => { setOpen(false); onResetPassword(); }}
+          className="w-full rounded-md px-3 py-2 text-left text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          Reset Password
+        </button>
 
         <div className="my-1 border-t border-gray-100" />
 
@@ -351,7 +357,7 @@ function UserActionMenu({
             isActive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100',
           )}
         >
-          {isActive ? 'Deactivate User' : 'Reactivate User'}
+          {isActive ? 'Deactivate User' : user.status === 'Inactive' ? 'Reactivate User' : 'Activate User'}
         </button>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -368,12 +374,14 @@ interface UserDrawerProps {
   editUser: AppUser | null;
   allUsers: AppUser[];
   groups: EmployeeGroup[];
-  onSave: (data: Partial<AppUser>) => void;
+  onSave: (data: Partial<AppUser>, editingUserId?: string) => void;
 }
 
 function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserDrawerProps) {
   const { roles: allRolesContext } = useAccessControlContext();
   const [mounted, setMounted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockedRef = useRef(false);
   useEffect(() => setMounted(true), []);
 
   /* form state */
@@ -385,7 +393,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
   const [employeeId,        setEmployeeId]        = useState('');
   const [departmentId,      setDepartmentId]      = useState('');
   const [teamId,            setTeamId]            = useState('');
-  const [verticalId,        setVerticalId]        = useState('');
+  const [verticalIds,       setVerticalIds]       = useState<string[]>([]);
   const [reportingManagerId, setReportingManagerId] = useState('');
   const [roles,             setRoles]             = useState<UserRole[]>([]);
   const [employeeGroups,    setEmployeeGroups]    = useState<string[]>([]);
@@ -395,6 +403,8 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
   /* Populate form when editing */
   useEffect(() => {
     if (open) {
+      submitLockedRef.current = false;
+      setIsSubmitting(false);
       setShowErrors(false);
       if (editUser) {
         setFirstName(editUser.firstName);
@@ -405,7 +415,11 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
         setEmployeeId(editUser.employeeId ?? '');
         setDepartmentId(editUser.departmentId);
         setTeamId(editUser.teamId ?? '');
-        setVerticalId(editUser.verticalId ?? '');
+        setVerticalIds(editUser.verticalIds?.length
+          ? [...editUser.verticalIds]
+          : editUser.verticalId
+            ? [editUser.verticalId]
+            : []);
         setReportingManagerId(editUser.reportingManagerId ?? '');
         setRoles([...editUser.roles]);
         setEmployeeGroups([...editUser.employeeGroups]);
@@ -413,7 +427,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
       } else {
         setFirstName(''); setLastName(''); setEmail(''); setPhone('');
         setJobTitle(''); setEmployeeId(''); setDepartmentId('');
-        setTeamId(''); setVerticalId(''); setReportingManagerId('');
+        setTeamId(''); setVerticalIds([]); setReportingManagerId('');
         setRoles([]); setEmployeeGroups([]); setJoiningDate('');
       }
     }
@@ -451,7 +465,9 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
 
   function handleSave() {
     setShowErrors(true);
-    if (!isFormValid) return;
+    if (!isFormValid || submitLockedRef.current) return;
+    submitLockedRef.current = true;
+    setIsSubmitting(true);
     onSave({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -461,12 +477,13 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
       employeeId: employeeId.trim() || undefined,
       departmentId,
       teamId: teamId || undefined,
-      verticalId: verticalId || undefined,
+      verticalIds: verticalIds.length ? verticalIds : undefined,
+      verticalId: verticalIds[0] || undefined,
       reportingManagerId: reportingManagerId || undefined,
       roles,
       employeeGroups,
       joiningDate: joiningDate || undefined,
-    });
+    }, editUser?.id);
   }
 
   if (!mounted) return null;
@@ -498,10 +515,10 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
           <button
             type="button"
             onClick={handleSave}
-            disabled={!isFormValid}
+            disabled={!isFormValid || isSubmitting}
             className={cn(
               'rounded-lg px-4 py-[7px] text-[13px] font-semibold text-white transition-colors',
-              isFormValid
+              isFormValid && !isSubmitting
                 ? 'bg-brand hover:bg-brand-hover'
                 : 'cursor-not-allowed bg-orange-200',
             )}
@@ -579,7 +596,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
             <DrawerField label="Department" required>
               <DrawerSelectField
                 value={departmentId}
-                onChange={v => { setDepartmentId(v); setTeamId(''); setVerticalId(''); }}
+                onChange={v => { setDepartmentId(v); setTeamId(''); setVerticalIds([]); }}
                 placeholder="Select department…"
                 options={MOCK_DEPARTMENTS.filter(d => d.status === 'Active').map(d => ({ value: d.id, label: d.name }))}
                 error={deptErr}
@@ -594,15 +611,19 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
                   options={deptTeams.map(t => ({ value: t.id, label: t.name }))}
                 />
               </DrawerField>
-              <DrawerField label="Vertical">
-                <DrawerSelectField
-                  value={verticalId}
-                  onChange={setVerticalId}
-                  placeholder="Select vertical…"
+              <DrawerField label="Verticals">
+                <MultiSelectField
+                  selected={verticalIds}
+                  onChange={setVerticalIds}
+                  placeholder="Select verticals…"
+                  summaryNoun="verticals"
                   options={deptVerticals.map(v => ({ value: v.id, label: v.name }))}
                 />
               </DrawerField>
             </div>
+            <p className="-mt-1 text-[11.5px] leading-relaxed text-gray-400">
+              Department and verticals are for organisational classification, filtering, and reporting only. They do not grant permissions or change data access.
+            </p>
             <DrawerField label="Reporting Manager">
               <DrawerSelectField
                 value={reportingManagerId}
@@ -1063,7 +1084,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | UserStatus>('All');
   const [deptFilter,   setDeptFilter]   = useState('');
+  const [verticalFilter, setVerticalFilter] = useState('');
   const [deptMenuOpen, setDeptMenuOpen] = useState(false);
+  const [verticalMenuOpen, setVerticalMenuOpen] = useState(false);
   const [page,         setPage]         = useState(1);
   const [pageSize,     setPageSize]     = useState(20);
   const [sortKey,      setSortKey]      = useState<UserSortKey>('name');
@@ -1087,6 +1110,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   /* Dept map for display */
   const deptMap = Object.fromEntries(MOCK_DEPARTMENTS.map(d => [d.id, d.name]));
+  const verticalMap = Object.fromEntries(MOCK_VERTICALS.map(v => [v.id, v.name]));
 
   /* Manager map */
   const managerMap = Object.fromEntries(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
@@ -1100,7 +1124,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       (u.employeeId ?? '').toLowerCase().includes(q);
     const statusMatch = statusFilter === 'All' || u.status === statusFilter;
     const deptMatch = !deptFilter || u.departmentId === deptFilter;
-    return nameMatch && statusMatch && deptMatch;
+    const assignedVerticals = u.verticalIds ?? (u.verticalId ? [u.verticalId] : []);
+    const verticalMatch = !verticalFilter || assignedVerticals.includes(verticalFilter);
+    return nameMatch && statusMatch && deptMatch && verticalMatch;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -1109,6 +1135,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       email: a.email,
       jobTitle: a.jobTitle ?? '',
       department: deptMap[a.departmentId] ?? '',
+      verticals: (a.verticalIds ?? (a.verticalId ? [a.verticalId] : []))
+        .map(id => verticalMap[id] ?? '')
+        .join(', '),
       roles: a.roles.join(', '),
       manager: a.reportingManagerId ? managerMap[a.reportingManagerId] ?? '' : '',
       status: a.status,
@@ -1118,6 +1147,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       email: b.email,
       jobTitle: b.jobTitle ?? '',
       department: deptMap[b.departmentId] ?? '',
+      verticals: (b.verticalIds ?? (b.verticalId ? [b.verticalId] : []))
+        .map(id => verticalMap[id] ?? '')
+        .join(', '),
       roles: b.roles.join(', '),
       manager: b.reportingManagerId ? managerMap[b.reportingManagerId] ?? '' : '',
       status: b.status,
@@ -1138,15 +1170,19 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, deptFilter]);
+  }, [search, statusFilter, deptFilter, verticalFilter]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedUsers = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  function handleSave(data: Partial<AppUser>) {
-    if (editUser) {
-      saveUser({ ...editUser, ...data });
+  function handleSave(data: Partial<AppUser>, editingUserId?: string) {
+    const singleRole = data.roles?.slice(0, 1);
+    const editingUser = editingUserId
+      ? users.find(user => user.id === editingUserId)
+      : undefined;
+    if (editingUser) {
+      saveUser({ ...editingUser, ...data, ...(singleRole ? { roles: singleRole } : {}) });
       toast.success(`${data.firstName} ${data.lastName} updated`);
     } else {
       const newUser: AppUser = {
@@ -1154,13 +1190,13 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         status: 'Pending',
         avatarColor: '#334756',
         createdAt: new Date().toISOString().slice(0, 10),
-        roles: [],
         employeeGroups: [],
         firstName: '',
         lastName: '',
         email: '',
         departmentId: '',
         ...data,
+        roles: singleRole ?? [],
       };
       saveUser(newUser);
       toast.success(`${newUser.firstName} ${newUser.lastName} added`);
@@ -1292,6 +1328,69 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
             </PopoverContent>
           </Popover>
 
+          {/* Vertical filter */}
+          <Popover open={verticalMenuOpen} onOpenChange={setVerticalMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Filter by vertical"
+                aria-expanded={verticalMenuOpen}
+                className={cn(
+                  'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
+                  verticalFilter
+                    ? 'border-brand text-brand hover:bg-orange-50/50'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                )}
+              >
+                {verticalFilter ? verticalMap[verticalFilter] ?? 'Vertical' : 'Vertical'}
+                <ChevronDown size={13} className={verticalFilter ? 'text-brand' : 'text-gray-500'} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="w-56 rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+            >
+              <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
+                  Vertical
+                </span>
+                {verticalFilter && (
+                  <button
+                    type="button"
+                    onClick={() => { setVerticalFilter(''); setVerticalMenuOpen(false); }}
+                    className="text-[11.5px] font-semibold text-brand transition-colors hover:text-brand/70"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                {[
+                  { value: '', label: 'All Verticals' },
+                  ...MOCK_VERTICALS.filter(vertical => vertical.status === 'Active')
+                    .map(vertical => ({ value: vertical.id, label: vertical.name })),
+                ].map(option => {
+                  const isSelected = verticalFilter === option.value;
+                  return (
+                    <button
+                      key={option.value || 'all'}
+                      type="button"
+                      onClick={() => { setVerticalFilter(option.value); setVerticalMenuOpen(false); }}
+                      className={cn(
+                        'flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium outline-none transition-colors',
+                        isSelected ? 'bg-orange-50 text-brand' : 'text-gray-700 hover:bg-gray-100',
+                      )}
+                    >
+                      {option.label}
+                      {isSelected && <Check size={14} className="flex-shrink-0 text-brand" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <button type="button" onClick={openAdd}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
             <Plus size={14} /> Add User
@@ -1301,7 +1400,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
       {/* Table */}
       <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-        <Table className="w-full min-w-[1040px] table-auto">
+        <Table className="w-full min-w-[1180px] table-auto">
           <TableHeader className="whitespace-nowrap">
             <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
               <TableHead className="w-[150px] pl-5">
@@ -1315,6 +1414,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
               </TableHead>
               <TableHead className="w-[140px]">
                 <SortableTableHead label="Department" sortKey="department" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-[150px]">
+                <SortableTableHead label="Verticals" sortKey="verticals" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-[150px]">
                 <SortableTableHead label={ALLOW_MULTIPLE_ROLES ? 'Roles' : 'Role'} sortKey="roles" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
@@ -1331,13 +1433,13 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-0">
+                <TableCell colSpan={9} className="py-0">
                   <Empty
-                    icon={search || deptFilter || statusFilter !== 'All' ? SearchX : Users}
-                    title={search || deptFilter || statusFilter !== 'All'
+                    icon={search || deptFilter || verticalFilter || statusFilter !== 'All' ? SearchX : Users}
+                    title={search || deptFilter || verticalFilter || statusFilter !== 'All'
                       ? 'No matching users'
                       : 'No users yet'}
-                    description={search || deptFilter || statusFilter !== 'All'
+                    description={search || deptFilter || verticalFilter || statusFilter !== 'All'
                       ? 'Try adjusting your search or filters to find what you’re looking for.'
                       : 'Add a user to start managing access and assignments.'}
                     className="py-16"
@@ -1346,6 +1448,9 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
               </TableRow>
             ) : paginatedUsers.map(u => {
               const deptName = deptMap[u.departmentId] ?? '—';
+              const verticalNames = (u.verticalIds ?? (u.verticalId ? [u.verticalId] : []))
+                .map(id => verticalMap[id])
+                .filter(Boolean);
               const manager  = u.reportingManagerId ? managerMap[u.reportingManagerId] : null;
               const isInactive = u.status === 'Inactive';
               return (
@@ -1392,10 +1497,17 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     </div>
                   </TableCell>
 
-                  {/* Roles */}
+                  {/* Verticals */}
+                  <TableCell className="py-3">
+                    <span className="block max-w-[145px] truncate text-[12.5px] text-gray-700">
+                      {verticalNames.length > 0 ? verticalNames.join(', ') : '—'}
+                    </span>
+                  </TableCell>
+
+                  {/* Role */}
                   <TableCell className="py-3">
                     <div className="text-[13px] font-normal leading-relaxed text-gray-700">
-                      {u.roles.length > 0 ? u.roles.join(', ') : '—'}
+                      {u.roles[0] ?? '—'}
                     </div>
                   </TableCell>
 

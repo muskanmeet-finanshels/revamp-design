@@ -10,7 +10,10 @@ import {
   type UserRole,
   type UserStatus,
 } from '@/screens/users/mock-data';
-import { storedAssignmentNamesForRole } from '@/contexts/AccessControlContext';
+import {
+  resolveEffectiveRoleNames,
+  storedAssignmentNamesForRole,
+} from '@/contexts/AccessControlContext';
 import {
   normalizeEmployeeGroupsStorage,
   replaceRoleAssignmentsInStorage,
@@ -41,9 +44,16 @@ function makeGroupId() {
   return `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function enforceSingleDirectRole(user: AppUser): AppUser {
+  const role = resolveEffectiveRoleNames(user.roles)[0] ?? 'Team Member';
+  return { ...user, roles: [role] };
+}
+
 export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState<AppUser[]>(() =>
-    normalizeEmployeeGroupsStorage({ users: MOCK_USERS, groups: MOCK_EMPLOYEE_GROUPS })?.users ?? MOCK_USERS);
+  const [users, setUsers] = useState<AppUser[]>(() => {
+    const normalized = normalizeEmployeeGroupsStorage({ users: MOCK_USERS, groups: MOCK_EMPLOYEE_GROUPS });
+    return (normalized?.users ?? MOCK_USERS).map(enforceSingleDirectRole);
+  });
   const [groups, setGroups] = useState<EmployeeGroup[]>(MOCK_EMPLOYEE_GROUPS);
   const [hydrated, setHydrated] = useState(false);
 
@@ -53,7 +63,7 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
       if (stored) {
         const normalized = normalizeEmployeeGroupsStorage(JSON.parse(stored));
         if (normalized) {
-          setUsers(normalized.users);
+          setUsers(normalized.users.map(enforceSingleDirectRole));
           setGroups(normalized.groups);
         }
       }
@@ -75,12 +85,12 @@ export function EmployeeGroupsProvider({ children }: { children: ReactNode }) {
 
   function saveUser(user: AppUser) {
     const activeNames = new Set(groups.filter(group => group.status === 'Active').map(group => group.name));
-    const nextUser = {
+    const nextUser = enforceSingleDirectRole({
       ...user,
       employeeGroups: user.status === 'Active'
         ? user.employeeGroups.filter(groupName => activeNames.has(groupName))
         : [],
-    };
+    });
     setUsers(current => current.some(item => item.id === nextUser.id)
       ? current.map(item => item.id === nextUser.id ? nextUser : item)
       : [...current, nextUser]);

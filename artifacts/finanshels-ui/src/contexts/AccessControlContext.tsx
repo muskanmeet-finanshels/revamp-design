@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   MOCK_ROLES,
+  MODULES,
   inheritBasePermissions,
   type AppRole,
   type PermissionRule,
@@ -32,15 +33,32 @@ function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
     const baseRole = inheritedBaseRoleId
       ? MOCK_ROLES.find(seed => seed.id === inheritedBaseRoleId)
       : undefined;
+    const defaultDataScope = role.defaultDataScope
+      ?? seededRole?.defaultDataScope
+      ?? baseRole?.defaultDataScope
+      ?? role.permissions.find(permission => permission.enabled)?.scope
+      ?? 'All';
+    const permissions = MODULES.flatMap(module => module.actions.map(action => {
+      const persistedRule = role.permissions.find(
+        permission => permission.moduleId === module.id && permission.actionId === action.id,
+      );
+      const seededRule = seededRole?.permissions.find(
+        permission => permission.moduleId === module.id && permission.actionId === action.id,
+      );
+      return persistedRule ?? seededRule ?? {
+        moduleId: module.id,
+        actionId: action.id,
+        enabled: false,
+        scope: defaultDataScope,
+        exceptions: [],
+      };
+    }));
 
     return {
       ...role,
       baseRoleId: inheritedBaseRoleId,
-      defaultDataScope: role.defaultDataScope
-        ?? seededRole?.defaultDataScope
-        ?? baseRole?.defaultDataScope
-        ?? role.permissions.find(permission => permission.enabled)?.scope
-        ?? 'All',
+      defaultDataScope,
+      permissions,
     };
   });
 

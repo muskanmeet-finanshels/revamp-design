@@ -11,7 +11,8 @@ test('upgrades legacy v1 employee groups before Admin screens consume them', () 
       {
         id: 'active-user',
         status: 'Active',
-        roles: ['Team Member', null],
+        roles: ['Team Member', 'Admin', null],
+        verticalId: 'vertical-legacy',
         employeeGroups: ['Legacy Group', 42],
       },
       {
@@ -33,6 +34,7 @@ test('upgrades legacy v1 employee groups before Admin screens consume them', () 
   assert.ok(normalized);
   assert.deepEqual(normalized.groups[0].roles, []);
   assert.deepEqual(normalized.users[0].roles, ['Team Member']);
+  assert.deepEqual(normalized.users[0].verticalIds, ['vertical-legacy']);
   assert.deepEqual(normalized.users[0].employeeGroups, ['Legacy Group']);
   assert.deepEqual(normalized.users[1].employeeGroups, []);
 });

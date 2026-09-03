@@ -143,7 +143,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                 ) : (
                   <>
                     <div>
-                      <span className="text-[12px] font-medium text-gray-700 block mb-1">Direct Roles</span>
+                      <span className="text-[12px] font-medium text-gray-700 block mb-1">Direct Role</span>
                       <div className="flex flex-wrap gap-1.5">
                         {resolvedRoles.length > 0 
                           ? activeDirectRoleNames.map(r => <span key={r} className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-[11.5px] font-medium text-blue-700">{r}</span>)
@@ -158,6 +158,9 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                           : <span className="text-[12px] text-gray-400">None</span>}
                       </div>
                     </div>
+                    <p className="rounded-lg bg-gray-50 px-3 py-2 text-[11.5px] leading-relaxed text-gray-500">
+                      Department and vertical memberships are organisational classifications only. Effective access is calculated from roles and reporting hierarchy, never from those memberships.
+                    </p>
                   </>
                 )}
               </div>

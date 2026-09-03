@@ -22,11 +22,19 @@ export function normalizeEmployeeGroupsStorage(value: unknown): {
 
   const users = stored.users
     .filter((user): user is AppUser => Boolean(user) && typeof user === 'object')
-    .map(user => ({
-      ...user,
-      roles: stringArray(user.roles),
-      employeeGroups: stringArray(user.employeeGroups),
-    }));
+    .map(user => {
+      const verticalIds = stringArray(user.verticalIds);
+      return {
+        ...user,
+        roles: stringArray(user.roles).slice(0, 1),
+        verticalIds: verticalIds.length > 0
+          ? verticalIds
+          : typeof user.verticalId === 'string'
+            ? [user.verticalId]
+            : [],
+        employeeGroups: stringArray(user.employeeGroups),
+      };
+    });
   const groups = stored.groups
     .filter((group): group is EmployeeGroup => Boolean(group) && typeof group === 'object')
     .map(group => ({

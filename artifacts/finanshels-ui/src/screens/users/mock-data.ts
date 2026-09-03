@@ -12,8 +12,8 @@ export type UserStatus = 'Active' | 'Inactive' | 'Pending';
 
 export type UserRole = string;
 
-/** Product setting: when false, the User drawer falls back to one role. */
-export const ALLOW_MULTIPLE_ROLES = true;
+/** Each user has exactly one direct role. Employee-group roles remain separate inherited sources. */
+export const ALLOW_MULTIPLE_ROLES = false;
 
 // ROLE_OPTIONS is no longer statically defining valid roles; it is only kept for backwards-compat if needed,
 // but UI should now read active roles from AccessControlContext.
@@ -64,6 +64,9 @@ export interface AppUser {
   status: UserStatus;
   departmentId: string;
   teamId?: string;
+  /** Classification only; does not grant permissions or change data access. */
+  verticalIds?: string[];
+  /** Legacy single-vertical field retained while older browser data migrates. */
   verticalId?: string;
   reportingManagerId?: string;
   roles: UserRole[];
@@ -89,7 +92,7 @@ export const MOCK_USERS: AppUser[] = [
     departmentId: 'dept-1',
     teamId: 'team-1',
     verticalId: 'vert-1',
-    roles: ['Finance Manager', 'Team Lead'],
+    roles: ['Finance Manager'],
     employeeGroups: ['Management', 'Senior Staff'],
     joiningDate: '2022-03-01',
     createdAt: '2022-03-01',
@@ -144,7 +147,7 @@ export const MOCK_USERS: AppUser[] = [
     teamId: 'team-6',
     verticalId: 'vert-7',
     reportingManagerId: 'u7',
-    roles: ['Tax Consultant', 'Compliance Officer'],
+    roles: ['Tax Consultant'],
     employeeGroups: ['Senior Staff'],
     joiningDate: '2021-11-20',
     createdAt: '2021-11-20',
@@ -163,7 +166,7 @@ export const MOCK_USERS: AppUser[] = [
     teamId: 'team-4',
     verticalId: 'vert-5',
     reportingManagerId: 'u1',
-    roles: ['Senior Auditor', 'Team Lead'],
+    roles: ['Senior Auditor'],
     employeeGroups: ['Management', 'Senior Staff'],
     joiningDate: '2020-08-01',
     createdAt: '2020-08-01',
@@ -199,7 +202,7 @@ export const MOCK_USERS: AppUser[] = [
     status: 'Active',
     departmentId: 'dept-4',
     teamId: 'team-7',
-    roles: ['Compliance Officer', 'Team Lead'],
+    roles: ['Compliance Officer'],
     employeeGroups: ['Management'],
     joiningDate: '2021-04-12',
     createdAt: '2021-04-12',
