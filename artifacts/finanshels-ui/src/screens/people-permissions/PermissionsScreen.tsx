@@ -265,7 +265,7 @@ export function PermissionsScreen() {
     <div className="px-6 py-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-[18px] font-bold text-gray-900">Permissions Configuration</h2>
+          <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
           <p className="mt-0.5 text-[13px] text-gray-500">
             Configure each role using Module + Action + Data Scope. Available scopes vary by module.
           </p>
@@ -293,28 +293,6 @@ export function PermissionsScreen() {
             </Select>
           </div>
         </div>
-      </div>
-
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
-        {([
-          {
-            scope: 'Own',
-            description: "User's own records.",
-          },
-          {
-            scope: 'Reporting Team',
-            description: "User's own records and records belonging to users below them.",
-          },
-          {
-            scope: 'All',
-            description: 'All applicable records in the organisation.',
-          },
-        ] as Array<{ scope: DataScope; description: string }>).map(item => (
-          <div key={item.scope} className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-[12.5px] font-semibold text-gray-900">{item.scope}</p>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-gray-500">{item.description}</p>
-          </div>
-        ))}
       </div>
 
       <div className="mb-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
