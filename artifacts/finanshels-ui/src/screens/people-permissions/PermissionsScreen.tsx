@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, Lock, Save, ShieldCheck, SearchX, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, Lock, Save, ShieldCheck, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   MODULES,
   resolveRolePermissions,
+  type AppRole,
   type PermissionRule,
   type DataScope,
   type ScopeException,
@@ -141,47 +142,44 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
   );
 }
 
-export function PermissionsScreen() {
-  const searchParams = useSearchParams();
-  const { roles, updateRolePermissions } = useAccessControlContext();
+function RolePermissionTable({
+  role,
+  roles,
+  filteredModules,
+}: {
+  role: AppRole;
+  roles: AppRole[];
+  filteredModules: typeof MODULES;
+}) {
+  const { updateRolePermissions } = useAccessControlContext();
   const { users } = useEmployeeGroupsContext();
   const { departments, verticals } = useOrgContext();
-  const defaultRoleId = searchParams.get('roleId') || 'role-admin';
-
-  const [selectedRoleId, setSelectedRoleId] = useState(defaultRoleId);
-  const selectedRole = useMemo(
-    () => roles.find(role => role.id === selectedRoleId) ?? roles[0],
-    [selectedRoleId, roles],
-  );
   const baseRole = useMemo(
-    () => selectedRole.baseRoleId
-      ? roles.find(role => role.id === selectedRole.baseRoleId)
+    () => role.baseRoleId
+      ? roles.find(candidate => candidate.id === role.baseRoleId)
       : undefined,
-    [roles, selectedRole.baseRoleId],
+    [roles, role.baseRoleId],
+  );
+  const basePermissions = useMemo(
+    () => baseRole ? resolveRolePermissions(baseRole, roles) : [],
+    [baseRole, roles],
   );
 
   const [permissions, setPermissions] = useState<PermissionRule[]>(() =>
-    cloneRules(resolveRolePermissions(selectedRole, roles)));
+    cloneRules(resolveRolePermissions(role, roles)));
   const [isSaved, setIsSaved] = useState(true);
-  const [permissionSearch, setPermissionSearch] = useState('');
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
 
   useEffect(() => {
-    setPermissions(cloneRules(resolveRolePermissions(selectedRole, roles)));
+    setPermissions(cloneRules(resolveRolePermissions(role, roles)));
     setIsSaved(true);
-  }, [selectedRole, baseRole, roles]);
+  }, [role, roles]);
 
   const granted = countGrantedModules(permissions);
   const total = MODULES.length;
   const coverage = Math.round((granted / total) * 100);
-  const readOnly = selectedRole.isProtected;
-
-  const filteredModules = useMemo(() => {
-    const query = permissionSearch.trim().toLowerCase();
-    if (!query) return MODULES;
-    return MODULES.filter(module => module.label.toLowerCase().includes(query));
-  }, [permissionSearch]);
+  const readOnly = role.isProtected;
 
   function updateRule(moduleId: string, actionId: string, updates: Partial<PermissionRule>) {
     if (readOnly) return;
@@ -199,7 +197,7 @@ export function PermissionsScreen() {
   }
 
   function toggleAction(moduleId: string, actionId: string, currentEnabled: boolean) {
-    const inheritedRule = baseRole?.permissions.find(
+    const inheritedRule = basePermissions.find(
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
     if (inheritedRule?.enabled && currentEnabled) return;
@@ -209,7 +207,7 @@ export function PermissionsScreen() {
   function setScope(moduleId: string, actionId: string, scope: DataScope) {
     const module = MODULES.find(item => item.id === moduleId);
     if (!module?.availableScopes.includes(scope)) return;
-    const inheritedRule = baseRole?.permissions.find(
+    const inheritedRule = basePermissions.find(
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
     if (inheritedRule?.enabled && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope]) return;
@@ -217,7 +215,7 @@ export function PermissionsScreen() {
   }
 
   function addException(moduleId: string, actionId: string, exceptionData: Omit<ScopeException, 'id'>) {
-    const inheritedRule = baseRole?.permissions.find(
+    const inheritedRule = basePermissions.find(
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
     if (inheritedRule?.enabled) return;
@@ -256,81 +254,48 @@ export function PermissionsScreen() {
   }
 
   function savePermissions() {
-    updateRolePermissions(selectedRole.id, permissions);
-    toast.success(`Permissions updated for ${selectedRole.name}`);
+    updateRolePermissions(role.id, permissions);
+    toast.success(`Permissions updated for ${role.name}`);
     setIsSaved(true);
   }
 
   return (
-    <div className="px-6 py-6 lg:px-8">
-      <div className="mb-6">
-        <div>
-          <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
-          <p className="mt-0.5 text-[13px] text-gray-500">
-            Configure each role using Module + Action + Data Scope. Available scopes vary by module.
-          </p>
-        </div>
-        <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:items-end">
-          <SearchInput
-            value={permissionSearch}
-            onChange={setPermissionSearch}
-            placeholder="Search modules…"
-            className="w-full sm:w-80"
-          />
-          <div className="w-full sm:w-[260px]">
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-              Editing Role
-            </label>
-            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
-              <SelectTrigger className="h-9 w-full rounded-xl border border-gray-200 bg-white text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map(role => (
-                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="overflow-hidden bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-brand">
-            <ShieldCheck size={20} />
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand">
+            <ShieldCheck size={18} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
-              {selectedRole.name}
-              {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
-            </h3>
-            <p className="truncate text-[12px] text-gray-500">{selectedRole.description}</p>
-            {baseRole && (
-              <p className="mt-1 truncate text-[11.5px] font-medium text-brand">
-                Based on {baseRole.name} · inherited actions and scopes are the minimum access
-              </p>
-            )}
+            <p className="text-[14px] font-semibold text-gray-900">
+              Permission matrix
+            </p>
+            <p className="text-[11.5px] text-gray-500">
+              {granted} of {total} modules enabled
+            </p>
           </div>
         </div>
         <button
+          type="button"
           onClick={savePermissions}
           disabled={readOnly || isSaved}
-          className="inline-flex h-9 w-full flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 sm:w-auto"
+          className="inline-flex h-8 flex-shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-[12px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
         >
-          <Save size={15} />
-          Save Changes
+          <Save size={14} />
+          Save
         </button>
       </div>
 
-      <div className="space-y-4">
-        {filteredModules.length === 0 ? (
+      {filteredModules.length === 0 ? (
+        <div className="p-5">
           <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
-        ) : filteredModules.map(module => {
-          return (
-            <div key={module.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-5 py-3">
-                <h4 className="text-[14px] font-semibold text-gray-900">{module.label}</h4>
+        </div>
+      ) : (
+        <div className="space-y-3 bg-gray-50/50 p-3 sm:p-4">
+          {filteredModules.map(module => (
+            <div key={module.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
+                <h4 className="text-[13.5px] font-semibold text-gray-900">{module.label}</h4>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[10.5px] font-medium text-gray-400">Available scopes:</span>
                   {module.availableScopes.map(scope => (
@@ -348,15 +313,14 @@ export function PermissionsScreen() {
                   const rule = getRule(module.id, action.id);
                   const isEnabled = rule.enabled;
                   const isAll = rule.scope === 'All';
-                  const inheritedRule = baseRole?.permissions.find(
+                  const inheritedRule = basePermissions.find(
                     permission => permission.moduleId === module.id && permission.actionId === action.id,
                   );
                   const isInherited = Boolean(inheritedRule?.enabled);
 
                   return (
-                    <div key={action.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 gap-4 transition-colors hover:bg-gray-50/50">
-
-                      <div className="flex items-center gap-4 min-w-[200px]">
+                    <div key={action.id} className="flex flex-col justify-between gap-4 p-4 transition-colors hover:bg-gray-50/50 lg:flex-row lg:items-center">
+                      <div className="flex min-w-[200px] items-center gap-4">
                         <button
                           type="button"
                           onClick={() => toggleAction(module.id, action.id, isEnabled)}
@@ -365,7 +329,7 @@ export function PermissionsScreen() {
                           className={cn(
                             'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
                             isEnabled ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                            (readOnly || isInherited) && 'opacity-50 cursor-not-allowed'
+                            (readOnly || isInherited) && 'cursor-not-allowed opacity-50',
                           )}
                         >
                           {isEnabled && <Check size={12} className="text-white" strokeWidth={3} />}
@@ -379,40 +343,39 @@ export function PermissionsScreen() {
                       </div>
 
                       {isEnabled && (
-                        <div className="flex-1 flex flex-col gap-3 pl-8 lg:pl-0">
-                          <div className="flex items-center gap-2">
-                            <span className="w-20 text-[12px] text-gray-500">Data Scope:</span>
-                            <div className="flex bg-gray-100/80 p-0.5 rounded-lg border border-gray-200/60">
-                              {module.availableScopes.map(scope => (
-                                (() => {
-                                  const belowInheritedScope = Boolean(
-                                    inheritedRule?.enabled
-                                    && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
-                                  );
-                                  return (
-                                    <button
-                                      key={scope}
-                                      onClick={() => setScope(module.id, action.id, scope)}
-                                      disabled={readOnly || belowInheritedScope}
-                                      title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
-                                      className={cn(
-                                        'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
-                                        rule.scope === scope
-                                          ? 'bg-white text-brand shadow-sm border border-gray-200/50'
-                                          : 'text-gray-500 hover:text-gray-900',
-                                        (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40'
-                                      )}
-                                    >
-                                      {scope}
-                                    </button>
-                                  );
-                                })()
-                              ))}
+                        <div className="flex flex-1 flex-col gap-3 pl-8 lg:pl-0">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <span className="flex-shrink-0 text-[12px] text-gray-500 sm:w-20">Data Scope:</span>
+                            <div className="flex w-full max-w-full rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5 sm:w-auto">
+                              {module.availableScopes.map(scope => {
+                                const belowInheritedScope = Boolean(
+                                  inheritedRule?.enabled
+                                  && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
+                                );
+                                return (
+                                  <button
+                                    key={scope}
+                                    type="button"
+                                    onClick={() => setScope(module.id, action.id, scope)}
+                                    disabled={readOnly || belowInheritedScope}
+                                    title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                    className={cn(
+                                      'flex-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11.5px] font-medium transition-all sm:flex-none sm:px-3 sm:text-[12px]',
+                                      rule.scope === scope
+                                        ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-900',
+                                      (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
+                                    )}
+                                  >
+                                    {scope}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
                           {isAll && (
-                            <div className="pl-[56px] flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 sm:pl-[56px]">
                               {rule.exceptions && rule.exceptions.length > 0 && (
                                 <div className="flex flex-wrap gap-2">
                                   {rule.exceptions.map(ex => {
@@ -425,25 +388,26 @@ export function PermissionsScreen() {
                                             return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
                                           })();
                                     return (
-                                      <div key={ex.id} className="flex items-center gap-1.5 bg-orange-50 border border-brand/20 px-2 py-1 rounded-md">
-                                        <span className="text-[11px] text-brand font-medium">
+                                      <div key={ex.id} className="flex items-center gap-1.5 rounded-md border border-brand/20 bg-orange-50 px-2 py-1">
+                                        <span className="text-[11px] font-medium text-brand">
                                           Except: {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : 'Manager'} - {targetName}
                                           {ex.hierarchyApplies && ' (Hierarchy)'}
                                         </span>
                                         {!readOnly && (
-                                          <button onClick={() => removeException(module.id, action.id, ex.id)} className="text-brand/60 hover:text-brand">
+                                          <button type="button" onClick={() => removeException(module.id, action.id, ex.id)} className="text-brand/60 hover:text-brand">
                                             <X size={12} />
                                           </button>
                                         )}
                                       </div>
-                                    )
+                                    );
                                   })}
                                 </div>
                               )}
                               {!readOnly && !isInherited && (
                                 <button
+                                  type="button"
                                   onClick={() => setExceptionDialogTarget({ moduleId: module.id, actionId: action.id, title: `${module.label} > ${action.label}` })}
-                                  className="text-[11.5px] font-medium text-brand hover:underline inline-flex items-center gap-1 w-fit"
+                                  className="inline-flex w-fit items-center gap-1 text-[11.5px] font-medium text-brand hover:underline"
                                 >
                                   <Plus size={12} /> Add Exception
                                 </button>
@@ -462,9 +426,9 @@ export function PermissionsScreen() {
                 })}
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
       <ExceptionDialog
         open={Boolean(exceptionDialogTarget)}
@@ -472,6 +436,132 @@ export function PermissionsScreen() {
         onClose={() => setExceptionDialogTarget(null)}
         onAdd={(ex) => exceptionDialogTarget && addException(exceptionDialogTarget.moduleId, exceptionDialogTarget.actionId, ex)}
       />
+    </div>
+  );
+}
+
+export function PermissionsScreen() {
+  const searchParams = useSearchParams();
+  const { roles } = useAccessControlContext();
+  const defaultExpandedRoleId = searchParams.get('roleId') || 'role-admin';
+  const initialExpandedRoleId = roles.some(role => role.id === defaultExpandedRoleId)
+    ? defaultExpandedRoleId
+    : undefined;
+  const [expandedRoleIds, setExpandedRoleIds] = useState<Set<string>>(
+    () => new Set(initialExpandedRoleId ? [initialExpandedRoleId] : []),
+  );
+  const [mountedRoleIds, setMountedRoleIds] = useState<Set<string>>(
+    () => new Set(initialExpandedRoleId ? [initialExpandedRoleId] : []),
+  );
+  const [permissionSearch, setPermissionSearch] = useState('');
+
+  const filteredModules = useMemo(() => {
+    const query = permissionSearch.trim().toLowerCase();
+    if (!query) return MODULES;
+    return MODULES.filter(module => module.label.toLowerCase().includes(query));
+  }, [permissionSearch]);
+
+  function toggleRole(roleId: string) {
+    setMountedRoleIds(current => {
+      if (current.has(roleId)) return current;
+      const next = new Set(current);
+      next.add(roleId);
+      return next;
+    });
+    setExpandedRoleIds(current => {
+      const next = new Set(current);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }
+
+  return (
+    <div className="px-6 py-6 lg:px-8">
+      <div className="mb-6">
+        <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
+        <p className="mt-0.5 text-[13px] text-gray-500">
+          Configure each role using Module + Action + Data Scope. Expand a role to view and edit its permission matrix.
+        </p>
+        <div className="mt-4 flex w-full sm:w-80">
+          <SearchInput
+            value={permissionSearch}
+            onChange={setPermissionSearch}
+            placeholder="Search modules…"
+            aria-label="Search modules"
+            className="w-full"
+          />
+        </div>
+      </div>
+
+      {roles.length === 0 ? (
+        <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
+      ) : (
+        <div className="space-y-3">
+          {roles.map(role => {
+            const isExpanded = expandedRoleIds.has(role.id);
+            const effectivePermissions = resolveRolePermissions(role, roles);
+            const enabledModules = countGrantedModules(effectivePermissions);
+
+            return (
+              <section key={role.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={`permissions-${role.id}`}
+                    onClick={() => toggleRole(role.id)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <ChevronDown
+                      size={17}
+                      className={cn(
+                        'flex-shrink-0 text-gray-400 transition-transform',
+                        !isExpanded && '-rotate-90',
+                      )}
+                    />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-[14px] font-semibold text-gray-900">{role.name}</h2>
+                        {role.isProtected && <Lock size={12} className="text-violet-500" />}
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 text-[10.5px] font-medium',
+                          role.type === 'system'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-orange-50 text-brand',
+                        )}>
+                          {role.type === 'system' ? 'Base role' : 'Specialized'}
+                        </span>
+                      </div>
+                      <p className="truncate text-[11.5px] text-gray-500">{role.description}</p>
+                    </div>
+                  </button>
+                  <div className="hidden flex-shrink-0 text-right sm:block">
+                    <p className="text-[12px] font-semibold text-gray-700">{enabledModules}/{MODULES.length} modules</p>
+                    <p className="text-[10.5px] text-gray-400">{role.userCount} assigned users</p>
+                  </div>
+                </div>
+
+                {mountedRoleIds.has(role.id) && (
+                  <div
+                    id={`permissions-${role.id}`}
+                    className={cn('border-t border-gray-100', !isExpanded && 'hidden')}
+                  >
+                    <RolePermissionTable
+                      role={role}
+                      roles={roles}
+                      filteredModules={filteredModules}
+                    />
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
