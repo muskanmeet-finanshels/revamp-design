@@ -262,8 +262,8 @@ export function PermissionsScreen() {
   }
 
   return (
-    <div className="px-6 py-6 lg:px-8 max-w-6xl mx-auto">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-[18px] font-bold text-gray-900">Permissions Configuration</h2>
           <p className="mt-0.5 text-[13px] text-gray-500">
@@ -317,19 +317,19 @@ export function PermissionsScreen() {
         ))}
       </div>
 
-      <div className="mb-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3">
+      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-brand">
             <ShieldCheck size={20} />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
               {selectedRole.name}
               {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
             </h3>
-            <p className="text-[12px] text-gray-500">{selectedRole.description}</p>
+            <p className="truncate text-[12px] text-gray-500">{selectedRole.description}</p>
             {baseRole && (
-              <p className="mt-1 text-[11.5px] font-medium text-brand">
+              <p className="mt-1 truncate text-[11.5px] font-medium text-brand">
                 Based on {baseRole.name} · inherited actions and scopes are the minimum access
               </p>
             )}
@@ -338,7 +338,7 @@ export function PermissionsScreen() {
         <button
           onClick={savePermissions}
           disabled={readOnly || isSaved}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
+          className="inline-flex h-9 w-full flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 sm:w-auto"
         >
           <Save size={15} />
           Save Changes
