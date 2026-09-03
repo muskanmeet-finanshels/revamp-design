@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, ChevronDown, Lock, Save, ShieldCheck, SearchX, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, Lock, Save, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -271,9 +271,6 @@ function RolePermissionTable({
     <div className="overflow-hidden bg-white">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand">
-            <ShieldCheck size={18} />
-          </div>
           <div className="min-w-0">
             <p className="text-[14px] font-semibold text-gray-900">
               Permission matrix
@@ -540,9 +537,6 @@ export function PermissionsScreen() {
                         !isExpanded && '-rotate-90',
                       )}
                     />
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand">
-                      <ShieldCheck size={18} />
-                    </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-[14px] font-semibold text-gray-900">{role.name}</h2>

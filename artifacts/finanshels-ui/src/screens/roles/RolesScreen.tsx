@@ -1438,16 +1438,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                 {/* Role name */}
                 <TableCell className="pl-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className={cn(
-                      'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg',
-                      role.isProtected ? 'bg-violet-50' : role.type === 'system' ? 'bg-blue-50' : 'bg-orange-50',
-                    )}>
-                      {role.isProtected
-                        ? <Lock size={14} className="text-violet-500" />
-                        : <Shield size={14} className={role.type === 'system' ? 'text-blue-500' : 'text-brand'} />}
-                    </span>
-                    <div>
+                  <div>
                       <div className="flex items-center gap-1.5">
                         <button type="button" onClick={() => setViewRole(role)}
                           className="text-[13.5px] font-medium text-gray-900 transition-colors text-left">
@@ -1487,7 +1478,6 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                           Cloned from {MOCK_ROLES.find(r => r.id === role.clonedFromId)?.name ?? role.clonedFromId}
                         </p>
                       )}
-                    </div>
                   </div>
                 </TableCell>
                 {orderedVisibleColumns.map(column => renderRoleCell(column, role))}
