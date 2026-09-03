@@ -4,10 +4,9 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { cn } from '@/lib/utils';
-import { Shield, Users, KeyRound, Building2, UsersRound, Settings } from 'lucide-react';
+import { Shield, Users, KeyRound, Building2, UsersRound } from 'lucide-react';
 
 const ADMIN_TABS = [
-  { label: 'Overview', href: '/settings/admin', icon: Settings },
   { label: 'Users', href: '/settings/users', icon: Users },
   { label: 'Roles', href: '/settings/roles', icon: Shield },
   { label: 'Permissions', href: '/settings/permissions', icon: KeyRound },
@@ -25,12 +24,8 @@ export function AdminShell({ children, breadcrumbLabel }: { children: React.Reac
         { label: breadcrumbLabel },
       ]}
     >
-      <div className="flex flex-col h-full bg-gray-50/50">
-        <div className="border-b border-gray-200 bg-white px-4 pt-5 sm:px-6 sm:pt-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Admin Workspace</h1>
-            <p className="mt-1 text-[13.5px] text-gray-500">Manage users, access controls, and organisational structure.</p>
-          </div>
+      <div className="flex h-full flex-col bg-white">
+        <div className="border-b border-gray-200 bg-white px-4 pt-3 sm:px-6 sm:pt-4">
           <div className="-mx-4 flex gap-5 overflow-x-auto whitespace-nowrap px-4 sm:mx-0 sm:gap-6 sm:px-0">
             {ADMIN_TABS.map(tab => {
               const active = pathname === tab.href;

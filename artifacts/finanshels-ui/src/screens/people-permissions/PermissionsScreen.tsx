@@ -5,7 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { Check, Lock, Save, ShieldCheck, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { MODULES, type PermissionRule, type DataScope, type ScopeException } from '@/screens/roles/mock-data';
+import {
+  MODULES,
+  inheritBasePermissions,
+  type PermissionRule,
+  type DataScope,
+  type ScopeException,
+} from '@/screens/roles/mock-data';
 import { useAccessControlContext } from '@/contexts/AccessControlContext';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 import { useOrgContext } from '@/contexts/OrgContext';
@@ -26,6 +32,12 @@ function cloneRules(rules: PermissionRule[]): PermissionRule[] {
     exceptions: r.exceptions ? r.exceptions.map(e => ({ ...e })) : [],
   }));
 }
+
+const SCOPE_RANK: Record<DataScope, number> = {
+  Own: 0,
+  Team: 1,
+  All: 2,
+};
 
 /* ── Exception Dialog ── */
 
@@ -141,17 +153,31 @@ export function PermissionsScreen() {
     () => roles.find(role => role.id === selectedRoleId) ?? roles[0],
     [selectedRoleId, roles],
   );
+  const baseRole = useMemo(
+    () => selectedRole.baseRoleId
+      ? roles.find(role => role.id === selectedRole.baseRoleId)
+      : undefined,
+    [roles, selectedRole.baseRoleId],
+  );
 
-  const [permissions, setPermissions] = useState<PermissionRule[]>(() => cloneRules(selectedRole.permissions));
+  const [permissions, setPermissions] = useState<PermissionRule[]>(() => cloneRules(
+    baseRole
+      ? inheritBasePermissions(baseRole.permissions, selectedRole.permissions)
+      : selectedRole.permissions,
+  ));
   const [isSaved, setIsSaved] = useState(true);
   const [permissionSearch, setPermissionSearch] = useState('');
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
 
   useEffect(() => {
-    setPermissions(cloneRules(selectedRole.permissions));
+    setPermissions(cloneRules(
+      baseRole
+        ? inheritBasePermissions(baseRole.permissions, selectedRole.permissions)
+        : selectedRole.permissions,
+    ));
     setIsSaved(true);
-  }, [selectedRole]);
+  }, [selectedRole, baseRole]);
 
   const granted = countGrantedModules(permissions);
   const total = MODULES.length;
@@ -179,10 +205,18 @@ export function PermissionsScreen() {
   }
 
   function toggleAction(moduleId: string, actionId: string, currentEnabled: boolean) {
+    const inheritedRule = baseRole?.permissions.find(
+      rule => rule.moduleId === moduleId && rule.actionId === actionId,
+    );
+    if (inheritedRule?.enabled && currentEnabled) return;
     updateRule(moduleId, actionId, { enabled: !currentEnabled });
   }
 
   function setScope(moduleId: string, actionId: string, scope: DataScope) {
+    const inheritedRule = baseRole?.permissions.find(
+      rule => rule.moduleId === moduleId && rule.actionId === actionId,
+    );
+    if (inheritedRule?.enabled && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope]) return;
     updateRule(moduleId, actionId, { scope });
   }
 
@@ -266,6 +300,11 @@ export function PermissionsScreen() {
               {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
             </h3>
             <p className="text-[12px] text-gray-500">{selectedRole.description}</p>
+            {baseRole && (
+              <p className="mt-1 text-[11.5px] font-medium text-brand">
+                Based on {baseRole.name} · inherited actions and scopes are the minimum access
+              </p>
+            )}
           </div>
         </div>
         <button
@@ -292,6 +331,10 @@ export function PermissionsScreen() {
                   const rule = getRule(module.id, action.id);
                   const isEnabled = rule.enabled;
                   const isAll = rule.scope === 'All';
+                  const inheritedRule = baseRole?.permissions.find(
+                    permission => permission.moduleId === module.id && permission.actionId === action.id,
+                  );
+                  const isInherited = Boolean(inheritedRule?.enabled);
 
                   return (
                     <div key={action.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 gap-4 transition-colors hover:bg-gray-50/50">
@@ -300,16 +343,22 @@ export function PermissionsScreen() {
                         <button
                           type="button"
                           onClick={() => toggleAction(module.id, action.id, isEnabled)}
-                          disabled={readOnly}
+                          disabled={readOnly || isInherited}
+                          title={isInherited ? `Inherited from ${baseRole?.name}` : undefined}
                           className={cn(
                             'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
                             isEnabled ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                            readOnly && 'opacity-50 cursor-not-allowed'
+                            (readOnly || isInherited) && 'opacity-50 cursor-not-allowed'
                           )}
                         >
                           {isEnabled && <Check size={12} className="text-white" strokeWidth={3} />}
                         </button>
                         <span className="text-[13.5px] font-medium text-gray-800">{action.label}</span>
+                        {isInherited && (
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10.5px] font-medium text-blue-700">
+                            Inherited
+                          </span>
+                        )}
                       </div>
 
                       {isEnabled && (
@@ -318,20 +367,29 @@ export function PermissionsScreen() {
                             <span className="text-[12px] text-gray-500 w-12">Scope:</span>
                             <div className="flex bg-gray-100/80 p-0.5 rounded-lg border border-gray-200/60">
                               {(['Own', 'Team', 'All'] as DataScope[]).map(scope => (
-                                <button
-                                  key={scope}
-                                  onClick={() => setScope(module.id, action.id, scope)}
-                                  disabled={readOnly}
-                                  className={cn(
-                                    'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
-                                    rule.scope === scope
-                                      ? 'bg-white text-brand shadow-sm border border-gray-200/50'
-                                      : 'text-gray-500 hover:text-gray-900',
-                                    readOnly && 'cursor-not-allowed'
-                                  )}
-                                >
-                                  {scope}
-                                </button>
+                                (() => {
+                                  const belowInheritedScope = Boolean(
+                                    inheritedRule?.enabled
+                                    && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
+                                  );
+                                  return (
+                                    <button
+                                      key={scope}
+                                      onClick={() => setScope(module.id, action.id, scope)}
+                                      disabled={readOnly || belowInheritedScope}
+                                      title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                      className={cn(
+                                        'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
+                                        rule.scope === scope
+                                          ? 'bg-white text-brand shadow-sm border border-gray-200/50'
+                                          : 'text-gray-500 hover:text-gray-900',
+                                        (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40'
+                                      )}
+                                    >
+                                      {scope}
+                                    </button>
+                                  );
+                                })()
                               ))}
                             </div>
                           </div>

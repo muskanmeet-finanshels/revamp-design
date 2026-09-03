@@ -155,6 +155,12 @@ export interface AppRole {
   status: RoleStatus;
   /** Super Admin: cannot be edited, cloned differently, or deactivated */
   isProtected: boolean;
+  /** Base system role used by a specialized custom role. */
+  baseRoleId?: string;
+  /** Default record scope inherited when a specialized role is created. */
+  defaultDataScope?: DataScope;
+  /** Short code shown for the five standard base roles. */
+  shortCode?: 'AM' | 'TL' | 'TM' | 'A' | 'SA';
   /** List of permission rules per module and action */
   permissions: PermissionRule[];
   userCount: number;
@@ -179,6 +185,59 @@ export function convertLegacyPermissions(perms: Record<string, string[]>, defaul
   return rules;
 }
 
+const DATA_SCOPE_RANK: Record<DataScope, number> = {
+  Own: 0,
+  Team: 1,
+  All: 2,
+};
+
+export function inheritBasePermissions(
+  basePermissions: PermissionRule[],
+  specializedPermissions: PermissionRule[],
+): PermissionRule[] {
+  const merged = basePermissions.map(baseRule => {
+    const specializedRule = specializedPermissions.find(
+      rule => rule.moduleId === baseRule.moduleId && rule.actionId === baseRule.actionId,
+    );
+
+    if (!specializedRule) {
+      return {
+        ...baseRule,
+        exceptions: baseRule.exceptions.map(exception => ({ ...exception })),
+      };
+    }
+
+    if (!baseRule.enabled) {
+      return {
+        ...specializedRule,
+        exceptions: specializedRule.exceptions.map(exception => ({ ...exception })),
+      };
+    }
+
+    return {
+      ...specializedRule,
+      enabled: true,
+      scope: DATA_SCOPE_RANK[specializedRule.scope] >= DATA_SCOPE_RANK[baseRule.scope]
+        ? specializedRule.scope
+        : baseRule.scope,
+      exceptions: specializedRule.exceptions.map(exception => ({ ...exception })),
+    };
+  });
+
+  const baseKeys = new Set(
+    basePermissions.map(rule => `${rule.moduleId}:${rule.actionId}`),
+  );
+  return [
+    ...merged,
+    ...specializedPermissions
+      .filter(rule => !baseKeys.has(`${rule.moduleId}:${rule.actionId}`))
+      .map(rule => ({
+        ...rule,
+        exceptions: rule.exceptions.map(exception => ({ ...exception })),
+      })),
+  ];
+}
+
 
 /* ─── Seed data ──────────────────────────────────────────────────────────── */
 
@@ -191,6 +250,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: true,
+    defaultDataScope: 'All',
+    shortCode: 'SA',
     permissions: convertLegacyPermissions(fullPermissions(), 'All'),
     userCount: 1,
     createdAt: '2020-01-01',
@@ -202,6 +263,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
+    defaultDataScope: 'All',
+    shortCode: 'A',
     permissions: convertLegacyPermissions({
       projects:     ['view', 'create', 'edit', 'delete', 'assign_team', 'approve'],
       tasks:        ['view', 'create', 'edit', 'delete', 'assign'],
@@ -224,6 +287,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
+    defaultDataScope: 'Team',
+    shortCode: 'AM',
     permissions: convertLegacyPermissions({
       projects:     ['view', 'create', 'edit', 'assign_team', 'approve'],
       tasks:        ['view', 'create', 'edit', 'assign'],
@@ -246,6 +311,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
+    defaultDataScope: 'Team',
+    shortCode: 'TL',
     permissions: convertLegacyPermissions({
       projects:     ['view', 'edit', 'assign_team'],
       tasks:        ['view', 'create', 'edit', 'delete', 'assign'],
@@ -268,6 +335,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'system',
     status: 'Active',
     isProtected: false,
+    defaultDataScope: 'Team',
+    shortCode: 'TM',
     permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view', 'create', 'edit'],
@@ -279,7 +348,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  [],
       reports:      ['view'],
       settings:     ['view'],
-    }, 'Own'),
+    }, 'Team'),
     userCount: 8,
     createdAt: '2020-01-01',
   },
@@ -291,6 +360,8 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Active',
     isProtected: false,
+    baseRoleId: 'role-team-member',
+    defaultDataScope: 'Team',
     permissions: convertLegacyPermissions({
       projects:     ['view', 'edit'],
       tasks:        ['view', 'create', 'edit', 'assign'],
@@ -302,7 +373,7 @@ export const MOCK_ROLES: AppRole[] = [
       audit_trail:  ['view'],
       reports:      ['view'],
       settings:     ['view'],
-    }, 'Own'),
+    }, 'Team'),
     userCount: 2,
     createdAt: '2024-03-15',
     clonedFromId: 'role-team-member',
@@ -314,6 +385,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Active',
     isProtected: false,
+    defaultDataScope: 'All',
     permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view'],
@@ -336,6 +408,7 @@ export const MOCK_ROLES: AppRole[] = [
     type: 'custom',
     status: 'Inactive',
     isProtected: false,
+    defaultDataScope: 'Team',
     permissions: convertLegacyPermissions({
       projects:     ['view'],
       tasks:        ['view'],

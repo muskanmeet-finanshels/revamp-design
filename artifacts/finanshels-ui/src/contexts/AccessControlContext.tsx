@@ -1,7 +1,13 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { MOCK_ROLES, type AppRole, type PermissionRule, type RoleStatus } from '@/screens/roles/mock-data';
+import {
+  MOCK_ROLES,
+  inheritBasePermissions,
+  type AppRole,
+  type PermissionRule,
+  type RoleStatus,
+} from '@/screens/roles/mock-data';
 
 interface AccessControlContextValue {
   roles: AppRole[];
@@ -12,6 +18,43 @@ interface AccessControlContextValue {
 
 const AccessControlContext = createContext<AccessControlContextValue | null>(null);
 const STORAGE_KEY = 'finanshels-roles-v1';
+
+function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
+  const baseRoleIds = new Set(
+    MOCK_ROLES.filter(role => role.type === 'system').map(role => role.id),
+  );
+
+  const normalized = parsed.map(role => {
+    const seededRole = MOCK_ROLES.find(seed => seed.id === role.id);
+    const inheritedBaseRoleId = role.baseRoleId
+      ?? seededRole?.baseRoleId
+      ?? (role.clonedFromId && baseRoleIds.has(role.clonedFromId) ? role.clonedFromId : undefined);
+    const baseRole = inheritedBaseRoleId
+      ? MOCK_ROLES.find(seed => seed.id === inheritedBaseRoleId)
+      : undefined;
+
+    return {
+      ...role,
+      baseRoleId: inheritedBaseRoleId,
+      defaultDataScope: role.defaultDataScope
+        ?? seededRole?.defaultDataScope
+        ?? baseRole?.defaultDataScope
+        ?? role.permissions.find(permission => permission.enabled)?.scope
+        ?? 'All',
+    };
+  });
+
+  return normalized.map(role => {
+    if (!role.baseRoleId) return role;
+    const baseRole = normalized.find(candidate => candidate.id === role.baseRoleId)
+      ?? MOCK_ROLES.find(candidate => candidate.id === role.baseRoleId);
+    if (!baseRole) return role;
+    return {
+      ...role,
+      permissions: inheritBasePermissions(baseRole.permissions, role.permissions),
+    };
+  });
+}
 
 export function AccessControlProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>(MOCK_ROLES);
@@ -25,7 +68,7 @@ export function AccessControlProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Merge with MOCK_ROLES to ensure we have any new system roles, but prefer stored data.
           // For simplicity and to allow full local overrides, we'll just use parsed directly if valid.
-          setRoles(parsed);
+          setRoles(normalizePersistedRoles(parsed));
         }
       }
     } catch {

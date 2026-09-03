@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
@@ -31,8 +31,8 @@ import {
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
-  allPermissionsFor, fullPermissions, normalizeModulePermissions,
-  type AppRole, type RoleType, type RoleStatus, type PermissionRule,
+  allPermissionsFor, fullPermissions, inheritBasePermissions, normalizeModulePermissions,
+  type AppRole, type RoleType, type RoleStatus, type PermissionRule, type DataScope,
 } from './mock-data';
 import type { AppUser, EmployeeGroup } from '@/screens/users/mock-data';
 import { resolveEffectiveRoleNames, useAccessControlContext } from '@/contexts/AccessControlContext';
@@ -46,6 +46,19 @@ type RoleSortKey = 'name' | 'description' | 'type' | 'permissions' | 'users' | '
 
 function countEnabledModules(perms: PermissionRule[]): number {
   return new Set(perms.filter(p => p.enabled).map(p => p.moduleId)).size;
+}
+
+function clonePermissionRules(rules: PermissionRule[]): PermissionRule[] {
+  return rules.map(rule => ({
+    ...rule,
+    exceptions: rule.exceptions ? rule.exceptions.map(exception => ({ ...exception })) : [],
+  }));
+}
+
+function roleDefaultScope(role: AppRole): DataScope {
+  return role.defaultDataScope
+    ?? role.permissions.find(permission => permission.enabled)?.scope
+    ?? 'All';
 }
 
 function usersAssignedToRole(users: AppUser[], groups: EmployeeGroup[], roleName: string): AppUser[] {
@@ -76,7 +89,7 @@ function TypeLabel({ type, isProtected }: { type: RoleType; isProtected?: boolea
   }
   return type === 'system' ? (
     <span className="text-[12px] font-normal text-blue-700">
-      System
+      Base role
     </span>
   ) : (
     <span className="text-[12px] font-normal text-brand">
@@ -211,20 +224,22 @@ interface RoleDrawerProps {
   editRole: AppRole | null;
   /** When set, pre-fills as a clone of this role */
   cloneSource: AppRole | null;
+  baseRoles: AppRole[];
   onSave: (data: Partial<AppRole>) => void;
 }
 
-function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawerProps) {
+function RoleDrawer({ open, onClose, editRole, cloneSource, baseRoles, onSave }: RoleDrawerProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const [name,        setName]        = useState('');
   const [description, setDescription] = useState('');
   const [permissions, setPermissions] = useState<PermissionRule[]>([]);
+  const [baseRoleId,  setBaseRoleId]  = useState('role-team-member');
   const [showErrors,  setShowErrors]  = useState(false);
 
   const isClone = Boolean(cloneSource) && !editRole;
-  const title   = editRole ? 'Edit Role' : isClone ? `Clone: ${cloneSource!.name}` : 'Create New Role';
+  const title   = editRole ? 'Edit Role' : isClone ? `Clone: ${cloneSource!.name}` : 'Create Specialized Role';
 
   useEffect(() => {
     if (!open) return;
@@ -232,17 +247,24 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
     if (editRole) {
       setName(editRole.name);
       setDescription(editRole.description);
-      setPermissions(JSON.parse(JSON.stringify(editRole.permissions)));
+      setPermissions(clonePermissionRules(editRole.permissions));
+      setBaseRoleId(editRole.baseRoleId ?? 'role-team-member');
     } else if (cloneSource) {
       setName(`Copy of ${cloneSource.name}`);
       setDescription(cloneSource.description);
-      setPermissions(JSON.parse(JSON.stringify(cloneSource.permissions)));
+      setPermissions(clonePermissionRules(cloneSource.permissions));
+      setBaseRoleId(
+        cloneSource.baseRoleId
+          ?? (cloneSource.type === 'system' ? cloneSource.id : 'role-team-member'),
+      );
     } else {
       setName('');
       setDescription('');
-      setPermissions([]);
+      setBaseRoleId('role-team-member');
+      const defaultBaseRole = baseRoles.find(role => role.id === 'role-team-member');
+      setPermissions(defaultBaseRole ? clonePermissionRules(defaultBaseRole.permissions) : []);
     }
-  }, [open, editRole, cloneSource]);
+  }, [open, editRole, cloneSource, baseRoles]);
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
@@ -252,7 +274,16 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
   function handleSave() {
     setShowErrors(true);
     if (!name.trim()) return;
-    onSave({ name: name.trim(), description: description.trim(), permissions });
+    const baseRole = baseRoles.find(role => role.id === baseRoleId);
+    onSave({
+      name: name.trim(),
+      description: description.trim(),
+      permissions,
+      ...(!editRole && {
+        baseRoleId,
+        defaultDataScope: baseRole ? roleDefaultScope(baseRole) : 'Team',
+      }),
+    });
   }
 
   if (!mounted) return null;
@@ -313,10 +344,53 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, onSave }: RoleDrawer
               />
             </DrawerField>
 
+            {!editRole && (
+              <DrawerField label="Base role" required>
+                <Select
+                  value={baseRoleId}
+                  onValueChange={value => {
+                    setBaseRoleId(value);
+                    const selectedBaseRole = baseRoles.find(role => role.id === value);
+                    if (selectedBaseRole) {
+                      setPermissions(clonePermissionRules(selectedBaseRole.permissions));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 w-full rounded-xl border-gray-200 bg-white text-[13px]">
+                    <SelectValue placeholder="Select a base role" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[200] rounded-xl border border-gray-100 bg-white shadow-xl">
+                    {baseRoles.map(role => (
+                      <SelectItem key={role.id} value={role.id} className="cursor-pointer rounded-lg py-2.5 text-[13px]">
+                        <span className="flex items-center gap-2">
+                          {role.shortCode && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">{role.shortCode}</span>}
+                          {role.name}
+                          <span className="text-[11px] text-gray-400">· {roleDefaultScope(role)}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-gray-400">
+                  Examples: TM – Data Entry, TM – Support, TL – Operations, or AM – Sales.
+                </p>
+              </DrawerField>
+            )}
+
+            {editRole?.baseRoleId && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3">
+                <Shield size={14} className="mt-0.5 flex-shrink-0 text-brand" />
+                <p className="text-[12.5px] leading-relaxed text-orange-800">
+                  Specialized role based on <strong>{baseRoles.find(role => role.id === editRole.baseRoleId)?.name ?? 'a base role'}</strong>.
+                  Its current permissions can be broadened from the Permissions tab.
+                </p>
+              </div>
+            )}
+
             <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 mt-4">
               <Info size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
               <p className="text-[12.5px] text-blue-700 leading-relaxed">
-                After creating this role, navigate to the <strong>Permissions</strong> tab to configure action-level access and data scope.
+                This role inherits the selected base role. After creating it, use the <strong>Permissions</strong> tab to add actions or broaden individual data scopes.
               </p>
             </div>
           </div>
@@ -756,12 +830,21 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
    ═══════════════════════════════════════════════════════════════════════ */
 
 type TabFilter = 'all' | 'system' | 'custom';
+const TAB_LABELS: Record<TabFilter, string> = {
+  all: 'All',
+  system: 'Base Roles',
+  custom: 'Specialized',
+};
 
 export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const { roles, saveRole, setRoleStatus } = useAccessControlContext();
   const { users, groups, replaceRoleAssignments } = useEmployeeGroupsContext();
   const roleAssignmentCounts = new Map(
     roles.map(role => [role.id, usersAssignedToRole(users, groups, role.name).length]),
+  );
+  const baseRoles = useMemo(
+    () => roles.filter(role => role.type === 'system' && role.status === 'Active'),
+    [roles],
   );
 
   const [tab,    setTab]    = useState<TabFilter>('all');
@@ -849,6 +932,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       saveRole(nextRole);
       toast.success(`Role "${nextRole.name}" updated`);
     } else {
+      const inheritedBaseRole = roles.find(role => role.id === data.baseRoleId);
       const newRole: AppRole = {
         id: makeId(),
         name: data.name ?? '',
@@ -856,7 +940,11 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         type: 'custom',
         status: 'Active',
         isProtected: false,
-        permissions: data.permissions ?? [],
+        baseRoleId: data.baseRoleId,
+        defaultDataScope: data.defaultDataScope,
+        permissions: inheritedBaseRole
+          ? inheritBasePermissions(inheritedBaseRole.permissions, data.permissions ?? [])
+          : data.permissions ?? [],
         userCount: 0,
         createdAt: new Date().toISOString().slice(0, 10),
         clonedFromId: cloneSource?.id,
@@ -894,7 +982,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         <div className="mb-6">
           <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Role Management</h1>
           <p className="mt-0.5 text-[13.5px] text-gray-500">
-            Define system and custom roles with action-level permissions and data scopes.
+            Manage five standard base roles and create specialized roles that inherit their access.
           </p>
         </div>
       )}
@@ -908,7 +996,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
               value={t}
               className="relative rounded-none border-b-2 border-transparent px-4 py-3 text-[13px] font-medium capitalize text-gray-500 shadow-none transition-colors hover:text-gray-800 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-gray-900 data-[state=active]:shadow-none"
             >
-              {t}
+              {TAB_LABELS[t]}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -925,7 +1013,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         <div className="ml-auto">
           <button type="button" onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
-            <Plus size={14} /> New Role
+            <Plus size={14} /> New Specialized Role
           </button>
         </div>
       </div>
@@ -951,6 +1039,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 <TableHead className="min-w-[260px]">
                   <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
+                <TableHead className="w-[180px]">Base role / scope</TableHead>
                 <TableHead className="w-[110px]">
                   <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
@@ -991,6 +1080,11 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                           className="text-[13.5px] font-medium text-gray-900 transition-colors text-left">
                           {role.name}
                         </button>
+                        {role.shortCode && (
+                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+                            {role.shortCode}
+                          </span>
+                        )}
                         {role.isProtected && (
                           <TooltipProvider delayDuration={150}>
                             <Tooltip>
@@ -1027,6 +1121,25 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 {/* Description */}
                 <TableCell className="py-3.5">
                   <DescriptionTooltip value={role.description} className="text-[12.5px]" />
+                </TableCell>
+
+                {/* Base role and default scope */}
+                <TableCell className="py-3.5">
+                  {role.type === 'system' ? (
+                    <div>
+                      <p className="text-[12.5px] font-medium text-gray-700">Standard base role</p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">Default: {roleDefaultScope(role)}</p>
+                    </div>
+                  ) : role.baseRoleId ? (
+                    <div>
+                      <p className="text-[12.5px] font-medium text-gray-700">
+                        {roles.find(baseRole => baseRole.id === role.baseRoleId)?.name ?? 'Base role'}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-brand">Specialized · Default: {roleDefaultScope(role)}</p>
+                    </div>
+                  ) : (
+                    <span className="text-[12px] text-gray-400">Legacy custom role</span>
+                  )}
                 </TableCell>
 
                 {/* Type */}
@@ -1093,6 +1206,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onClose={() => { setDrawerOpen(false); setEditRole(null); setCloneSource(null); }}
         editRole={editRole}
         cloneSource={cloneSource}
+        baseRoles={baseRoles}
         onSave={handleSave}
       />
 
