@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Plus, MoreHorizontal, Pencil, Copy, PowerOff, Power,
   ArrowLeft, Lock, Shield, Check, X,
   AlertTriangle, Info, Users, UserCheck, SearchX, ShieldCheck,
+  Columns3, GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
@@ -28,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
@@ -44,6 +46,43 @@ import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 function makeId() { return `role-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
 type RoleSortKey = 'name' | 'description' | 'type' | 'permissions' | 'users' | 'status';
+
+type RoleColumnKey =
+  | 'description'
+  | 'baseScope'
+  | 'type'
+  | 'permissions'
+  | 'users'
+  | 'status'
+  | 'actions';
+
+const ROLE_COLUMN_OPTIONS: Array<{
+  key: RoleColumnKey;
+  label: string;
+  sortKey?: RoleSortKey;
+  className: string;
+}> = [
+  { key: 'description', label: 'Description',      sortKey: 'description', className: 'min-w-[260px]' },
+  { key: 'baseScope',   label: 'Base Role / Scope',                         className: 'w-[180px]' },
+  { key: 'type',        label: 'Type',            sortKey: 'type',         className: 'w-[110px]' },
+  { key: 'permissions', label: 'Access Coverage', sortKey: 'permissions', className: 'w-[130px]' },
+  { key: 'users',       label: 'Users',            sortKey: 'users',        className: 'w-[80px] text-center' },
+  { key: 'status',      label: 'Status',           sortKey: 'status',       className: 'w-[100px]' },
+  { key: 'actions',     label: 'Actions',                                      className: 'w-[76px]' },
+];
+
+const ROLE_COLUMN_ORDER_STORAGE_KEY = 'fh_roles_column_order';
+
+function normalizeRoleColumnOrder(value: unknown): RoleColumnKey[] | null {
+  if (!Array.isArray(value)) return null;
+  const available = new Set(ROLE_COLUMN_OPTIONS.map(({ key }) => key));
+  const valid = [...new Set(value.filter(
+    (key): key is RoleColumnKey =>
+      typeof key === 'string' && available.has(key as RoleColumnKey),
+  ))];
+  const missing = ROLE_COLUMN_OPTIONS.map(({ key }) => key).filter(key => !valid.includes(key));
+  return valid.length ? [...valid, ...missing] : null;
+}
 
 function countEnabledModules(perms: PermissionRule[]): number {
   return new Set(perms.filter(p => p.enabled).map(p => p.moduleId)).size;
@@ -854,6 +893,54 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
   const [pageSize, setPageSize] = useState(10);
   const [sortKey, setSortKey] = useState<RoleSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [visibleColumns, setVisibleColumns] = useState<Set<RoleColumnKey>>(
+    () => new Set(ROLE_COLUMN_OPTIONS.map(({ key }) => key)),
+  );
+  const [columnOrder, setColumnOrder] = useState<RoleColumnKey[]>(
+    () => ROLE_COLUMN_OPTIONS.map(({ key }) => key),
+  );
+  const [columnOrderHydrated, setColumnOrderHydrated] = useState(false);
+  const draggedColumn = useRef<RoleColumnKey | null>(null);
+  const [dropTarget, setDropTarget] = useState<RoleColumnKey | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(ROLE_COLUMN_ORDER_STORAGE_KEY);
+      if (stored) {
+        const saved = normalizeRoleColumnOrder(JSON.parse(stored));
+        if (saved) setColumnOrder(saved);
+      }
+    } catch {
+      /* Ignore malformed or unavailable browser storage. */
+    }
+    setColumnOrderHydrated(true);
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== ROLE_COLUMN_ORDER_STORAGE_KEY) return;
+      if (!event.newValue) {
+        setColumnOrder(ROLE_COLUMN_OPTIONS.map(({ key }) => key));
+        return;
+      }
+      try {
+        const saved = normalizeRoleColumnOrder(JSON.parse(event.newValue));
+        if (saved) setColumnOrder(saved);
+      } catch {
+        /* Ignore malformed cross-tab updates. */
+      }
+    }
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!columnOrderHydrated) return;
+    try {
+      localStorage.setItem(ROLE_COLUMN_ORDER_STORAGE_KEY, JSON.stringify(columnOrder));
+    } catch {
+      /* Ignore unavailable browser storage. */
+    }
+  }, [columnOrder, columnOrderHydrated]);
 
   /* Drawer */
   const [drawerOpen,   setDrawerOpen]   = useState(false);
@@ -916,6 +1003,53 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     setPage(1);
   }
 
+  function toggleColumn(column: RoleColumnKey) {
+    setVisibleColumns(current => {
+      const next = new Set(current);
+      if (next.has(column)) next.delete(column);
+      else next.add(column);
+      return next;
+    });
+  }
+
+  function toggleAllColumns() {
+    setVisibleColumns(current =>
+      current.size === ROLE_COLUMN_OPTIONS.length
+        ? new Set<RoleColumnKey>()
+        : new Set(ROLE_COLUMN_OPTIONS.map(({ key }) => key)),
+    );
+  }
+
+  function handleColumnDragStart(column: RoleColumnKey) {
+    draggedColumn.current = column;
+  }
+
+  function handleColumnDragOver(event: React.DragEvent, column: RoleColumnKey) {
+    event.preventDefault();
+    if (draggedColumn.current && draggedColumn.current !== column) setDropTarget(column);
+  }
+
+  function handleColumnDrop(column: RoleColumnKey) {
+    const dragged = draggedColumn.current;
+    if (!dragged || dragged === column) {
+      setDropTarget(null);
+      return;
+    }
+    const next = [...columnOrder];
+    const fromIndex = next.indexOf(dragged);
+    const toIndex = next.indexOf(column);
+    next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, dragged);
+    setColumnOrder(next);
+    draggedColumn.current = null;
+    setDropTarget(null);
+  }
+
+  function handleColumnDragEnd() {
+    draggedColumn.current = null;
+    setDropTarget(null);
+  }
+
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedRoles = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -976,6 +1110,127 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
     toast.success(`Role "${r.name}" deactivated` + (replacementRole ? ` and assignments transferred to "${replacementRole.name}"` : ''));
   }
 
+  const orderedVisibleColumns = columnOrder.filter(column => visibleColumns.has(column));
+
+  function renderColumnHeader(column: RoleColumnKey) {
+    const option = ROLE_COLUMN_OPTIONS.find(item => item.key === column)!;
+    const isDropTarget = dropTarget === column;
+    return (
+      <TableHead
+        key={column}
+        draggable
+        onDragStart={() => handleColumnDragStart(column)}
+        onDragOver={event => handleColumnDragOver(event, column)}
+        onDrop={() => handleColumnDrop(column)}
+        onDragEnd={handleColumnDragEnd}
+        className={cn(
+          'group select-none transition-colors',
+          option.className,
+          isDropTarget && 'border-l-2 border-brand bg-orange-50/60',
+        )}
+      >
+        <div className="flex min-w-max items-center gap-1.5">
+          {option.sortKey ? (
+            <SortableTableHead
+              label={option.label}
+              sortKey={option.sortKey}
+              currentKey={sortKey}
+              currentDirection={sortDirection}
+              onSort={handleSort}
+            />
+          ) : (
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+              {option.label}
+            </span>
+          )}
+          <GripVertical
+            size={13}
+            aria-hidden="true"
+            className="ml-auto flex-shrink-0 cursor-grab text-gray-300 opacity-60 transition-colors group-hover:text-brand group-hover:opacity-100 active:cursor-grabbing"
+          />
+        </div>
+      </TableHead>
+    );
+  }
+
+  function renderRoleCell(column: RoleColumnKey, role: AppRole) {
+    switch (column) {
+      case 'description':
+        return (
+          <TableCell key={column} className="py-3.5">
+            <DescriptionTooltip value={role.description} className="text-[12.5px]" />
+          </TableCell>
+        );
+      case 'baseScope':
+        return (
+          <TableCell key={column} className="py-3.5">
+            {role.type === 'system' ? (
+              <div>
+                <p className="text-[12.5px] font-medium text-gray-700">Standard base role</p>
+                <p className="mt-0.5 text-[11px] text-gray-400">Default: {roleDefaultScope(role)}</p>
+              </div>
+            ) : role.baseRoleId ? (
+              <div>
+                <p className="text-[12.5px] font-medium text-gray-700">
+                  {roles.find(baseRole => baseRole.id === role.baseRoleId)?.name ?? 'Base role'}
+                </p>
+                <p className="mt-0.5 text-[11px] text-brand">Specialized · Default: {roleDefaultScope(role)}</p>
+              </div>
+            ) : (
+              <span className="text-[12px] text-gray-400">Legacy custom role</span>
+            )}
+          </TableCell>
+        );
+      case 'type':
+        return (
+          <TableCell key={column} className="py-3.5">
+            <TypeLabel type={role.type} isProtected={role.isProtected} />
+          </TableCell>
+        );
+      case 'permissions':
+        return (
+          <TableCell key={column} className="py-3.5">
+            <CoverageBar permissions={resolveRolePermissions(role, roles)} />
+          </TableCell>
+        );
+      case 'users':
+        return (
+          <TableCell key={column} className="py-3.5 text-center">
+            {(roleAssignmentCounts.get(role.id) ?? 0) > 0 ? (
+              <button
+                type="button"
+                onClick={() => { setViewInitialTab('users'); setViewRole(role); }}
+                className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-gray-700 transition-colors hover:text-brand"
+              >
+                <Users size={11} />
+                {roleAssignmentCounts.get(role.id) ?? 0}
+              </button>
+            ) : (
+              <span className="text-[13px] text-gray-400">—</span>
+            )}
+          </TableCell>
+        );
+      case 'status':
+        return (
+          <TableCell key={column} className="py-3.5">
+            <StatusBadge status={role.status} />
+          </TableCell>
+        );
+      case 'actions':
+        return (
+          <TableCell key={column} className="py-3.5 pr-3">
+            <RoleActionMenu
+              role={role}
+              onEdit={() => openEdit(role)}
+              onClone={() => openClone(role)}
+              onActivate={() => setActivateRole(role)}
+              onDeactivate={() => setDeactivateRole(role)}
+            />
+          </TableCell>
+        );
+    }
+  }
+
   return (
     <div className="px-6 py-6 lg:px-8">
       {/* Header */}
@@ -1011,7 +1266,96 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
           aria-label="Search roles"
           className="w-full sm:w-80"
         />
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <TooltipProvider delayDuration={150}>
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Select columns"
+                      className={cn(
+                        'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
+                        visibleColumns.size < ROLE_COLUMN_OPTIONS.length
+                          ? 'border-brand text-brand hover:bg-orange-50/50'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                      )}
+                    >
+                      <Columns3
+                        size={13}
+                        className={visibleColumns.size < ROLE_COLUMN_OPTIONS.length ? 'text-brand' : 'text-gray-500'}
+                      />
+                      Columns
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={6}
+                  className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+                >
+                  Select Columns
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" sideOffset={6} className="w-56 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+                <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
+                  <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
+                    Columns
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleAllColumns}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-md px-3 py-[7px] text-left text-[13px] font-medium transition-colors outline-none',
+                    visibleColumns.size === ROLE_COLUMN_OPTIONS.length
+                      ? 'bg-orange-50 text-brand'
+                      : 'text-gray-700 hover:bg-gray-100',
+                  )}
+                >
+                  Select All
+                  {visibleColumns.size === ROLE_COLUMN_OPTIONS.length && (
+                    <Check size={14} className="flex-shrink-0 text-brand" />
+                  )}
+                </button>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  type="button"
+                  disabled
+                  className="flex w-full cursor-not-allowed items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-400"
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded border border-brand bg-brand text-white">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  Role
+                  <span className="ml-auto text-[10px] text-gray-400">Required</span>
+                </button>
+                {columnOrder.map(column => {
+                  const option = ROLE_COLUMN_OPTIONS.find(item => item.key === column);
+                  if (!option) return null;
+                  const checked = visibleColumns.has(column);
+                  return (
+                    <button
+                      key={column}
+                      type="button"
+                      onClick={() => toggleColumn(column)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <span className={cn(
+                        'flex h-4 w-4 items-center justify-center rounded border',
+                        checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
+                      )}>
+                        {checked && <Check size={11} strokeWidth={3} />}
+                      </span>
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </PopoverContent>
+            </Popover>
+          </TooltipProvider>
+
           <button type="button" onClick={openCreate}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-brand-hover transition-colors">
             <Plus size={14} /> New Specialized Role
@@ -1031,32 +1375,16 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
       ) : (
         /* Table */
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <Table>
-            <TableHeader>
+          <Table className="w-full min-w-[980px] table-auto">
+            <TableHeader className="whitespace-nowrap">
               <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
                 <TableHead className="pl-5">
                   <SortableTableHead label="Role" sortKey="name" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
                 </TableHead>
-                <TableHead className="min-w-[260px]">
-                  <SortableTableHead label="Description" sortKey="description" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-                </TableHead>
-                <TableHead className="w-[180px]">Base role / scope</TableHead>
-                <TableHead className="w-[110px]">
-                  <SortableTableHead label="Type" sortKey="type" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-                </TableHead>
-                <TableHead className="w-[130px]">
-                  <SortableTableHead label="Access Coverage" sortKey="permissions" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-                </TableHead>
-                <TableHead className="w-[80px] text-center">
-                  <SortableTableHead label="Users" sortKey="users" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} className="mx-auto justify-center" />
-                </TableHead>
-                <TableHead className="w-[100px]">
-                  <SortableTableHead label="Status" sortKey="status" currentKey={sortKey} currentDirection={sortDirection} onSort={handleSort} />
-                </TableHead>
-                <TableHead className="w-[52px]" />
+                {orderedVisibleColumns.map(renderColumnHeader)}
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="whitespace-nowrap">
               {paginatedRoles.map(role => (
               <TableRow key={role.id}
                 className={cn(
@@ -1118,72 +1446,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                     </div>
                   </div>
                 </TableCell>
-
-                {/* Description */}
-                <TableCell className="py-3.5">
-                  <DescriptionTooltip value={role.description} className="text-[12.5px]" />
-                </TableCell>
-
-                {/* Base role and default scope */}
-                <TableCell className="py-3.5">
-                  {role.type === 'system' ? (
-                    <div>
-                      <p className="text-[12.5px] font-medium text-gray-700">Standard base role</p>
-                      <p className="mt-0.5 text-[11px] text-gray-400">Default: {roleDefaultScope(role)}</p>
-                    </div>
-                  ) : role.baseRoleId ? (
-                    <div>
-                      <p className="text-[12.5px] font-medium text-gray-700">
-                        {roles.find(baseRole => baseRole.id === role.baseRoleId)?.name ?? 'Base role'}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-brand">Specialized · Default: {roleDefaultScope(role)}</p>
-                    </div>
-                  ) : (
-                    <span className="text-[12px] text-gray-400">Legacy custom role</span>
-                  )}
-                </TableCell>
-
-                {/* Type */}
-                <TableCell className="py-3.5">
-                  <TypeLabel type={role.type} isProtected={role.isProtected} />
-                </TableCell>
-
-                {/* Permissions coverage */}
-                <TableCell className="py-3.5">
-                  <CoverageBar permissions={resolveRolePermissions(role, roles)} />
-                </TableCell>
-
-                {/* User count — clickable to show assigned users */}
-                <TableCell className="py-3.5 text-center">
-                  {(roleAssignmentCounts.get(role.id) ?? 0) > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => { setViewInitialTab('users'); setViewRole(role); }}
-                      className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-gray-700 transition-colors hover:text-brand"
-                    >
-                      <Users size={11} />
-                      {roleAssignmentCounts.get(role.id) ?? 0}
-                    </button>
-                  ) : (
-                    <span className="text-[13px] text-gray-400">—</span>
-                  )}
-                </TableCell>
-
-                {/* Status */}
-                <TableCell className="py-3.5">
-                  <StatusBadge status={role.status} />
-                </TableCell>
-
-                {/* Actions */}
-                <TableCell className="py-3.5 pr-3">
-                  <RoleActionMenu
-                    role={role}
-                    onEdit={() => openEdit(role)}
-                    onClone={() => openClone(role)}
-                    onActivate={() => setActivateRole(role)}
-                    onDeactivate={() => setDeactivateRole(role)}
-                  />
-                </TableCell>
+                {orderedVisibleColumns.map(column => renderRoleCell(column, role))}
               </TableRow>
               ))}
             </TableBody>

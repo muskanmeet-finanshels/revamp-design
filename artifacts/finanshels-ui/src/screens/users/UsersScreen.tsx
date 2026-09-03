@@ -1748,7 +1748,6 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                   <span className="text-[9.5px] font-bold uppercase tracking-widest text-gray-400">
                     Columns
                   </span>
-                  <span className="text-[10px] text-gray-400">Drag table headers to reorder</span>
                 </div>
                 <button
                   type="button"
