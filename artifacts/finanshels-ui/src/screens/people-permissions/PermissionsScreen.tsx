@@ -18,6 +18,14 @@ import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 import { useOrgContext } from '@/contexts/OrgContext';
 import { SearchInput } from '@/components/ui/search-input';
 import { Empty } from '@/components/ui/empty';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
@@ -308,7 +316,15 @@ function RolePermissionTable({
                   ))}
                 </div>
               </div>
-              <div className="divide-y divide-gray-100">
+              <Table className="w-full min-w-[760px] table-auto">
+                <TableHeader className="whitespace-nowrap">
+                  <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="w-[260px] pl-4">Permission</TableHead>
+                    <TableHead className="w-[320px]">Data Scope</TableHead>
+                    <TableHead className="pr-4">Exceptions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {module.actions.map(action => {
                   const rule = getRule(module.id, action.id);
                   const isEnabled = rule.enabled;
@@ -319,112 +335,116 @@ function RolePermissionTable({
                   const isInherited = Boolean(inheritedRule?.enabled);
 
                   return (
-                    <div key={action.id} className="flex flex-col justify-between gap-4 p-4 transition-colors hover:bg-gray-50/50 lg:flex-row lg:items-center">
-                      <div className="flex min-w-[200px] items-center gap-4">
-                        <button
-                          type="button"
-                          onClick={() => toggleAction(module.id, action.id, isEnabled)}
-                          disabled={readOnly || isInherited}
-                          title={isInherited ? `Inherited from ${baseRole?.name}` : undefined}
-                          className={cn(
-                            'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
-                            isEnabled ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                            (readOnly || isInherited) && 'cursor-not-allowed opacity-50',
-                          )}
-                        >
-                          {isEnabled && <Check size={12} className="text-white" strokeWidth={3} />}
-                        </button>
-                        <span className="text-[13.5px] font-medium text-gray-800">{action.label}</span>
-                        {isInherited && (
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10.5px] font-medium text-blue-700">
-                            Inherited
-                          </span>
-                        )}
-                      </div>
-
-                      {isEnabled && (
-                        <div className="flex flex-1 flex-col gap-3 pl-8 lg:pl-0">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <span className="flex-shrink-0 text-[12px] text-gray-500 sm:w-20">Data Scope:</span>
-                            <div className="flex w-full max-w-full rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5 sm:w-auto">
-                              {module.availableScopes.map(scope => {
-                                const belowInheritedScope = Boolean(
-                                  inheritedRule?.enabled
-                                  && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
-                                );
-                                return (
-                                  <button
-                                    key={scope}
-                                    type="button"
-                                    onClick={() => setScope(module.id, action.id, scope)}
-                                    disabled={readOnly || belowInheritedScope}
-                                    title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
-                                    className={cn(
-                                      'flex-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11.5px] font-medium transition-all sm:flex-none sm:px-3 sm:text-[12px]',
-                                      rule.scope === scope
-                                        ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-900',
-                                      (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
-                                    )}
-                                  >
-                                    {scope}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {isAll && (
-                            <div className="flex flex-col gap-2 sm:pl-[56px]">
-                              {rule.exceptions && rule.exceptions.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {rule.exceptions.map(ex => {
-                                    const targetName = ex.type === 'department'
-                                      ? departments.find(d => d.id === ex.targetId)?.name
-                                      : ex.type === 'service'
-                                        ? verticals.find(v => v.id === ex.targetId)?.name
-                                        : (() => {
-                                            const manager = users.find(user => user.id === ex.targetId);
-                                            return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                          })();
-                                    return (
-                                      <div key={ex.id} className="flex items-center gap-1.5 rounded-md border border-brand/20 bg-orange-50 px-2 py-1">
-                                        <span className="text-[11px] font-medium text-brand">
-                                          Except: {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : 'Manager'} - {targetName}
-                                          {ex.hierarchyApplies && ' (Hierarchy)'}
-                                        </span>
-                                        {!readOnly && (
-                                          <button type="button" onClick={() => removeException(module.id, action.id, ex.id)} className="text-brand/60 hover:text-brand">
-                                            <X size={12} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                              {!readOnly && !isInherited && (
-                                <button
-                                  type="button"
-                                  onClick={() => setExceptionDialogTarget({ moduleId: module.id, actionId: action.id, title: `${module.label} > ${action.label}` })}
-                                  className="inline-flex w-fit items-center gap-1 text-[11.5px] font-medium text-brand hover:underline"
-                                >
-                                  <Plus size={12} /> Add Exception
-                                </button>
-                              )}
-                              {isInherited && (
-                                <p className="text-[11px] text-gray-400">
-                                  Inherited access cannot be narrowed with new exceptions.
-                                </p>
-                              )}
-                            </div>
+                    <TableRow key={action.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50/50">
+                      <TableCell className="py-3.5 pl-4">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleAction(module.id, action.id, isEnabled)}
+                            disabled={readOnly || isInherited}
+                            title={isInherited ? `Inherited from ${baseRole?.name}` : undefined}
+                            className={cn(
+                              'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
+                              isEnabled ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
+                              (readOnly || isInherited) && 'cursor-not-allowed opacity-50',
+                            )}
+                          >
+                            {isEnabled && <Check size={12} className="text-white" strokeWidth={3} />}
+                          </button>
+                          <span className="text-[13.5px] font-medium text-gray-800">{action.label}</span>
+                          {isInherited && (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10.5px] font-medium text-blue-700">
+                              Inherited
+                            </span>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        {isEnabled ? (
+                          <div className="flex w-fit rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
+                            {module.availableScopes.map(scope => {
+                              const belowInheritedScope = Boolean(
+                                inheritedRule?.enabled
+                                && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
+                              );
+                              return (
+                                <button
+                                  key={scope}
+                                  type="button"
+                                  onClick={() => setScope(module.id, action.id, scope)}
+                                  disabled={readOnly || belowInheritedScope}
+                                  title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                  className={cn(
+                                    'whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-medium transition-all',
+                                    rule.scope === scope
+                                      ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
+                                      : 'text-gray-500 hover:text-gray-900',
+                                    (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
+                                  )}
+                                >
+                                  {scope}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-400">Not enabled</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3.5 pr-4">
+                        {isEnabled && isAll ? (
+                          <div className="flex min-w-[220px] flex-col gap-2">
+                            {rule.exceptions && rule.exceptions.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {rule.exceptions.map(ex => {
+                                  const targetName = ex.type === 'department'
+                                    ? departments.find(d => d.id === ex.targetId)?.name
+                                    : ex.type === 'service'
+                                      ? verticals.find(v => v.id === ex.targetId)?.name
+                                      : (() => {
+                                          const manager = users.find(user => user.id === ex.targetId);
+                                          return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                        })();
+                                  return (
+                                    <div key={ex.id} className="flex items-center gap-1.5 rounded-md border border-brand/20 bg-orange-50 px-2 py-1">
+                                      <span className="text-[11px] font-medium text-brand">
+                                        Except: {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : 'Manager'} - {targetName}
+                                        {ex.hierarchyApplies && ' (Hierarchy)'}
+                                      </span>
+                                      {!readOnly && (
+                                        <button type="button" onClick={() => removeException(module.id, action.id, ex.id)} className="text-brand/60 hover:text-brand">
+                                          <X size={12} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {!readOnly && !isInherited && (
+                              <button
+                                type="button"
+                                onClick={() => setExceptionDialogTarget({ moduleId: module.id, actionId: action.id, title: `${module.label} > ${action.label}` })}
+                                className="inline-flex w-fit items-center gap-1 text-[11.5px] font-medium text-brand hover:underline"
+                              >
+                                <Plus size={12} /> Add Exception
+                              </button>
+                            )}
+                            {isInherited && (
+                              <p className="text-[11px] text-gray-400">
+                                Inherited access cannot be narrowed with new exceptions.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </div>
+                </TableBody>
+              </Table>
             </div>
           ))}
         </div>
