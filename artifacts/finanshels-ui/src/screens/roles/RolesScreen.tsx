@@ -1167,7 +1167,6 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
                 <p className="text-[12.5px] font-medium text-gray-700">
                   {roles.find(baseRole => baseRole.id === role.baseRoleId)?.name ?? 'Base role'}
                 </p>
-                <p className="mt-0.5 text-[11px] text-brand">Specialized · Default: {roleDefaultScope(role)}</p>
               </div>
             ) : (
               <span className="text-[12px] text-gray-400">Legacy custom role</span>
