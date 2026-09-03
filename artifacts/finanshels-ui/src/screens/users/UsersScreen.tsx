@@ -6,7 +6,7 @@ import {
   X, Plus, MoreHorizontal,
   ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp,
   AlertTriangle, UserCheck, UserRound, Users, Users2, Building2, Layers, SearchX,
-  Mail,
+  Mail, Search,
 } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
@@ -162,15 +162,24 @@ function MultiSelectField({
   summaryNoun?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const selectedLabels = options
     .filter(option => selected.includes(option.value))
     .map(option => option.label);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
 
   function toggle(option: string) {
     onChange(selected.includes(option)
       ? selected.filter(value => value !== option)
       : [...selected, option]);
   }
+
+  const visibleOptions = query.trim()
+    ? options.filter(option => option.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -184,7 +193,7 @@ function MultiSelectField({
             'focus:outline-none focus:ring-1 focus:ring-brand/20',
             error
               ? 'border-red-400 focus:border-red-400'
-              : selected.length
+              : selected.length || open
                 ? 'border-brand focus:border-brand'
                 : 'border-gray-200 text-gray-400 focus:border-brand',
           )}
@@ -196,44 +205,75 @@ function MultiSelectField({
                 ? selectedLabels[0]
                 : `${selectedLabels.length} ${summaryNoun} selected`}
           </span>
-          <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />
+          {open
+            ? <ChevronUp size={16} className="flex-shrink-0 text-gray-400" />
+            : <ChevronDown size={16} className="flex-shrink-0 text-gray-400" />}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] p-1.5">
-        <div className="max-h-60 overflow-y-auto">
-          {options.map(option => {
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="z-[200] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl"
+      >
+        <div className="p-1 pb-1.5">
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3">
+            <Search size={13} className="flex-shrink-0 text-gray-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder={`Search ${summaryNoun}...`}
+              aria-label={`Search ${summaryNoun}`}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-gray-800 outline-none placeholder:text-gray-400"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                aria-label="Clear search"
+                className="flex h-4 w-4 items-center justify-center rounded bg-gray-200 text-[10px] text-gray-600 transition-colors hover:bg-gray-300"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+        <ul className="max-h-[220px] overflow-y-auto p-1 pt-0">
+          {visibleOptions.length > 0 ? visibleOptions.map(option => {
             const checked = selected.includes(option.value);
             return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => toggle(option.value)}
-                aria-pressed={checked}
-                className={cn(
-                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors',
-                  checked ? 'bg-orange-50 font-medium text-brand' : 'text-gray-700 hover:bg-gray-50',
-                )}
-              >
-                <span className={cn(
-                  'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
-                  checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                )}>
-                  {checked && <Check size={10} className="text-white" strokeWidth={3} />}
-                </span>
-                <span className="truncate">{option.label}</span>
-              </button>
+              <li key={option.value}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={checked}
+                  onClick={() => toggle(option.value)}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
+                    checked
+                      ? 'bg-orange-50 text-brand'
+                      : 'text-gray-800 hover:bg-gray-100',
+                  )}
+                >
+                  <span className={cn(
+                    'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
+                    checked ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
+                  )}>
+                    {checked && <Check size={11} className="text-white" strokeWidth={3} />}
+                  </span>
+                  <span className={cn(
+                    'select-none text-[13px]',
+                    checked && 'font-medium',
+                  )}>
+                    {option.label}
+                  </span>
+                </button>
+              </li>
             );
-          })}
-        </div>
-        <div className="mt-1 border-t border-gray-100 pt-1">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="w-full rounded-md px-2.5 py-2 text-right text-[12px] font-semibold text-brand transition-colors hover:bg-orange-50"
-          >
-            Done
-          </button>
-        </div>
+          }) : (
+            <li className="px-3 py-4 text-center text-[12px] text-gray-400">No results</li>
+          )}
+        </ul>
       </PopoverContent>
     </Popover>
   );
