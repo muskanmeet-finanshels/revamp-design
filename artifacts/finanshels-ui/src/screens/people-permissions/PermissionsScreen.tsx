@@ -263,14 +263,14 @@ export function PermissionsScreen() {
 
   return (
     <div className="px-6 py-6 lg:px-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mb-6">
         <div>
           <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
           <p className="mt-0.5 text-[13px] text-gray-500">
             Configure each role using Module + Action + Data Scope. Available scopes vary by module.
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+        <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:items-end">
           <SearchInput
             value={permissionSearch}
             onChange={setPermissionSearch}
