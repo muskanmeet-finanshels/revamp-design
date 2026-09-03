@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, ChevronDown, Lock, Save, SearchX, Plus, X } from 'lucide-react';
+import { ChevronDown, Lock, Save, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -178,6 +178,15 @@ function RolePermissionTable({
   const [isSaved, setIsSaved] = useState(true);
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
+  const [expandedScopeModules, setExpandedScopeModules] = useState<Set<string>>(new Set());
+  const matrixActions = useMemo(() => {
+    const seen = new Set<string>();
+    return filteredModules.flatMap(module => module.actions.filter(action => {
+      if (seen.has(action.id)) return false;
+      seen.add(action.id);
+      return true;
+    }));
+  }, [filteredModules]);
 
   useEffect(() => {
     setPermissions(cloneRules(resolveRolePermissions(role, roles)));
@@ -261,6 +270,15 @@ function RolePermissionTable({
       };
   }
 
+  function toggleScopeModule(moduleId: string) {
+    setExpandedScopeModules(current => {
+      const next = new Set(current);
+      if (next.has(moduleId)) next.delete(moduleId);
+      else next.add(moduleId);
+      return next;
+    });
+  }
+
   function savePermissions() {
     updateRolePermissions(role.id, permissions);
     toast.success(`Permissions updated for ${role.name}`);
@@ -296,156 +314,193 @@ function RolePermissionTable({
           <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
         </div>
       ) : (
-        <div className="space-y-3 bg-gray-50/50 p-3 sm:p-4">
-          {filteredModules.map(module => (
-            <div key={module.id} className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
-                <h4 className="text-[13.5px] font-semibold text-gray-900">{module.label}</h4>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10.5px] font-medium text-gray-400">Available scopes:</span>
-                  {module.availableScopes.map(scope => (
-                    <span
-                      key={scope}
-                      className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[10.5px] font-medium text-gray-600"
-                    >
-                      {scope}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
-                <Table className="w-full min-w-[760px] table-auto">
-                  <TableHeader className="whitespace-nowrap">
-                    <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="w-[260px] pl-4">Permission</TableHead>
-                      <TableHead className="w-[320px]">Data Scope</TableHead>
-                      <TableHead className="pr-4">Exceptions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="whitespace-nowrap">
-                {module.actions.map(action => {
-                  const rule = getRule(module.id, action.id);
-                  const isEnabled = rule.enabled;
-                  const isAll = rule.scope === 'All';
-                  const inheritedRule = basePermissions.find(
-                    permission => permission.moduleId === module.id && permission.actionId === action.id,
-                  );
-                  const isInherited = Boolean(inheritedRule?.enabled);
+        <div className="bg-gray-50/50 p-3 sm:p-4">
+          <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+              <Table className={cn(
+                'w-full table-auto',
+                matrixActions.length > 6 ? 'min-w-[1180px]' : 'min-w-[760px]',
+              )}>
+                <TableHeader className="whitespace-nowrap">
+                  <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="min-w-[230px] pl-5">Permissions</TableHead>
+                    {matrixActions.map(action => (
+                      <TableHead key={action.id} className="min-w-[105px] px-3 text-center">
+                        {action.label}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="whitespace-nowrap">
+                  {filteredModules.map(module => {
+                    const enabledRules = module.actions
+                      .map(action => ({ action, rule: getRule(module.id, action.id) }))
+                      .filter(item => item.rule.enabled);
+                    const enabledScopes = new Set(enabledRules.map(item => item.rule.scope));
+                    const scopeSummary = enabledRules.length === 0
+                      ? 'No permissions enabled'
+                      : enabledScopes.size === 1
+                        ? `${enabledRules.length} enabled · ${enabledRules[0].rule.scope}`
+                        : `${enabledRules.length} enabled · Mixed scopes`;
+                    const scopeExpanded = expandedScopeModules.has(module.id);
 
-                  return (
-                    <TableRow key={action.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50/50">
-                      <TableCell className="py-3.5 pl-4">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleAction(module.id, action.id, isEnabled)}
-                            disabled={readOnly || isInherited}
-                            title={isInherited ? `Inherited from ${baseRole?.name}` : undefined}
-                            className={cn(
-                              'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
-                              isEnabled ? 'border-brand bg-brand' : 'border-gray-300 bg-white',
-                              (readOnly || isInherited) && 'cursor-not-allowed opacity-50',
-                            )}
-                          >
-                            {isEnabled && <Check size={12} className="text-white" strokeWidth={3} />}
-                          </button>
-                          <span className="text-[13.5px] font-medium text-gray-800">{action.label}</span>
-                          {isInherited && (
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10.5px] font-medium text-blue-700">
-                              Inherited
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3.5">
-                        {isEnabled ? (
-                          <div className="flex w-fit rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
-                            {module.availableScopes.map(scope => {
-                              const belowInheritedScope = Boolean(
-                                inheritedRule?.enabled
-                                && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
-                              );
-                              return (
-                                <button
-                                  key={scope}
-                                  type="button"
-                                  onClick={() => setScope(module.id, action.id, scope)}
-                                  disabled={readOnly || belowInheritedScope}
-                                  title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
-                                  className={cn(
-                                    'whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-medium transition-all',
-                                    rule.scope === scope
-                                      ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
-                                      : 'text-gray-500 hover:text-gray-900',
-                                    (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
-                                  )}
-                                >
-                                  {scope}
-                                </button>
-                              );
-                            })}
+                    return [
+                      <TableRow
+                        key={module.id}
+                        className="border-b border-gray-100 transition-colors hover:bg-gray-50/70"
+                      >
+                        <TableCell className="pl-5 py-4">
+                          <div className="flex min-w-[210px] items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleScopeModule(module.id)}
+                              disabled={enabledRules.length === 0}
+                              aria-label={`${scopeExpanded ? 'Hide' : 'Show'} scope settings for ${module.label}`}
+                              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              <ChevronDown
+                                size={15}
+                                className={cn('transition-transform', !scopeExpanded && '-rotate-90')}
+                              />
+                            </button>
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-semibold text-gray-900">{module.label}</p>
+                              <p className="mt-0.5 text-[10.5px] text-gray-400">{scopeSummary}</p>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-[12px] text-gray-400">Not enabled</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-3.5 pr-4">
-                        {isEnabled && isAll ? (
-                          <div className="flex min-w-[220px] flex-col gap-2">
-                            {rule.exceptions && rule.exceptions.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {rule.exceptions.map(ex => {
-                                  const targetName = ex.type === 'department'
-                                    ? departments.find(d => d.id === ex.targetId)?.name
-                                    : ex.type === 'service'
-                                      ? verticals.find(v => v.id === ex.targetId)?.name
-                                      : (() => {
-                                          const manager = users.find(user => user.id === ex.targetId);
-                                          return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                        })();
-                                  return (
-                                    <div key={ex.id} className="flex items-center gap-1.5 rounded-md border border-brand/20 bg-orange-50 px-2 py-1">
-                                      <span className="text-[11px] font-medium text-brand">
-                                        Except: {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : 'Manager'} - {targetName}
-                                        {ex.hierarchyApplies && ' (Hierarchy)'}
-                                      </span>
-                                      {!readOnly && (
-                                        <button type="button" onClick={() => removeException(module.id, action.id, ex.id)} className="text-brand/60 hover:text-brand">
-                                          <X size={12} />
-                                        </button>
+                        </TableCell>
+                        {matrixActions.map(action => {
+                          const supportedAction = module.actions.find(candidate => candidate.id === action.id);
+                          if (!supportedAction) {
+                            return (
+                              <TableCell key={action.id} className="px-3 py-4 text-center">
+                                <span className="text-[12px] text-gray-200">—</span>
+                              </TableCell>
+                            );
+                          }
+
+                          const rule = getRule(module.id, action.id);
+                          const inheritedRule = basePermissions.find(
+                            permission => permission.moduleId === module.id && permission.actionId === action.id,
+                          );
+                          const isInherited = Boolean(inheritedRule?.enabled);
+
+                          return (
+                            <TableCell key={action.id} className="px-3 py-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={rule.enabled}
+                                onChange={() => toggleAction(module.id, action.id, rule.enabled)}
+                                disabled={readOnly || isInherited}
+                                title={isInherited ? `Inherited from ${baseRole?.name}` : `${supportedAction.label} ${module.label}`}
+                                aria-label={`${supportedAction.label} permission for ${module.label}`}
+                                className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#F97316] disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>,
+                      scopeExpanded && (
+                        <TableRow key={`${module.id}-scope`} className="border-b border-gray-100 bg-gray-50/70 hover:bg-gray-50/70">
+                          <TableCell colSpan={matrixActions.length + 1} className="px-5 py-4">
+                            <div className="grid gap-3 whitespace-normal md:grid-cols-2 xl:grid-cols-3">
+                              {enabledRules.map(({ action, rule }) => {
+                                const inheritedRule = basePermissions.find(
+                                  permission => permission.moduleId === module.id && permission.actionId === action.id,
+                                );
+                                const isInherited = Boolean(inheritedRule?.enabled);
+
+                                return (
+                                  <div key={action.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                      <p className="text-[12px] font-semibold text-gray-800">{action.label}</p>
+                                      {isInherited && (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                                          Inherited
+                                        </span>
                                       )}
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {!readOnly && !isInherited && (
-                              <button
-                                type="button"
-                                onClick={() => setExceptionDialogTarget({ moduleId: module.id, actionId: action.id, title: `${module.label} > ${action.label}` })}
-                                className="inline-flex w-fit items-center gap-1 text-[11.5px] font-medium text-brand hover:underline"
-                              >
-                                <Plus size={12} /> Add Exception
-                              </button>
-                            )}
-                            {isInherited && (
-                              <p className="text-[11px] text-gray-400">
-                                Inherited access cannot be narrowed with new exceptions.
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-gray-400">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                  </TableBody>
-                </Table>
-              </div>
+                                    <div className="flex w-fit rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
+                                      {module.availableScopes.map(scope => {
+                                        const belowInheritedScope = Boolean(
+                                          inheritedRule?.enabled
+                                          && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
+                                        );
+                                        return (
+                                          <button
+                                            key={scope}
+                                            type="button"
+                                            onClick={() => setScope(module.id, action.id, scope)}
+                                            disabled={readOnly || belowInheritedScope}
+                                            title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                            className={cn(
+                                              'whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-medium transition-all',
+                                              rule.scope === scope
+                                                ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-900',
+                                              (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
+                                            )}
+                                          >
+                                            {scope}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    {rule.scope === 'All' && (
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {rule.exceptions?.map(ex => {
+                                          const targetName = ex.type === 'department'
+                                            ? departments.find(d => d.id === ex.targetId)?.name
+                                            : ex.type === 'service'
+                                              ? verticals.find(v => v.id === ex.targetId)?.name
+                                              : (() => {
+                                                  const manager = users.find(user => user.id === ex.targetId);
+                                                  return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                                })();
+                                          return (
+                                            <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-brand/20 bg-orange-50 px-2 py-1 text-[10.5px] font-medium text-brand">
+                                              Except: {targetName}
+                                              {!readOnly && !isInherited && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeException(module.id, action.id, ex.id)}
+                                                  aria-label={`Remove ${targetName} exception`}
+                                                  className="text-brand/60 hover:text-brand"
+                                                >
+                                                  <X size={11} />
+                                                </button>
+                                              )}
+                                            </span>
+                                          );
+                                        })}
+                                        {!readOnly && !isInherited && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setExceptionDialogTarget({
+                                              moduleId: module.id,
+                                              actionId: action.id,
+                                              title: `${module.label} > ${action.label}`,
+                                            })}
+                                            className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-brand hover:underline"
+                                          >
+                                            <Plus size={11} /> Add Exception
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    ];
+                  })}
+                </TableBody>
+              </Table>
             </div>
-          ))}
+          </div>
         </div>
       )}
 
