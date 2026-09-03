@@ -517,7 +517,7 @@ export function ProjectsTable({
               return (
                 <TableRow
                   key={p.id}
-                  onClick={() => router.push(`/projects/${p.id}/tasks?from=list`)}
+                  onClick={() => router.push(`/projects/${p.id}`)}
                   className={cn(
                     'cursor-pointer border-b border-gray-100 transition-colors',
                     isSelected ? 'bg-brand/5 hover:bg-brand/8' : 'hover:bg-gray-50/70',

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
-import { ProjectDetailScreen } from '@/screens/projects/ProjectDetailScreen';
+import { ProjectTasksScreen } from '@/screens/projects/ProjectTasksScreen';
 import { MOCK_PROJECTS } from '@/screens/projects/mock-data';
 
 interface Props {
@@ -19,10 +19,10 @@ export default function ProjectDetailPage({ params }: Props) {
     <AppShell
       breadcrumbs={[
         { label: 'Projects', href: '/projects' },
-        { label: project.title },
+        { label: 'Project Detail' },
       ]}
     >
-      <ProjectDetailScreen project={project} />
+      <ProjectTasksScreen />
     </AppShell>
   );
 }
