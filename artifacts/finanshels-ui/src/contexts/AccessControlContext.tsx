@@ -5,6 +5,8 @@ import {
   MOCK_ROLES,
   MODULES,
   inheritBasePermissions,
+  normalizeDataScope,
+  normalizePermissionScope,
   type AppRole,
   type PermissionRule,
   type RoleStatus,
@@ -33,11 +35,11 @@ function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
     const baseRole = inheritedBaseRoleId
       ? MOCK_ROLES.find(seed => seed.id === inheritedBaseRoleId)
       : undefined;
-    const defaultDataScope = role.defaultDataScope
+    const defaultDataScope = normalizeDataScope(role.defaultDataScope
       ?? seededRole?.defaultDataScope
       ?? baseRole?.defaultDataScope
       ?? role.permissions.find(permission => permission.enabled)?.scope
-      ?? 'All';
+      ?? 'All');
     const permissions = MODULES.flatMap(module => module.actions.map(action => {
       const persistedRule = role.permissions.find(
         permission => permission.moduleId === module.id && permission.actionId === action.id,
@@ -45,12 +47,20 @@ function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
       const seededRule = seededRole?.permissions.find(
         permission => permission.moduleId === module.id && permission.actionId === action.id,
       );
-      return persistedRule ?? seededRule ?? {
-        moduleId: module.id,
-        actionId: action.id,
-        enabled: false,
-        scope: defaultDataScope,
-        exceptions: [],
+      const sourceRule = persistedRule ?? seededRule;
+      if (!sourceRule) {
+        return {
+          moduleId: module.id,
+          actionId: action.id,
+          enabled: false,
+          scope: normalizePermissionScope(module.id, defaultDataScope),
+          exceptions: [],
+        };
+      }
+      return {
+        ...sourceRule,
+        scope: normalizePermissionScope(module.id, sourceRule.scope, defaultDataScope),
+        exceptions: sourceRule.exceptions ?? [],
       };
     }));
 
@@ -114,7 +124,12 @@ export function AccessControlProvider({ children }: { children: ReactNode }) {
   }
 
   function updateRolePermissions(roleId: string, permissions: PermissionRule[]) {
-    setRoles(current => current.map(r => r.id === roleId ? { ...r, permissions } : r));
+    const normalizedPermissions = permissions.map(rule => ({
+      ...rule,
+      scope: normalizePermissionScope(rule.moduleId, rule.scope),
+      exceptions: rule.exceptions ?? [],
+    }));
+    setRoles(current => current.map(r => r.id === roleId ? { ...r, permissions: normalizedPermissions } : r));
   }
 
   function setRoleStatus(roleId: string, status: RoleStatus) {

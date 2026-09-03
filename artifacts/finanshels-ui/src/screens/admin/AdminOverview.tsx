@@ -9,7 +9,7 @@ import { useOrgContext } from '@/contexts/OrgContext';
 const SECTIONS = [
   { label: 'Users', description: 'Assign roles, groups, organisation placement, and reporting managers.', href: '/settings/users', icon: Users },
   { label: 'Roles', description: 'Create reusable access profiles for individuals and employee groups.', href: '/settings/roles', icon: Shield },
-  { label: 'Permissions', description: 'Configure actions, Own/Team/All scope, and controlled exceptions.', href: '/settings/permissions', icon: KeyRound },
+  { label: 'Permissions', description: 'Configure module actions with Own, Reporting Team, or All scope.', href: '/settings/permissions', icon: KeyRound },
   { label: 'Employee Groups', description: 'Group employees and grant inherited roles without replacing direct access.', href: '/settings/employee-management', icon: UsersRound },
   { label: 'Organisation', description: 'Maintain departments, services, and teams used by scoped access rules.', href: '/settings/organisation', icon: Building2 },
 ];

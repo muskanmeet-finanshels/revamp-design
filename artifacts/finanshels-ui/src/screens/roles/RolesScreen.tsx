@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import {
   MOCK_ROLES, MODULES,
   allPermissionsFor, fullPermissions, inheritBasePermissions, normalizeModulePermissions,
+  resolveRolePermissions,
   type AppRole, type RoleType, type RoleStatus, type PermissionRule, type DataScope,
 } from './mock-data';
 import type { AppUser, EmployeeGroup } from '@/screens/users/mock-data';
@@ -281,7 +282,7 @@ function RoleDrawer({ open, onClose, editRole, cloneSource, baseRoles, onSave }:
       permissions,
       ...(!editRole && {
         baseRoleId,
-        defaultDataScope: baseRole ? roleDefaultScope(baseRole) : 'Team',
+        defaultDataScope: baseRole ? roleDefaultScope(baseRole) : 'Reporting Team',
       }),
     });
   }
@@ -481,7 +482,7 @@ function ViewPermissionsModal({
               <div>
                 <p className="text-[14px] font-semibold text-gray-900">Detailed Action & Scope Matrix</p>
                 <p className="text-[12.5px] text-gray-500 mt-1 max-w-sm">
-                  Permissions are now configured at a granular action level with Data Scopes (Own/Team/All).
+                  Permissions are configured per module and action with Data Scopes (Own/Reporting Team/All).
                 </p>
               </div>
               <a
@@ -624,7 +625,7 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
 
   const transferRole = transferOptions.find(r => r.id === transferRoleId);
   const canConfirm   = !hasAssignments || Boolean(transferRoleId);
-  const granted      = countEnabledModules(role.permissions);
+  const granted      = countEnabledModules(resolveRolePermissions(role, allRoles));
   const coverage     = Math.round((granted / MODULES.length) * 100);
 
   function handleConfirm() {
@@ -1149,7 +1150,7 @@ export function RolesScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                 {/* Permissions coverage */}
                 <TableCell className="py-3.5">
-                  <CoverageBar permissions={role.permissions} />
+                  <CoverageBar permissions={resolveRolePermissions(role, roles)} />
                 </TableCell>
 
                 {/* User count — clickable to show assigned users */}

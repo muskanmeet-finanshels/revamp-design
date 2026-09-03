@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ShieldCheck, ArrowLeft, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MODULES, type AppRole, type DataScope, type ScopeException } from '@/screens/roles/mock-data';
+import {
+  MODULES,
+  resolveRolePermissions,
+  type AppRole,
+  type DataScope,
+  type ScopeException,
+} from '@/screens/roles/mock-data';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 import { useAccessControlContext, resolveEffectiveRoleNames } from '@/contexts/AccessControlContext';
 import { useOrgContext } from '@/contexts/OrgContext';
@@ -17,7 +23,7 @@ interface EffectiveAccessDrawerProps {
 
 const SCOPE_PRIORITY: Record<DataScope, number> = {
   All: 3,
-  Team: 2,
+  'Reporting Team': 2,
   Own: 1,
 };
 
@@ -79,7 +85,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
     const map = new Map<string, { scope: DataScope, sources: string[], exceptions: ScopeException[] }>();
 
     for (const role of effectiveRoles) {
-      for (const rule of role.permissions) {
+      for (const rule of resolveRolePermissions(role, allRoles)) {
         if (!rule.enabled) continue;
         
         const key = `${rule.moduleId}:${rule.actionId}`;
@@ -99,7 +105,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
       }
     }
     return map;
-  }, [effectiveRoles]);
+  }, [allRoles, effectiveRoles]);
 
   if (!mounted || !user) return null;
 
@@ -190,7 +196,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                                 <span className={cn(
                                   'text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider',
                                   access.scope === 'All' ? 'bg-emerald-100 text-emerald-700' :
-                                  access.scope === 'Team' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                                  access.scope === 'Reporting Team' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
                                 )}>{access.scope}</span>
                               </div>
                               <p className="text-[11.5px] text-gray-400 mb-1">
@@ -199,7 +205,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                               {access.scope === 'Own' && (
                                 <p className="text-[11px] text-gray-500 italic">User's own assigned records only.</p>
                               )}
-                              {access.scope === 'Team' && (
+                              {access.scope === 'Reporting Team' && (
                                 <p className="text-[11px] text-gray-500 italic">
                                   User&apos;s own records plus {activeReports.length} active direct/indirect {activeReports.length === 1 ? 'report' : 'reports'}
                                   {activeReports.length > 0 ? ` (${activeReports.map(report => `${report.firstName} ${report.lastName}`).join(', ')})` : ''}.

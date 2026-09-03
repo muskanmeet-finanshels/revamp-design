@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   MODULES,
-  inheritBasePermissions,
+  resolveRolePermissions,
   type PermissionRule,
   type DataScope,
   type ScopeException,
@@ -35,7 +35,7 @@ function cloneRules(rules: PermissionRule[]): PermissionRule[] {
 
 const SCOPE_RANK: Record<DataScope, number> = {
   Own: 0,
-  Team: 1,
+  'Reporting Team': 1,
   All: 2,
 };
 
@@ -160,24 +160,17 @@ export function PermissionsScreen() {
     [roles, selectedRole.baseRoleId],
   );
 
-  const [permissions, setPermissions] = useState<PermissionRule[]>(() => cloneRules(
-    baseRole
-      ? inheritBasePermissions(baseRole.permissions, selectedRole.permissions)
-      : selectedRole.permissions,
-  ));
+  const [permissions, setPermissions] = useState<PermissionRule[]>(() =>
+    cloneRules(resolveRolePermissions(selectedRole, roles)));
   const [isSaved, setIsSaved] = useState(true);
   const [permissionSearch, setPermissionSearch] = useState('');
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
 
   useEffect(() => {
-    setPermissions(cloneRules(
-      baseRole
-        ? inheritBasePermissions(baseRole.permissions, selectedRole.permissions)
-        : selectedRole.permissions,
-    ));
+    setPermissions(cloneRules(resolveRolePermissions(selectedRole, roles)));
     setIsSaved(true);
-  }, [selectedRole, baseRole]);
+  }, [selectedRole, baseRole, roles]);
 
   const granted = countGrantedModules(permissions);
   const total = MODULES.length;
@@ -195,7 +188,8 @@ export function PermissionsScreen() {
     setPermissions(current => {
       const idx = current.findIndex(r => r.moduleId === moduleId && r.actionId === actionId);
       if (idx === -1) {
-        return [...current, { moduleId, actionId, enabled: false, scope: 'Own', exceptions: [], ...updates }];
+        const defaultScope = MODULES.find(module => module.id === moduleId)?.availableScopes[0] ?? 'All';
+        return [...current, { moduleId, actionId, enabled: false, scope: defaultScope, exceptions: [], ...updates }];
       }
       const newRules = [...current];
       newRules[idx] = { ...newRules[idx], ...updates };
@@ -213,6 +207,8 @@ export function PermissionsScreen() {
   }
 
   function setScope(moduleId: string, actionId: string, scope: DataScope) {
+    const module = MODULES.find(item => item.id === moduleId);
+    if (!module?.availableScopes.includes(scope)) return;
     const inheritedRule = baseRole?.permissions.find(
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
@@ -221,6 +217,10 @@ export function PermissionsScreen() {
   }
 
   function addException(moduleId: string, actionId: string, exceptionData: Omit<ScopeException, 'id'>) {
+    const inheritedRule = baseRole?.permissions.find(
+      rule => rule.moduleId === moduleId && rule.actionId === actionId,
+    );
+    if (inheritedRule?.enabled) return;
     setPermissions(current => {
       const idx = current.findIndex(r => r.moduleId === moduleId && r.actionId === actionId);
       if (idx === -1) return current;
@@ -246,7 +246,13 @@ export function PermissionsScreen() {
 
   function getRule(moduleId: string, actionId: string) {
     return permissions.find(r => r.moduleId === moduleId && r.actionId === actionId)
-      || { moduleId, actionId, enabled: false, scope: 'Own' as DataScope, exceptions: [] };
+      || {
+        moduleId,
+        actionId,
+        enabled: false,
+        scope: MODULES.find(module => module.id === moduleId)?.availableScopes[0] ?? 'All',
+        exceptions: [],
+      };
   }
 
   function savePermissions() {
@@ -261,7 +267,7 @@ export function PermissionsScreen() {
         <div>
           <h2 className="text-[18px] font-bold text-gray-900">Permissions Configuration</h2>
           <p className="mt-0.5 text-[13px] text-gray-500">
-            Configure action-level access, data scope, and exceptions per role.
+            Configure each role using Module + Action + Data Scope. Available scopes vary by module.
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
@@ -287,6 +293,28 @@ export function PermissionsScreen() {
             </Select>
           </div>
         </div>
+      </div>
+
+      <div className="mb-6 grid gap-3 md:grid-cols-3">
+        {([
+          {
+            scope: 'Own',
+            description: "User's own records.",
+          },
+          {
+            scope: 'Reporting Team',
+            description: "User's own records and records belonging to users below them.",
+          },
+          {
+            scope: 'All',
+            description: 'All applicable records in the organisation.',
+          },
+        ] as Array<{ scope: DataScope; description: string }>).map(item => (
+          <div key={item.scope} className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[12.5px] font-semibold text-gray-900">{item.scope}</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-gray-500">{item.description}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mb-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -323,8 +351,19 @@ export function PermissionsScreen() {
         ) : filteredModules.map(module => {
           return (
             <div key={module.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-              <div className="bg-gray-50 border-b border-gray-100 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-5 py-3">
                 <h4 className="text-[14px] font-semibold text-gray-900">{module.label}</h4>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10.5px] font-medium text-gray-400">Available scopes:</span>
+                  {module.availableScopes.map(scope => (
+                    <span
+                      key={scope}
+                      className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[10.5px] font-medium text-gray-600"
+                    >
+                      {scope}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="divide-y divide-gray-100">
                 {module.actions.map(action => {
@@ -364,9 +403,9 @@ export function PermissionsScreen() {
                       {isEnabled && (
                         <div className="flex-1 flex flex-col gap-3 pl-8 lg:pl-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] text-gray-500 w-12">Scope:</span>
+                            <span className="w-20 text-[12px] text-gray-500">Data Scope:</span>
                             <div className="flex bg-gray-100/80 p-0.5 rounded-lg border border-gray-200/60">
-                              {(['Own', 'Team', 'All'] as DataScope[]).map(scope => (
+                              {module.availableScopes.map(scope => (
                                 (() => {
                                   const belowInheritedScope = Boolean(
                                     inheritedRule?.enabled
@@ -423,13 +462,18 @@ export function PermissionsScreen() {
                                   })}
                                 </div>
                               )}
-                              {!readOnly && (
+                              {!readOnly && !isInherited && (
                                 <button
                                   onClick={() => setExceptionDialogTarget({ moduleId: module.id, actionId: action.id, title: `${module.label} > ${action.label}` })}
                                   className="text-[11.5px] font-medium text-brand hover:underline inline-flex items-center gap-1 w-fit"
                                 >
                                   <Plus size={12} /> Add Exception
                                 </button>
+                              )}
+                              {isInherited && (
+                                <p className="text-[11px] text-gray-400">
+                                  Inherited access cannot be narrowed with new exceptions.
+                                </p>
                               )}
                             </div>
                           )}
