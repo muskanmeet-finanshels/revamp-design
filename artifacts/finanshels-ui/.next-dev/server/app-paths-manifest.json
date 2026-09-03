@@ -1,0 +1,8 @@
+{
+  "/projects/page": "app/projects/page.js",
+  "/settings/users/page": "app/settings/users/page.js",
+  "/settings/permissions/page": "app/settings/permissions/page.js",
+  "/settings/roles/page": "app/settings/roles/page.js",
+  "/projects/[id]/page": "app/projects/[id]/page.js",
+  "/page": "app/page.js"
+}
