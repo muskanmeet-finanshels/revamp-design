@@ -1546,7 +1546,7 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
 
                   {/* Role */}
                   <TableCell className="py-3">
-                    <div className="text-[13px] font-normal leading-relaxed text-gray-700">
+                    <div className="whitespace-nowrap text-[13px] font-normal leading-relaxed text-gray-700">
                       {u.roles[0] ?? '—'}
                     </div>
                   </TableCell>
