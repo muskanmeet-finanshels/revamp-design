@@ -298,7 +298,7 @@ function RolePermissionTable({
       ) : (
         <div className="space-y-3 bg-gray-50/50 p-3 sm:p-4">
           {filteredModules.map(module => (
-            <div key={module.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div key={module.id} className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-3">
                 <h4 className="text-[13.5px] font-semibold text-gray-900">{module.label}</h4>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -313,15 +313,16 @@ function RolePermissionTable({
                   ))}
                 </div>
               </div>
-              <Table className="w-full min-w-[760px] table-auto">
-                <TableHeader className="whitespace-nowrap">
-                  <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="w-[260px] pl-4">Permission</TableHead>
-                    <TableHead className="w-[320px]">Data Scope</TableHead>
-                    <TableHead className="pr-4">Exceptions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+                <Table className="w-full min-w-[760px] table-auto">
+                  <TableHeader className="whitespace-nowrap">
+                    <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="w-[260px] pl-4">Permission</TableHead>
+                      <TableHead className="w-[320px]">Data Scope</TableHead>
+                      <TableHead className="pr-4">Exceptions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="whitespace-nowrap">
                 {module.actions.map(action => {
                   const rule = getRule(module.id, action.id);
                   const isEnabled = rule.enabled;
@@ -440,8 +441,9 @@ function RolePermissionTable({
                     </TableRow>
                   );
                 })}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ))}
         </div>
