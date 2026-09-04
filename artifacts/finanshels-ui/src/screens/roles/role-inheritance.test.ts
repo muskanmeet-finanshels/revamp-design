@@ -5,6 +5,8 @@ import {
   MODULES,
   convertLegacyPermissions,
   inheritBasePermissions,
+  isRoleOnlyPermissionModule,
+  normalizeModulePermissions,
   normalizePermissionScope,
   resolveRolePermissions,
 } from './mock-data.ts';
@@ -49,6 +51,54 @@ test('all required data scopes are available and legacy Team values are migrated
   );
   assert.equal(normalizePermissionScope('projects', 'Team'), 'Reporting Team');
   assert.equal(normalizePermissionScope('users', 'Team'), 'All');
+});
+
+test('role-only modules always use All access and discard ownership exceptions', () => {
+  const roleOnlyModuleIds = [
+    'project_task_configuration',
+    'users',
+    'services',
+    'content_management',
+    'settings',
+    'system_settings',
+  ];
+  assert.deepEqual(
+    roleOnlyModuleIds.map(moduleId => isRoleOnlyPermissionModule(moduleId)),
+    roleOnlyModuleIds.map(() => true),
+  );
+  assert.equal(isRoleOnlyPermissionModule('projects'), false);
+
+  const [roleOnlyRule, recordRule] = normalizeModulePermissions([
+    {
+      moduleId: 'content_management',
+      actionId: 'view',
+      enabled: true,
+      scope: 'Own',
+      exceptions: [{
+        id: 'invalid-role-only-exception',
+        type: 'department',
+        targetId: 'department-1',
+        hierarchyApplies: false,
+      }],
+    },
+    {
+      moduleId: 'projects',
+      actionId: 'view',
+      enabled: true,
+      scope: 'All',
+      exceptions: [{
+        id: 'valid-record-exception',
+        type: 'department',
+        targetId: 'department-1',
+        hierarchyApplies: false,
+      }],
+    },
+  ]);
+
+  assert.equal(roleOnlyRule.scope, 'All');
+  assert.deepEqual(roleOnlyRule.exceptions, []);
+  assert.equal(recordRule.scope, 'All');
+  assert.equal(recordRule.exceptions.length, 1);
 });
 
 test('specialized roles cannot narrow inherited access with new exceptions', () => {

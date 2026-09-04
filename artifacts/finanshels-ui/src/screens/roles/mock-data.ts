@@ -202,6 +202,21 @@ export function normalizePermissionScope(
     : allowedScopes[0] ?? 'All';
 }
 
+/** Organisation-wide modules are granted solely by their enabled role actions. */
+export function isRoleOnlyPermissionModule(moduleId: string): boolean {
+  const availableScopes = MODULES.find(module => module.id === moduleId)?.availableScopes;
+  return availableScopes?.length === 1 && availableScopes[0] === 'All';
+}
+
+/** Ownership exceptions never apply to organisation-wide, role-only modules. */
+export function normalizePermissionExceptions(
+  moduleId: string,
+  exceptions: ScopeException[] | undefined,
+): ScopeException[] {
+  if (isRoleOnlyPermissionModule(moduleId)) return [];
+  return (exceptions ?? []).map(exception => ({ ...exception }));
+}
+
 /* All permissions map (module → all action ids) */
 export function allPermissionsFor(moduleId: string): string[] {
   return MODULES.find(m => m.id === moduleId)?.actions.map(a => a.id) ?? [];
@@ -272,7 +287,7 @@ export function normalizeModulePermissions(permissions: PermissionRule[]): Permi
   return permissions.map(rule => ({
     ...rule,
     scope: normalizePermissionScope(rule.moduleId, rule.scope),
-    exceptions: rule.exceptions ?? [],
+    exceptions: normalizePermissionExceptions(rule.moduleId, rule.exceptions),
   }));
 }
 
@@ -349,6 +364,7 @@ export function inheritBasePermissions(
     const normalizedBaseRule = {
       ...baseRule,
       scope: normalizePermissionScope(baseRule.moduleId, baseRule.scope),
+      exceptions: normalizePermissionExceptions(baseRule.moduleId, baseRule.exceptions),
     };
     const specializedRule = specializedPermissions.find(
       rule => rule.moduleId === baseRule.moduleId && rule.actionId === baseRule.actionId,
@@ -363,6 +379,7 @@ export function inheritBasePermissions(
     const normalizedSpecializedRule = {
       ...specializedRule,
       scope: normalizePermissionScope(specializedRule.moduleId, specializedRule.scope),
+      exceptions: normalizePermissionExceptions(specializedRule.moduleId, specializedRule.exceptions),
     };
 
     if (!normalizedBaseRule.enabled) {
@@ -402,7 +419,7 @@ export function inheritBasePermissions(
       .map(rule => ({
         ...rule,
         scope: normalizePermissionScope(rule.moduleId, rule.scope),
-        exceptions: rule.exceptions.map(exception => ({ ...exception })),
+        exceptions: normalizePermissionExceptions(rule.moduleId, rule.exceptions),
       })),
   ];
 }

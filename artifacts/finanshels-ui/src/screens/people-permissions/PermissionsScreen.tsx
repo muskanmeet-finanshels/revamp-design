@@ -6,6 +6,7 @@ import { ChevronDown, Lock, Pencil, Save, SearchX, Plus, X } from 'lucide-react'
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
+  isRoleOnlyPermissionModule,
   MODULES,
   resolveRolePermissions,
   type AppRole,
@@ -253,6 +254,7 @@ function RolePermissionTable({
   }
 
   function addException(moduleId: string, actionId: string, exceptionData: Omit<ScopeException, 'id'>) {
+    if (isRoleOnlyPermissionModule(moduleId)) return;
     const inheritedRule = basePermissions.find(
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
@@ -357,34 +359,47 @@ function RolePermissionTable({
                   const enabledRules = module.actions
                     .map(action => ({ action, rule: getRule(module.id, action.id) }))
                     .filter(item => item.rule.enabled);
+                  const roleOnlyAccess = isRoleOnlyPermissionModule(module.id);
                   const enabledScopes = new Set(enabledRules.map(item => item.rule.scope));
                   const scopeSummary = enabledRules.length === 0
                     ? 'No permissions enabled'
-                    : enabledScopes.size === 1
+                    : roleOnlyAccess
+                      ? `${enabledRules.length} of ${module.actions.length} · Role-based access`
+                      : enabledScopes.size === 1
                       ? `${enabledRules.length} of ${module.actions.length} · ${scopeLabel(enabledRules[0].rule.scope)}`
                       : `${enabledRules.length} of ${module.actions.length} · Mixed scopes`;
-                  const scopeExpanded = expandedScopeModules.has(module.id);
+                  const scopeExpanded = !roleOnlyAccess && expandedScopeModules.has(module.id);
 
                   return (
                     <Fragment key={module.id}>
                       <tr className="group transition-colors hover:bg-gray-50/70">
                       <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle transition-colors group-hover:bg-gray-50">
-                        <button
-                          type="button"
-                          onClick={() => toggleScopeModule(module.id)}
-                          aria-expanded={scopeExpanded}
-                          aria-controls={`module-permissions-${module.id}`}
-                          className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
-                        >
-                          <ChevronDown
-                            size={14}
-                            className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
-                            <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
-                          </span>
-                        </button>
+                        {roleOnlyAccess ? (
+                          <div className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5">
+                            <span className="h-[14px] w-[14px] flex-shrink-0" aria-hidden="true" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
+                              <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleScopeModule(module.id)}
+                            aria-expanded={scopeExpanded}
+                            aria-controls={`module-permissions-${module.id}`}
+                            className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                          >
+                            <ChevronDown
+                              size={14}
+                              className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
+                              <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                            </span>
+                          </button>
+                        )}
                       </td>
 
                       {matrixActions.map(action => {

@@ -7,6 +7,7 @@ import {
   findCompatiblePermissionRule,
   inheritBasePermissions,
   normalizeDataScope,
+  normalizePermissionExceptions,
   normalizePermissionScope,
   type AppRole,
   type PermissionRule,
@@ -59,7 +60,7 @@ function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
       return {
         ...sourceRule,
         scope: normalizePermissionScope(module.id, sourceRule.scope, defaultDataScope),
-        exceptions: sourceRule.exceptions ?? [],
+        exceptions: normalizePermissionExceptions(module.id, sourceRule.exceptions),
       };
     }));
 
@@ -126,7 +127,7 @@ export function AccessControlProvider({ children }: { children: ReactNode }) {
     const normalizedPermissions = permissions.map(rule => ({
       ...rule,
       scope: normalizePermissionScope(rule.moduleId, rule.scope),
-      exceptions: rule.exceptions ?? [],
+      exceptions: normalizePermissionExceptions(rule.moduleId, rule.exceptions),
     }));
     setRoles(current => current.map(r => r.id === roleId ? { ...r, permissions: normalizedPermissions } : r));
   }
