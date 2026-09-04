@@ -320,7 +320,7 @@ function RolePermissionTable({
 
   return (
     <div className="min-w-0">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3.5 sm:px-5">
+      <div className="flex items-center justify-between gap-3 px-1 pb-3 pt-1">
         <div>
           <p className="text-[13px] font-semibold text-gray-900">Permission matrix</p>
           <p className="mt-0.5 text-[11px] text-gray-500">{granted} of {total} modules enabled</p>
@@ -358,27 +358,26 @@ function RolePermissionTable({
       </div>
 
       {filteredModules.length === 0 ? (
-        <div className="p-5">
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
         </div>
       ) : (
-        <div className="bg-white">
-          <div className="overflow-hidden border-t border-gray-200 bg-white">
-            <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
               <table
-                className="w-full min-w-[820px] table-auto"
+                className="w-full min-w-[1760px] table-auto"
               >
                 <colgroup>
-                  <col className="min-w-[220px]" />
-                  {matrixActions.map(action => <col key={action.id} className="w-[86px]" />)}
+                  <col className="w-[250px]" />
+                  {matrixActions.map(action => <col key={action.id} className="w-[76px]" />)}
                 </colgroup>
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+                <thead className="whitespace-nowrap">
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="sticky left-0 z-10 h-10 bg-gray-50 px-4 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-700 shadow-[1px_0_0_#e5e7eb]">
                       Module
                     </th>
                 {matrixActions.map(action => (
-                  <th key={action.id} className="border-b border-r border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-600 last:border-r-0">
+                  <th key={action.id} className="h-10 bg-gray-50 px-2 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-600">
                     {action.label}
                   </th>
                 ))}
@@ -402,14 +401,14 @@ function RolePermissionTable({
 
                   return (
                     <Fragment key={module.id}>
-                      <tr className="group transition-colors hover:bg-gray-50/70">
-                      <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle transition-colors group-hover:bg-gray-50">
+                      <tr className="group border-b border-gray-100 transition-colors hover:bg-gray-50/70">
+                      <td className="sticky left-0 z-[5] min-w-0 bg-white p-0 align-middle shadow-[1px_0_0_#f3f4f6] transition-colors group-hover:bg-gray-50">
                         {roleOnlyAccess ? (
-                          <div className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5">
+                          <div className="flex min-h-[52px] w-full min-w-0 items-center gap-2.5 px-4 py-2.5">
                             <span className="h-[14px] w-[14px] flex-shrink-0" aria-hidden="true" />
                             <span className="min-w-0">
-                              <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
-                              <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                              <span className="block truncate text-[13px] font-semibold leading-snug text-gray-900">{module.label}</span>
+                              <span className="mt-0.5 block truncate text-[10px] text-gray-400">{scopeSummary}</span>
                             </span>
                           </div>
                         ) : (
@@ -418,15 +417,15 @@ function RolePermissionTable({
                             onClick={() => toggleScopeModule(module.id)}
                             aria-expanded={scopeExpanded}
                             aria-controls={`module-permissions-${module.id}`}
-                            className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                            className="flex min-h-[52px] w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
                           >
                             <ChevronDown
                               size={14}
                               className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
                             />
                             <span className="min-w-0">
-                              <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
-                              <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                              <span className="block truncate text-[13px] font-semibold leading-snug text-gray-900">{module.label}</span>
+                              <span className="mt-0.5 block truncate text-[10px] text-gray-400">{scopeSummary}</span>
                             </span>
                           </button>
                         )}
@@ -436,7 +435,7 @@ function RolePermissionTable({
                         const supportedAction = module.actions.find(candidate => candidate.id === action.id);
                         if (!supportedAction) {
                           return (
-                            <td key={action.id} className="border-b border-r border-gray-100 px-2 py-2.5 text-center align-middle last:border-r-0">
+                            <td key={action.id} className="h-[52px] px-2 py-3 text-center align-middle">
                               <span className="text-gray-200">—</span>
                             </td>
                           );
@@ -449,7 +448,7 @@ function RolePermissionTable({
                         const isInherited = Boolean(inheritedRule?.enabled);
 
                         return (
-                          <td key={action.id} className="border-b border-r border-gray-100 px-2 py-2.5 text-center align-middle last:border-r-0">
+                          <td key={action.id} className="h-[52px] px-2 py-3 text-center align-middle">
                             <Checkbox
                               checked={rule.enabled}
                               onCheckedChange={() => toggleAction(module.id, action.id, rule.enabled)}
@@ -466,10 +465,10 @@ function RolePermissionTable({
                       })}
                       </tr>
                       {scopeExpanded && (
-                        <tr id={`module-permissions-${module.id}`}>
+                        <tr id={`module-permissions-${module.id}`} className="border-b border-gray-100">
                           <td
                             colSpan={matrixActions.length + 1}
-                            className="border-b border-gray-100 bg-gray-50 px-4 py-4"
+                            className="bg-gray-50 px-4 py-4"
                           >
                           {enabledRules.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3">
@@ -613,7 +612,6 @@ function RolePermissionTable({
                 </tbody>
               </table>
             </div>
-          </div>
         </div>
       )}
 
