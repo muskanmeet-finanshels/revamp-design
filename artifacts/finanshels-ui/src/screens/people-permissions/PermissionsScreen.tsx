@@ -21,6 +21,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Empty } from '@/components/ui/empty';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 /* ── Helpers ── */
@@ -636,9 +637,7 @@ export function PermissionsScreen() {
   const initialExpandedRoleId = roles.some(role => role.id === defaultExpandedRoleId)
     ? defaultExpandedRoleId
     : roles[0]?.id;
-  const [expandedRoleIds, setExpandedRoleIds] = useState<Set<string>>(
-    () => initialExpandedRoleId ? new Set([initialExpandedRoleId]) : new Set(),
-  );
+  const [selectedRoleId, setSelectedRoleId] = useState(initialExpandedRoleId ?? '');
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [permissionSearch, setPermissionSearch] = useState('');
 
@@ -649,27 +648,17 @@ export function PermissionsScreen() {
   }, [permissionSearch]);
 
   useEffect(() => {
-    setExpandedRoleIds(current => {
-      const validRoleIds = new Set(roles.map(role => role.id));
-      const next = new Set([...current].filter(roleId => validRoleIds.has(roleId)));
-      if (next.size > 0 || roles.length === 0) return next;
+    if (!roles.some(role => role.id === selectedRoleId)) {
+      setSelectedRoleId(roles[0]?.id ?? '');
+    }
+  }, [roles, selectedRoleId]);
 
-      const fallbackRoleId = roles.some(role => role.id === defaultExpandedRoleId)
-        ? defaultExpandedRoleId
-        : roles[0]?.id;
-      return fallbackRoleId ? new Set([fallbackRoleId]) : next;
-    });
-  }, [defaultExpandedRoleId, roles]);
-
-  function toggleRole(roleId: string) {
-    if (editingRoleId === roleId) return;
-    setExpandedRoleIds(current => {
-      const next = new Set(current);
-      if (next.has(roleId)) next.delete(roleId);
-      else next.add(roleId);
-      return next;
-    });
-  }
+  const selectedRole = roles.find(role => role.id === selectedRoleId) ?? roles[0];
+  const selectedEffectivePermissions = selectedRole
+    ? resolveRolePermissions(selectedRole, roles)
+    : [];
+  const selectedEnabledModules = countGrantedModules(selectedEffectivePermissions);
+  const selectedEnabledActions = selectedEffectivePermissions.filter(permission => permission.enabled).length;
 
   return (
     <div className="px-6 py-6 lg:px-8">
@@ -692,86 +681,91 @@ export function PermissionsScreen() {
       {roles.length === 0 ? (
         <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
       ) : (
-        <div className="space-y-3">
-          {roles.map(role => {
-            const expanded = expandedRoleIds.has(role.id);
-            const effectivePermissions = resolveRolePermissions(role, roles);
-            const enabledModules = countGrantedModules(effectivePermissions);
-            const enabledActions = effectivePermissions.filter(permission => permission.enabled).length;
-            const isEditing = editingRoleId === role.id;
-
-            return (
-              <section
-                key={role.id}
-                className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleRole(role.id)}
-                  disabled={isEditing}
-                  aria-expanded={expanded}
-                  aria-controls={`role-permissions-${role.id}`}
-                  title={isEditing ? 'Finish editing before collapsing this role' : undefined}
-                  className={cn(
-                    'flex w-full items-center gap-3 px-5 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
-                    expanded ? 'bg-white' : 'hover:bg-gray-50/70',
-                    isEditing && 'cursor-default',
-                  )}
-                >
-                  <ChevronDown
-                    size={16}
+        <div>
+          <div className="-mx-6 lg:-mx-8">
+            <Tabs
+              value={selectedRole?.id ?? ''}
+              onValueChange={roleId => {
+                setSelectedRoleId(roleId);
+                setEditingRoleId(null);
+              }}
+            >
+              <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0 px-6 lg:px-8 flex-nowrap overflow-x-auto scrollbar-none">
+                {roles.map(role => (
+                  <TabsTrigger
+                    key={role.id}
+                    value={role.id}
                     className={cn(
-                      'flex-shrink-0 text-gray-400 transition-transform',
-                      !expanded && '-rotate-90',
+                      'relative shrink-0 rounded-none border-b-2 px-3.5 pb-3 pt-1 text-[13px] font-medium transition-colors focus-visible:ring-0 focus-visible:ring-offset-0',
+                      'data-[state=active]:bg-transparent data-[state=active]:shadow-none',
+                      role.id === selectedRole?.id
+                        ? 'border-brand text-brand'
+                        : 'border-transparent text-gray-500 hover:text-gray-700',
                     )}
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-[16px] font-semibold text-gray-900">{role.name}</h2>
-                      {role.isProtected && <Lock size={12} className="text-violet-500" />}
-                      <span className={cn(
-                        'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
-                        role.type === 'system' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600',
-                      )}>
-                        {role.type === 'system' ? 'Base role' : 'Specialized'}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 truncate text-[11px] text-gray-500">{role.description}</p>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-5 text-right sm:gap-6">
-                    <div>
-                      <p className="text-[12px] font-semibold text-gray-800">{enabledModules}/{MODULES.length}</p>
-                      <p className="text-[9.5px] text-gray-400">modules</p>
-                    </div>
-                    <div className="hidden sm:block">
-                      <p className="text-[12px] font-semibold text-gray-800">{enabledActions}</p>
-                      <p className="text-[9.5px] text-gray-400">actions</p>
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-semibold text-gray-800">{role.userCount}</p>
-                      <p className="text-[9.5px] text-gray-400">users</p>
-                    </div>
-                  </div>
-                </button>
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {role.name}
+                      {role.isProtected && <Lock size={11} />}
+                    </span>
+                    <span
+                      className={cn(
+                        'ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                        role.id === selectedRole?.id ? 'text-brand' : 'text-orange-500',
+                      )}
+                    >
+                      {role.userCount}
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
 
-                {expanded && (
-                  <div id={`role-permissions-${role.id}`} className="border-t border-gray-200 px-4 pb-4 sm:px-5">
-                    <RolePermissionTable
-                      key={role.id}
-                      role={role}
-                      roles={roles}
-                      filteredModules={filteredModules}
-                      editing={isEditing}
-                      onEdit={() => setEditingRoleId(role.id)}
-                      onCancel={() => setEditingRoleId(null)}
-                      onSaved={() => setEditingRoleId(null)}
-                    />
+          {selectedRole && (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 px-1 py-1">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-[16px] font-semibold text-gray-900">{selectedRole.name}</h2>
+                    {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
+                    <span className={cn(
+                      'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
+                      selectedRole.type === 'system' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600',
+                    )}>
+                      {selectedRole.type === 'system' ? 'Base role' : 'Specialized'}
+                    </span>
                   </div>
-                )}
+                  <p className="mt-0.5 text-[11px] text-gray-500">{selectedRole.description}</p>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-5 text-right sm:gap-6">
+                  <div>
+                    <p className="text-[12px] font-semibold text-gray-800">{selectedEnabledModules}/{MODULES.length}</p>
+                    <p className="text-[9.5px] text-gray-400">modules</p>
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-semibold text-gray-800">{selectedEnabledActions}</p>
+                    <p className="text-[9.5px] text-gray-400">actions</p>
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-semibold text-gray-800">{selectedRole.userCount}</p>
+                    <p className="text-[9.5px] text-gray-400">users</p>
+                  </div>
+                </div>
+              </div>
+              <section className="mt-3 overflow-hidden">
+                <RolePermissionTable
+                  key={selectedRole.id}
+                  role={selectedRole}
+                  roles={roles}
+                  filteredModules={filteredModules}
+                  editing={editingRoleId === selectedRole.id}
+                  onEdit={() => setEditingRoleId(selectedRole.id)}
+                  onCancel={() => setEditingRoleId(null)}
+                  onSaved={() => setEditingRoleId(null)}
+                />
               </section>
-            );
-          })}
+            </div>
+          )}
         </div>
       )}
     </div>
