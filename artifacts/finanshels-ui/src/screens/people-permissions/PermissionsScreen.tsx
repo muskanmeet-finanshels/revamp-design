@@ -345,12 +345,13 @@ function RolePermissionTable({
                   const scopeSummary = enabledRules.length === 0
                     ? 'No permissions enabled'
                     : enabledScopes.size === 1
-                      ? `${enabledRules.length} of ${module.actions.length} · ${enabledRules[0].rule.scope}`
+                      ? `${enabledRules.length} of ${module.actions.length} · ${scopeLabel(enabledRules[0].rule.scope)}`
                       : `${enabledRules.length} of ${module.actions.length} · Mixed scopes`;
                   const scopeExpanded = expandedScopeModules.has(module.id);
 
                   return (
                     <Fragment key={module.id}>
+                      <tr>
                       <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle">
                         <button
                           type="button"
@@ -387,7 +388,7 @@ function RolePermissionTable({
                         const isInherited = Boolean(inheritedRule?.enabled);
 
                         return (
-                          <div key={action.id} className="flex items-center justify-center border-b border-gray-100 px-2 py-3">
+                          <td key={action.id} className="border-b border-gray-100 px-2 py-3 text-center align-middle">
                             <input
                               type="checkbox"
                               checked={rule.enabled}
@@ -400,16 +401,16 @@ function RolePermissionTable({
                                 readOnly || isInherited ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                               )}
                             />
-                          </div>
+                          </td>
                         );
                       })}
-
+                      </tr>
                       {scopeExpanded && (
-                        <td
-                          id={`module-permissions-${module.id}`}
-                          colSpan={matrixActions.length + 1}
-                          className="border-b border-gray-100 bg-gray-50 px-4 py-4"
-                        >
+                        <tr id={`module-permissions-${module.id}`}>
+                          <td
+                            colSpan={matrixActions.length + 1}
+                            className="border-b border-gray-100 bg-gray-50 px-4 py-4"
+                          >
                           {enabledRules.length === 0 ? (
                             <p className="text-[11px] text-gray-500">Enable an action to configure its data scope.</p>
                           ) : (
@@ -505,16 +506,9 @@ function RolePermissionTable({
                               })}
                             </div>
                           )}
-                        </td>
+                          </td>
+                        </tr>
                       )}
-                    </tr>
-                    {scopeExpanded && (
-                      <tr>
-                        <td colSpan={matrixActions.length + 1} className="p-0">
-                          <div className="hidden" aria-hidden="true" />
-                        </td>
-                      </tr>
-                    )}
                     </Fragment>
                   );
                 })}
@@ -576,7 +570,7 @@ export function PermissionsScreen() {
       <div className="mb-5">
         <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
         <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-gray-500">
-          Expand a role to configure module access, actions, data scope, and specific exceptions.
+          Expand a role to configure module access, actions, data scope, and exceptions.
         </p>
         <div className="mt-4 w-full sm:max-w-sm">
           <SearchInput
