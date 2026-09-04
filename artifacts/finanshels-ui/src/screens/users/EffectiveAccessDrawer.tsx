@@ -37,7 +37,7 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
 
   const { groups, users } = useEmployeeGroupsContext();
   const { roles: allRoles } = useAccessControlContext();
-  const { departments, verticals } = useOrgContext();
+  const { departments, verticals, teams } = useOrgContext();
   const resolvedRoles = useMemo(
     () => user ? resolveEffectiveRoleNames(user.roles) : [],
     [user],
@@ -196,7 +196,8 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                                 <span className={cn(
                                   'text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider',
                                   access.scope === 'All' ? 'bg-emerald-100 text-emerald-700' :
-                                  access.scope === 'Reporting Team' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                                  access.scope === 'Reporting Team' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-gray-100 text-gray-700'
                                 )}>{access.scope}</span>
                               </div>
                               <p className="text-[11.5px] text-gray-400 mb-1">
@@ -218,13 +219,15 @@ export function EffectiveAccessDrawer({ user, onClose }: EffectiveAccessDrawerPr
                                       ? departments.find(d => d.id === ex.targetId)?.name 
                                       : ex.type === 'service'
                                         ? verticals.find(v => v.id === ex.targetId)?.name
-                                        : (() => {
-                                            const manager = users.find(candidate => candidate.id === ex.targetId);
-                                            return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                          })();
+                                        : ex.type === 'team'
+                                          ? teams.find(team => team.id === ex.targetId)?.name
+                                          : (() => {
+                                              const manager = users.find(candidate => candidate.id === ex.targetId);
+                                              return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                            })();
                                     return (
                                       <span key={ex.targetId} className="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-brand border border-brand/20">
-                                        Except {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : 'Manager'}: {targetName} {ex.hierarchyApplies && '(+Hierarchy)'}
+                                        Except {ex.type === 'department' ? 'Dept' : ex.type === 'service' ? 'Service' : ex.type === 'team' ? 'Team' : 'Manager'}: {targetName} {ex.hierarchyApplies && '(+Hierarchy)'}
                                       </span>
                                     );
                                   })}

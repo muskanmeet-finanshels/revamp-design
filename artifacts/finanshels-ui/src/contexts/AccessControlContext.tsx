@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import {
   MOCK_ROLES,
   MODULES,
+  findCompatiblePermissionRule,
   inheritBasePermissions,
   normalizeDataScope,
   normalizePermissionScope,
@@ -41,12 +42,10 @@ function normalizePersistedRoles(parsed: AppRole[]): AppRole[] {
       ?? role.permissions.find(permission => permission.enabled)?.scope
       ?? 'All');
     const permissions = MODULES.flatMap(module => module.actions.map(action => {
-      const persistedRule = role.permissions.find(
-        permission => permission.moduleId === module.id && permission.actionId === action.id,
-      );
-      const seededRule = seededRole?.permissions.find(
-        permission => permission.moduleId === module.id && permission.actionId === action.id,
-      );
+      const persistedRule = findCompatiblePermissionRule(role.permissions, module.id, action.id);
+      const seededRule = seededRole
+        ? findCompatiblePermissionRule(seededRole.permissions, module.id, action.id)
+        : undefined;
       const sourceRule = persistedRule ?? seededRule;
       if (!sourceRule) {
         return {

@@ -40,6 +40,13 @@ const SCOPE_RANK: Record<DataScope, number> = {
   All: 2,
 };
 
+function scopeLabel(scope: DataScope) {
+  if (scope === 'Own') return 'Own records';
+  if (scope === 'Reporting Team') return 'Reporting hierarchy';
+  if (scope === 'All') return 'All records';
+  return scope;
+}
+
 /* ── Exception Dialog ── */
 
 function ExceptionDialog({ open, onClose, onAdd, title }: {
@@ -49,8 +56,8 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
   title: string;
 }) {
   const { users } = useEmployeeGroupsContext();
-  const { departments, verticals } = useOrgContext();
-  const [type, setType] = useState<'department' | 'service' | 'account_manager'>('department');
+  const { departments, verticals, teams } = useOrgContext();
+  const [type, setType] = useState<ScopeException['type']>('department');
   const [targetId, setTargetId] = useState('');
   const [hierarchyApplies, setHierarchyApplies] = useState(false);
 
@@ -68,9 +75,11 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
     ? departments.filter(d => d.status === 'Active').map(d => ({ value: d.id, label: d.name }))
     : type === 'service'
       ? verticals.filter(v => v.status === 'Active').map(v => ({ value: v.id, label: v.name }))
-      : users
-          .filter(user => user.status === 'Active')
-          .map(user => ({ value: user.id, label: `${user.firstName} ${user.lastName}` }));
+      : type === 'team'
+        ? teams.filter(team => team.status === 'Active').map(team => ({ value: team.id, label: team.name }))
+        : users
+            .filter(user => user.status === 'Active')
+            .map(user => ({ value: user.id, label: `${user.firstName} ${user.lastName}` }));
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={open => !open && onClose()}>
@@ -81,7 +90,7 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
             Add Exception for {title}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="mt-2 text-[13px] text-gray-500 mb-5">
-            Narrow this All-scope permission by department, service, or account manager.
+            Narrow this All-records permission by department, account manager, service, or team.
           </DialogPrimitive.Description>
 
           <div className="space-y-4">
@@ -95,6 +104,7 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
                   <SelectItem value="department">Department</SelectItem>
                   <SelectItem value="service">Service (Vertical)</SelectItem>
                   <SelectItem value="account_manager">Account Manager</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -153,7 +163,7 @@ function RolePermissionTable({
 }) {
   const { updateRolePermissions } = useAccessControlContext();
   const { users } = useEmployeeGroupsContext();
-  const { departments, verticals } = useOrgContext();
+  const { departments, verticals, teams } = useOrgContext();
   const baseRole = useMemo(
     () => role.baseRoleId
       ? roles.find(candidate => candidate.id === role.baseRoleId)
@@ -169,7 +179,11 @@ function RolePermissionTable({
     cloneRules(resolveRolePermissions(role, roles)));
   const [isSaved, setIsSaved] = useState(true);
 
-  const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
+  const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{
+    moduleId: string;
+    actionId: string;
+    title: string;
+  } | null>(null);
   const [expandedScopeModules, setExpandedScopeModules] = useState<Set<string>>(new Set());
   const matrixActions = useMemo(() => {
     const seen = new Set<string>();
@@ -220,7 +234,7 @@ function RolePermissionTable({
       rule => rule.moduleId === moduleId && rule.actionId === actionId,
     );
     if (inheritedRule?.enabled && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope]) return;
-    updateRule(moduleId, actionId, { scope });
+    updateRule(moduleId, actionId, { scope, exceptions: [] });
   }
 
   function addException(moduleId: string, actionId: string, exceptionData: Omit<ScopeException, 'id'>) {
@@ -338,7 +352,7 @@ function RolePermissionTable({
                         onClick={() => toggleScopeModule(module.id)}
                         aria-expanded={scopeExpanded}
                         aria-controls={`module-permissions-${module.id}`}
-                        className="sticky left-0 z-[5] flex min-w-0 items-center gap-2.5 border-b border-r border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-orange-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                        className="sticky left-0 z-[5] flex min-w-0 items-center gap-2.5 border-b border-r border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
                       >
                         <ChevronDown
                           size={14}
@@ -387,7 +401,7 @@ function RolePermissionTable({
                       {scopeExpanded && (
                         <div
                           id={`module-permissions-${module.id}`}
-                          className="border-b border-orange-100 bg-gradient-to-b from-orange-50/55 to-white px-4 py-4"
+                          className="border-b border-gray-100 bg-gray-50 px-4 py-4"
                           style={{ gridColumn: '1 / -1' }}
                         >
                           {enabledRules.length === 0 ? (
@@ -431,7 +445,7 @@ function RolePermissionTable({
                                               (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
                                             )}
                                           >
-                                            {scope}
+                                            {scopeLabel(scope)}
                                           </button>
                                         );
                                       })}
@@ -443,12 +457,14 @@ function RolePermissionTable({
                                             ? departments.find(d => d.id === ex.targetId)?.name
                                             : ex.type === 'service'
                                               ? verticals.find(v => v.id === ex.targetId)?.name
-                                              : (() => {
-                                                  const manager = users.find(user => user.id === ex.targetId);
-                                                  return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                                })();
+                                              : ex.type === 'team'
+                                                ? teams.find(team => team.id === ex.targetId)?.name
+                                                : (() => {
+                                                    const manager = users.find(user => user.id === ex.targetId);
+                                                    return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                                  })();
                                           return (
-                                            <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-brand/20 bg-orange-50 px-2 py-1 text-[10px] font-medium text-brand">
+                                            <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-600">
                                               Except: {targetName}
                                               {!readOnly && !isInherited && (
                                                 <button
@@ -586,7 +602,7 @@ export function PermissionsScreen() {
                   <div className="flex min-w-0 items-center gap-3">
                     <span className={cn(
                       'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors',
-                      isExpanded ? 'border-brand/20 bg-orange-50 text-brand' : 'border-gray-200 text-gray-400',
+                      isExpanded ? 'border-gray-200 bg-gray-100 text-gray-600' : 'border-gray-200 text-gray-400',
                     )}>
                       <ChevronDown
                         size={16}
@@ -599,7 +615,7 @@ export function PermissionsScreen() {
                         {role.isProtected && <Lock size={12} className="text-violet-500" />}
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
-                          role.type === 'system' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-brand',
+                          role.type === 'system' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600',
                         )}>
                           {role.type === 'system' ? 'Base role' : 'Specialized'}
                         </span>

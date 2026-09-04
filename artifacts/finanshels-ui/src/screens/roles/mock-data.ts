@@ -20,40 +20,45 @@ export interface ModuleDef {
 
 export const MODULES: ModuleDef[] = [
   {
-    id: 'projects',
-    label: 'Projects',
+    id: 'dashboard',
+    label: 'Dashboard',
     availableScopes: RECORD_SCOPES,
     actions: [
-      { id: 'view',        label: 'View'        },
-      { id: 'create',      label: 'Create'      },
-      { id: 'edit',        label: 'Edit'        },
-      { id: 'delete',      label: 'Delete'      },
-      { id: 'assign_team', label: 'Assign Team' },
-      { id: 'approve',     label: 'Approve'     },
+      { id: 'view', label: 'View' },
     ],
   },
   {
-    id: 'tasks',
-    label: 'Tasks',
+    id: 'onboarding',
+    label: 'Onboarding',
     availableScopes: RECORD_SCOPES,
     actions: [
-      { id: 'view',   label: 'View'   },
+      { id: 'view', label: 'View' },
       { id: 'create', label: 'Create' },
-      { id: 'edit',   label: 'Edit'   },
+      { id: 'edit', label: 'Edit' },
       { id: 'delete', label: 'Delete' },
-      { id: 'assign', label: 'Assign' },
+      { id: 'assign_service', label: 'Assign Service' },
+      { id: 'manage_requests', label: 'Manage Requests' },
     ],
   },
   {
-    id: 'timesheets',
-    label: 'Timesheets',
+    id: 'onboarding_forms',
+    label: 'Onboarding Forms',
     availableScopes: RECORD_SCOPES,
     actions: [
-      { id: 'view',    label: 'View'    },
-      { id: 'submit',  label: 'Submit'  },
-      { id: 'approve', label: 'Approve' },
-      { id: 'reject',  label: 'Reject'  },
-      { id: 'manage',  label: 'Manage'  },
+      { id: 'view', label: 'View' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+    ],
+  },
+  {
+    id: 'project_task_configuration',
+    label: 'Project and Task Configuration',
+    availableScopes: ORGANISATION_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
     ],
   },
   {
@@ -65,71 +70,111 @@ export const MODULES: ModuleDef[] = [
       { id: 'create', label: 'Create' },
       { id: 'edit',   label: 'Edit'   },
       { id: 'delete', label: 'Delete' },
-    ],
-  },
-  {
-    id: 'organisation',
-    label: 'Organisation',
-    availableScopes: ORGANISATION_SCOPES,
-    actions: [
-      { id: 'view',       label: 'View'       },
-      { id: 'manage',     label: 'Manage'     },
-    ],
-  },
-  {
-    id: 'users',
-    label: 'User Management',
-    availableScopes: ORGANISATION_SCOPES,
-    actions: [
-      { id: 'view',         label: 'View'         },
-      { id: 'create',       label: 'Add User'     },
-      { id: 'edit',         label: 'Edit User'    },
-      { id: 'activate',     label: 'Activate User' },
-      { id: 'deactivate',   label: 'Deactivate User' },
+      { id: 'send_invitation', label: 'Send Invitation' },
       { id: 'reset_password', label: 'Reset Password' },
-      { id: 'assign_roles', label: 'Assign Role' },
-      { id: 'assign_department', label: 'Assign Department' },
-      { id: 'assign_verticals', label: 'Assign Verticals' },
-      { id: 'assign_reporting_manager', label: 'Assign Reporting Manager' },
     ],
   },
   {
-    id: 'roles',
-    label: 'Role Management',
-    availableScopes: ORGANISATION_SCOPES,
+    id: 'projects',
+    label: 'Projects & Tasks',
+    availableScopes: RECORD_SCOPES,
     actions: [
-      { id: 'view',       label: 'View'       },
-      { id: 'create',     label: 'Create'     },
-      { id: 'edit',       label: 'Edit'       },
-      { id: 'clone',      label: 'Clone'      },
-      { id: 'deactivate', label: 'Deactivate' },
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+      { id: 'reassign', label: 'Reassign' },
+      { id: 'collaborate', label: 'Collaborate' },
+      { id: 'extend_deadlines', label: 'Extend Deadlines' },
+    ],
+  },
+  {
+    id: 'timesheets',
+    label: 'Timesheets',
+    availableScopes: RECORD_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+      { id: 'submit', label: 'Submit' },
+      { id: 'approve', label: 'Approve' },
+      { id: 'reject', label: 'Reject' },
+      { id: 'comment', label: 'Comment' },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Documents & Reports',
+    availableScopes: RECORD_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'upload', label: 'Upload' },
+      { id: 'download', label: 'Download' },
+      { id: 'delete', label: 'Delete' },
+      { id: 'export', label: 'Export' },
+      { id: 'import', label: 'Import' },
     ],
   },
   {
     id: 'audit_trail',
     label: 'Audit Trail',
-    availableScopes: ORGANISATION_SCOPES,
+    availableScopes: RECORD_SCOPES,
     actions: [
-      { id: 'view',   label: 'View'   },
-      { id: 'export', label: 'Export' },
+      { id: 'view', label: 'View' },
+      { id: 'download', label: 'Download' },
     ],
   },
   {
-    id: 'reports',
-    label: 'Reports',
-    availableScopes: RECORD_SCOPES,
+    id: 'users',
+    label: 'Users & Roles',
+    availableScopes: ORGANISATION_SCOPES,
     actions: [
-      { id: 'view',   label: 'View'   },
-      { id: 'export', label: 'Export' },
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+      { id: 'manage_roles', label: 'Manage Roles' },
+    ],
+  },
+  {
+    id: 'services',
+    label: 'Services',
+    availableScopes: ORGANISATION_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
+    ],
+  },
+  {
+    id: 'content_management',
+    label: 'Content Management',
+    availableScopes: ORGANISATION_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'create', label: 'Create' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'delete', label: 'Delete' },
     ],
   },
   {
     id: 'settings',
-    label: 'Settings',
+    label: 'Compliance Settings',
     availableScopes: ORGANISATION_SCOPES,
     actions: [
-      { id: 'view',   label: 'View'   },
-      { id: 'manage', label: 'Manage' },
+      { id: 'view', label: 'View' },
+      { id: 'edit', label: 'Edit' },
+    ],
+  },
+  {
+    id: 'system_settings',
+    label: 'System Settings',
+    availableScopes: ORGANISATION_SCOPES,
+    actions: [
+      { id: 'view', label: 'View' },
+      { id: 'edit', label: 'Edit' },
     ],
   },
 ];
@@ -166,6 +211,62 @@ export function fullPermissions(): Record<string, string[]> {
   return Object.fromEntries(MODULES.map(m => [m.id, m.actions.map(a => a.id)]));
 }
 
+export function permissionMigrationCandidates(moduleId: string, actionId: string): Array<[string, string]> {
+  const candidates: Array<[string, string]> = [[moduleId, actionId]];
+
+  if (moduleId === 'projects') {
+    candidates.push(['tasks', actionId]);
+    if (actionId === 'reassign') {
+      candidates.push(['projects', 'assign_team'], ['tasks', 'assign']);
+    }
+  }
+  if (moduleId === 'users') {
+    candidates.push(['roles', actionId]);
+    if (actionId === 'manage_roles') {
+      candidates.push(
+        ['users', 'assign_roles'],
+        ['roles', 'view'],
+        ['roles', 'create'],
+        ['roles', 'edit'],
+        ['roles', 'clone'],
+        ['roles', 'deactivate'],
+      );
+    }
+  }
+  if (moduleId === 'audit_trail' && actionId === 'download') {
+    candidates.push(['audit_trail', 'export']);
+  }
+  if (moduleId === 'settings' && actionId === 'edit') {
+    candidates.push(['settings', 'manage']);
+  }
+  if (moduleId === 'system_settings') {
+    candidates.push(['settings', actionId]);
+    if (actionId === 'edit') candidates.push(['settings', 'manage']);
+  }
+  if (moduleId === 'project_task_configuration') {
+    candidates.push(['settings', actionId]);
+    if (actionId === 'edit') candidates.push(['settings', 'manage']);
+  }
+  if (moduleId === 'timesheets' && actionId === 'comment') {
+    candidates.push(['timesheets', 'manage']);
+  }
+
+  return candidates;
+}
+
+export function findCompatiblePermissionRule(
+  permissions: PermissionRule[],
+  moduleId: string,
+  actionId: string,
+): PermissionRule | undefined {
+  const matches = permissionMigrationCandidates(moduleId, actionId)
+    .map(([candidateModuleId, candidateActionId]) => permissions.find(
+      rule => rule.moduleId === candidateModuleId && rule.actionId === candidateActionId,
+    ))
+    .filter((rule): rule is PermissionRule => Boolean(rule));
+  return matches.find(rule => rule.enabled) ?? matches[0];
+}
+
 /** Normalizes action-level rules against each module's available scopes. */
 export function normalizeModulePermissions(permissions: PermissionRule[]): PermissionRule[] {
   return permissions.map(rule => ({
@@ -179,7 +280,7 @@ export function normalizeModulePermissions(permissions: PermissionRule[]): Permi
 
 export interface ScopeException {
   id: string;
-  type: 'department' | 'service' | 'account_manager';
+  type: 'department' | 'service' | 'account_manager' | 'team';
   targetId: string;
   hierarchyApplies: boolean;
 }
@@ -219,12 +320,13 @@ export interface AppRole {
 export function convertLegacyPermissions(perms: Record<string, string[]>, defaultScope: DataScope = 'All'): PermissionRule[] {
   const rules: PermissionRule[] = [];
   for (const module of MODULES) {
-    const grantedActions = perms[module.id] || [];
     for (const action of module.actions) {
+      const enabled = permissionMigrationCandidates(module.id, action.id)
+        .some(([candidateModuleId, candidateActionId]) => perms[candidateModuleId]?.includes(candidateActionId));
       rules.push({
         moduleId: module.id,
         actionId: action.id,
-        enabled: grantedActions.includes(action.id),
+        enabled,
         scope: normalizePermissionScope(module.id, defaultScope, defaultScope),
         exceptions: [],
       });
@@ -270,20 +372,23 @@ export function inheritBasePermissions(
       };
     }
 
+    const resolvedScope = DATA_SCOPE_RANK[normalizedSpecializedRule.scope] >= DATA_SCOPE_RANK[normalizedBaseRule.scope]
+      ? normalizedSpecializedRule.scope
+      : normalizedBaseRule.scope;
+    const resolvedExceptions = resolvedScope === 'All'
+      ? normalizedBaseRule.exceptions
+          .filter(baseException => normalizedSpecializedRule.exceptions.some(
+            specializedException => specializedException.type === baseException.type
+              && specializedException.targetId === baseException.targetId,
+          ))
+          .map(exception => ({ ...exception }))
+      : [];
+
     return {
       ...normalizedSpecializedRule,
       enabled: true,
-      scope: DATA_SCOPE_RANK[normalizedSpecializedRule.scope] >= DATA_SCOPE_RANK[normalizedBaseRule.scope]
-        ? normalizedSpecializedRule.scope
-        : normalizedBaseRule.scope,
-      exceptions: normalizedSpecializedRule.scope === 'All'
-        ? normalizedBaseRule.exceptions
-            .filter(baseException => normalizedSpecializedRule.exceptions.some(
-              specializedException => specializedException.type === baseException.type
-                && specializedException.targetId === baseException.targetId,
-            ))
-            .map(exception => ({ ...exception }))
-        : [],
+      scope: resolvedScope,
+      exceptions: resolvedExceptions,
     };
   });
 
@@ -359,6 +464,7 @@ export const MOCK_ROLES: AppRole[] = [
         'view',
         'create',
         'edit',
+        'delete',
         'activate',
         'deactivate',
         'reset_password',

@@ -37,10 +37,11 @@ test('specialized roles preserve base actions and can only broaden their scope',
   assert.equal(additionalUserView?.scope, 'All');
 });
 
-test('scope availability is configured per module and legacy Team values are migrated', () => {
+test('all required data scopes are available and legacy Team values are migrated', () => {
+  const requiredScopes = ['Own', 'Reporting Team', 'All'];
   assert.deepEqual(
     MODULES.find(module => module.id === 'projects')?.availableScopes,
-    ['Own', 'Reporting Team', 'All'],
+    requiredScopes,
   );
   assert.deepEqual(
     MODULES.find(module => module.id === 'users')?.availableScopes,
@@ -93,7 +94,31 @@ test('effective specialized permissions resolve against the current base role', 
   assert.equal(resolvedDelete?.scope, 'Reporting Team');
 });
 
-test('Admin role includes every user-management action without organisation membership checks', () => {
+test('permission modules expose the required actions', () => {
+  const requiredModules = {
+    dashboard: ['view'],
+    onboarding: ['view', 'create', 'edit', 'delete', 'assign_service', 'manage_requests'],
+    onboarding_forms: ['view', 'edit', 'delete'],
+    project_task_configuration: ['view', 'create', 'edit', 'delete'],
+    clients: ['view', 'create', 'edit', 'delete', 'send_invitation', 'reset_password'],
+    projects: ['view', 'create', 'edit', 'delete', 'reassign', 'collaborate', 'extend_deadlines'],
+    timesheets: ['view', 'create', 'edit', 'delete', 'submit', 'approve', 'reject', 'comment'],
+    reports: ['view', 'upload', 'download', 'delete', 'export', 'import'],
+    audit_trail: ['view', 'download'],
+    users: ['view', 'create', 'edit', 'delete', 'manage_roles'],
+    services: ['view', 'create', 'edit', 'delete'],
+    content_management: ['view', 'create', 'edit', 'delete'],
+    settings: ['view', 'edit'],
+    system_settings: ['view', 'edit'],
+  };
+
+  assert.deepEqual(
+    Object.fromEntries(MODULES.map(module => [module.id, module.actions.map(action => action.id)])),
+    requiredModules,
+  );
+});
+
+test('Admin role includes every required Users & Roles action', () => {
   const admin = MOCK_ROLES.find(role => role.id === 'role-admin');
   const enabledUserActions = admin?.permissions
     .filter(rule => rule.moduleId === 'users' && rule.enabled)
@@ -103,12 +128,7 @@ test('Admin role includes every user-management action without organisation memb
     'view',
     'create',
     'edit',
-    'activate',
-    'deactivate',
-    'reset_password',
-    'assign_roles',
-    'assign_department',
-    'assign_verticals',
-    'assign_reporting_manager',
+    'delete',
+    'manage_roles',
   ]);
 });
