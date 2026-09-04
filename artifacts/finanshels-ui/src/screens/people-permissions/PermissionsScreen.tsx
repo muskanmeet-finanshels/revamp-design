@@ -349,7 +349,7 @@ function RolePermissionTable({
             onClick={onEdit}
             disabled={role.isProtected}
             title={role.isProtected ? 'Protected roles cannot be edited' : 'Edit permissions'}
-            className="inline-flex flex-shrink-0 items-center gap-1 text-[12px] font-semibold text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-brand-hover hover:decoration-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
+            className="inline-flex h-8 flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-3 text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Pencil size={13} aria-hidden="true" />
             Edit
