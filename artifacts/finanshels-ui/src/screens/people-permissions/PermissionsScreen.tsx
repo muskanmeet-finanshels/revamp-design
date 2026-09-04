@@ -448,9 +448,10 @@ function RolePermissionTable({
 
                                 return (
                                   <fieldset key={action.id} className="min-w-0 rounded-lg border border-gray-200 bg-white p-3">
+                                    <legend className="sr-only">{action.label} data access</legend>
                                     <div className="mb-2.5 flex items-start justify-between gap-2">
                                       <div>
-                                        <legend className="text-[12px] font-semibold text-gray-900">{action.label}</legend>
+                                        <p className="text-[12px] font-semibold text-gray-900">{action.label}</p>
                                         <p className="mt-0.5 text-[10px] text-gray-500">
                                           {isInherited ? `Inherited from ${baseRole?.name}` : 'Select one data scope'}
                                         </p>
