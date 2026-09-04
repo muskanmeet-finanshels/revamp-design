@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown, Lock, Pencil, Save, SearchX, Plus, X } from 'lucide-react';
+import { ChevronDown, Lock, Pencil, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -169,12 +169,16 @@ function RolePermissionTable({
   roles,
   filteredModules,
   editing,
+  onEdit,
+  onCancel,
   onSaved,
 }: {
   role: AppRole;
   roles: AppRole[];
   filteredModules: typeof MODULES;
   editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
   onSaved: () => void;
 }) {
   const { updateRolePermissions } = useAccessControlContext();
@@ -190,10 +194,12 @@ function RolePermissionTable({
     () => baseRole ? resolveRolePermissions(baseRole, roles) : [],
     [baseRole, roles],
   );
+  const persistedPermissions = useMemo(
+    () => cloneRules(resolveRolePermissions(role, roles)),
+    [role, roles],
+  );
 
-  const [permissions, setPermissions] = useState<PermissionRule[]>(() =>
-    cloneRules(resolveRolePermissions(role, roles)));
-  const [isSaved, setIsSaved] = useState(true);
+  const [permissions, setPermissions] = useState<PermissionRule[]>(persistedPermissions);
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{
     moduleId: string;
@@ -211,14 +217,14 @@ function RolePermissionTable({
   }, [filteredModules]);
 
   useEffect(() => {
-    setPermissions(cloneRules(resolveRolePermissions(role, roles)));
-    setIsSaved(true);
-  }, [role, roles]);
+    setPermissions(persistedPermissions);
+  }, [persistedPermissions]);
 
   const granted = countGrantedModules(permissions);
   const total = MODULES.length;
   const coverage = Math.round((granted / total) * 100);
   const readOnly = role.isProtected || !editing;
+  const hasChanges = JSON.stringify(permissions) !== JSON.stringify(persistedPermissions);
 
   function updateRule(moduleId: string, actionId: string, updates: Partial<PermissionRule>) {
     if (readOnly) return;
@@ -232,7 +238,6 @@ function RolePermissionTable({
       newRules[idx] = { ...newRules[idx], ...updates };
       return newRules;
     });
-    setIsSaved(false);
   }
 
   function toggleAction(moduleId: string, actionId: string, currentEnabled: boolean) {
@@ -267,7 +272,6 @@ function RolePermissionTable({
       newRules[idx] = { ...newRules[idx], exceptions: [...(newRules[idx].exceptions || []), ex] };
       return newRules;
     });
-    setIsSaved(false);
   }
 
   function removeException(moduleId: string, actionId: string, exceptionId: string) {
@@ -279,7 +283,6 @@ function RolePermissionTable({
       newRules[idx] = { ...newRules[idx], exceptions: (newRules[idx].exceptions || []).filter(e => e.id !== exceptionId) };
       return newRules;
     });
-    setIsSaved(false);
   }
 
   function getRule(moduleId: string, actionId: string) {
@@ -305,8 +308,14 @@ function RolePermissionTable({
   function savePermissions() {
     updateRolePermissions(role.id, permissions);
     toast.success(`Permissions updated for ${role.name}`);
-    setIsSaved(true);
     onSaved();
+  }
+
+  function cancelEditing() {
+    setPermissions(persistedPermissions);
+    setExpandedScopeModules(new Set());
+    setExceptionDialogTarget(null);
+    onCancel();
   }
 
   return (
@@ -316,15 +325,36 @@ function RolePermissionTable({
           <p className="text-[13px] font-semibold text-gray-900">Permission matrix</p>
           <p className="mt-0.5 text-[11px] text-gray-500">{granted} of {total} modules enabled</p>
         </div>
-        <button
-          type="button"
-          onClick={savePermissions}
-          disabled={readOnly || isSaved}
-          className="inline-flex h-8 flex-shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-[12px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
-        >
-          <Save size={14} />
-          Save
-        </button>
+        {editing ? (
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={cancelEditing}
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-200 px-3 text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={savePermissions}
+              disabled={!hasChanges}
+              className="inline-flex h-8 items-center justify-center rounded-lg bg-brand px-3 text-[12px] font-semibold text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save Changes
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={role.isProtected}
+            title={role.isProtected ? 'Protected roles cannot be edited' : 'Edit permissions'}
+            className="inline-flex flex-shrink-0 items-center gap-1 text-[12px] font-semibold text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-brand-hover hover:decoration-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
+          >
+            <Pencil size={13} aria-hidden="true" />
+            Edit
+          </button>
+        )}
       </div>
 
       {filteredModules.length === 0 ? (
@@ -695,16 +725,6 @@ export function PermissionsScreen() {
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-1.5">
                       <h2 className="text-[16px] font-semibold text-gray-900">{selectedRole.name}</h2>
-                      <button
-                        type="button"
-                        onClick={() => setEditingRoleId(selectedRole.id)}
-                        disabled={selectedRole.isProtected || editingRoleId === selectedRole.id}
-                        aria-label={`Edit permissions for ${selectedRole.name}`}
-                        title={selectedRole.isProtected ? 'Protected roles cannot be edited' : 'Edit permissions'}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-default disabled:opacity-40"
-                      >
-                        <Pencil size={13} />
-                      </button>
                     </div>
                     {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
                     <span className={cn(
@@ -738,6 +758,8 @@ export function PermissionsScreen() {
                   roles={roles}
                   filteredModules={filteredModules}
                   editing={editingRoleId === selectedRole.id}
+                  onEdit={() => setEditingRoleId(selectedRole.id)}
+                  onCancel={() => setEditingRoleId(null)}
                   onSaved={() => setEditingRoleId(null)}
                 />
               </section>
