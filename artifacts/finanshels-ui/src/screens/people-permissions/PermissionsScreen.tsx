@@ -583,7 +583,7 @@ export function PermissionsScreen() {
         <div>
           <div className="-mx-6 lg:-mx-8">
             <Tabs value={selectedRole?.id ?? ''} onValueChange={setSelectedRoleId}>
-              <TabsList className="scrollbar-none flex h-auto w-full flex-nowrap justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 lg:px-8">
+              <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0 px-6 lg:px-8 flex-nowrap overflow-x-auto scrollbar-none">
                 {roles.map(role => (
                   <TabsTrigger
                     key={role.id}
@@ -603,7 +603,7 @@ export function PermissionsScreen() {
                     <span
                       className={cn(
                         'ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                        role.id === selectedRole?.id ? 'text-brand' : 'text-gray-500',
+                        role.id === selectedRole?.id ? 'text-brand' : 'text-orange-500',
                       )}
                     >
                       {role.userCount}
