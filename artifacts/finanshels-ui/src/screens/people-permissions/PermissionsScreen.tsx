@@ -49,6 +49,13 @@ function scopeLabel(scope: DataScope) {
   return scope;
 }
 
+function scopeDescription(scope: DataScope) {
+  if (scope === 'Own') return 'Assigned to this role';
+  if (scope === 'Reporting Team') return 'Their reporting hierarchy';
+  if (scope === 'All') return 'Every record in this module';
+  return '';
+}
+
 /* ── Exception Dialog ── */
 
 function ExceptionDialog({ open, onClose, onAdd, title }: {
@@ -420,9 +427,19 @@ function RolePermissionTable({
                             className="border-b border-gray-100 bg-gray-50 px-4 py-4"
                           >
                           {enabledRules.length === 0 ? (
-                            <p className="text-[11px] text-gray-500">Enable an action to configure its data scope.</p>
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3">
+                              <p className="text-[12px] font-medium text-gray-700">No data scope to configure yet</p>
+                              <p className="mt-0.5 text-[11px] text-gray-500">Enable an action above to choose which records it can access.</p>
+                            </div>
                           ) : (
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                              <div className="mb-3">
+                                <p className="text-[12px] font-semibold text-gray-800">Data access by action</p>
+                                <p className="mt-0.5 text-[11px] text-gray-500">
+                                  Choose which records each enabled action can access.
+                                </p>
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-2">
                               {enabledRules.map(({ action, rule }) => {
                                 const inheritedRule = basePermissions.find(
                                   permission => permission.moduleId === module.id && permission.actionId === action.id,
@@ -430,16 +447,25 @@ function RolePermissionTable({
                                 const isInherited = Boolean(inheritedRule?.enabled);
 
                                 return (
-                                  <div key={action.id} className="rounded-md border border-gray-200 bg-white p-3">
-                                    <div className="mb-2 flex items-center justify-between gap-2">
-                                      <p className="text-[11.5px] font-semibold text-gray-800">{action.label}</p>
+                                  <fieldset key={action.id} className="min-w-0 rounded-lg border border-gray-200 bg-white p-3">
+                                    <div className="mb-2.5 flex items-start justify-between gap-2">
+                                      <div>
+                                        <legend className="text-[12px] font-semibold text-gray-900">{action.label}</legend>
+                                        <p className="mt-0.5 text-[10px] text-gray-500">
+                                          {isInherited ? `Inherited from ${baseRole?.name}` : 'Select one data scope'}
+                                        </p>
+                                      </div>
                                       {isInherited && (
-                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
+                                        <span className="flex-shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
                                           Inherited
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex w-fit max-w-full flex-wrap rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
+                                    <div
+                                      role="group"
+                                      aria-label={`Data scope for ${module.label} ${action.label}`}
+                                      className="grid grid-cols-1 gap-1.5 sm:grid-cols-3"
+                                    >
                                       {module.availableScopes.map(scope => {
                                         const belowInheritedScope = Boolean(
                                           inheritedRule?.enabled
@@ -451,67 +477,85 @@ function RolePermissionTable({
                                             type="button"
                                             onClick={() => setScope(module.id, action.id, scope)}
                                             disabled={readOnly || belowInheritedScope}
-                                            title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                            aria-pressed={rule.scope === scope}
+                                            title={belowInheritedScope
+                                              ? `Cannot be narrower than ${scopeLabel(inheritedRule?.scope ?? 'All')}`
+                                              : scopeDescription(scope)}
                                             className={cn(
-                                              'whitespace-nowrap rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-all',
+                                              'min-h-[52px] rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                                               rule.scope === scope
-                                                ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-900',
-                                              (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
+                                                ? 'border-brand/40 bg-orange-50 text-brand'
+                                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                                              belowInheritedScope && 'cursor-not-allowed opacity-45',
+                                              readOnly && !belowInheritedScope && 'cursor-not-allowed',
                                             )}
                                           >
-                                            {scopeLabel(scope)}
+                                            <span className="block text-[10.5px] font-semibold">{scopeLabel(scope)}</span>
+                                            <span className="mt-0.5 block text-[9px] leading-tight text-gray-500">
+                                              {scopeDescription(scope)}
+                                            </span>
                                           </button>
                                         );
                                       })}
                                     </div>
                                     {rule.scope === 'All' && (
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                        {rule.exceptions?.map(ex => {
-                                          const targetName = ex.type === 'department'
-                                            ? departments.find(d => d.id === ex.targetId)?.name
-                                            : ex.type === 'service'
-                                              ? verticals.find(v => v.id === ex.targetId)?.name
-                                              : ex.type === 'team'
-                                                ? teams.find(team => team.id === ex.targetId)?.name
-                                                : (() => {
-                                                    const manager = users.find(user => user.id === ex.targetId);
-                                                    return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                                  })();
-                                          return (
-                                            <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-600">
-                                              Except: {targetName}
-                                              {!readOnly && !isInherited && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => removeException(module.id, action.id, ex.id)}
-                                                  aria-label={`Remove ${targetName} exception`}
-                                                  className="text-brand/60 hover:text-brand"
-                                                >
-                                                  <X size={11} />
-                                                </button>
-                                              )}
-                                            </span>
-                                          );
-                                        })}
-                                        {!readOnly && !isInherited && (
-                                          <button
-                                            type="button"
-                                            onClick={() => setExceptionDialogTarget({
-                                              moduleId: module.id,
-                                              actionId: action.id,
-                                              title: `${module.label} > ${action.label}`,
+                                      <div className="mt-3 border-t border-gray-100 pt-2.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <div>
+                                            <p className="text-[10.5px] font-semibold text-gray-700">Exceptions</p>
+                                            <p className="text-[9px] text-gray-500">Limit access to selected groups.</p>
+                                          </div>
+                                          {!readOnly && !isInherited && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setExceptionDialogTarget({
+                                                moduleId: module.id,
+                                                actionId: action.id,
+                                                title: `${module.label} > ${action.label}`,
+                                              })}
+                                              className="inline-flex min-h-8 items-center gap-1 rounded-md border border-brand/30 px-2.5 text-[10px] font-semibold text-brand transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                                            >
+                                              <Plus size={11} /> Add exception
+                                            </button>
+                                          )}
+                                        </div>
+                                        {rule.exceptions && rule.exceptions.length > 0 && (
+                                          <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {rule.exceptions.map(ex => {
+                                              const targetName = ex.type === 'department'
+                                                ? departments.find(d => d.id === ex.targetId)?.name
+                                                : ex.type === 'service'
+                                                  ? verticals.find(v => v.id === ex.targetId)?.name
+                                                  : ex.type === 'team'
+                                                    ? teams.find(team => team.id === ex.targetId)?.name
+                                                    : (() => {
+                                                        const manager = users.find(user => user.id === ex.targetId);
+                                                        return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                                      })();
+                                              return (
+                                                <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-700">
+                                                  {targetName}
+                                                  {!readOnly && !isInherited && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => removeException(module.id, action.id, ex.id)}
+                                                      aria-label={`Remove ${targetName} exception`}
+                                                      className="text-gray-400 hover:text-brand"
+                                                    >
+                                                      <X size={11} />
+                                                    </button>
+                                                  )}
+                                                </span>
+                                              );
                                             })}
-                                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand hover:underline"
-                                          >
-                                            <Plus size={11} /> Add Exception
-                                          </button>
+                                          </div>
                                         )}
                                       </div>
                                     )}
-                                  </div>
+                                  </fieldset>
                                 );
                               })}
+                              </div>
                             </div>
                           )}
                           </td>
