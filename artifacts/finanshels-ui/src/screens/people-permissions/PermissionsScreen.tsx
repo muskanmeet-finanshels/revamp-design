@@ -171,6 +171,14 @@ function RolePermissionTable({
 
   const [exceptionDialogTarget, setExceptionDialogTarget] = useState<{ moduleId: string, actionId: string, title: string } | null>(null);
   const [expandedScopeModules, setExpandedScopeModules] = useState<Set<string>>(new Set());
+  const matrixActions = useMemo(() => {
+    const seen = new Set<string>();
+    return filteredModules.flatMap(module => module.actions.filter(action => {
+      if (seen.has(action.id)) return false;
+      seen.add(action.id);
+      return true;
+    }));
+  }, [filteredModules]);
 
   useEffect(() => {
     setPermissions(cloneRules(resolveRolePermissions(role, roles)));
@@ -292,74 +300,66 @@ function RolePermissionTable({
           <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
         </div>
       ) : (
-        <div className="space-y-3 bg-[#f8fafc] p-3 sm:p-4">
-          {filteredModules.map(module => {
-            const enabledRules = module.actions
-              .map(action => ({ action, rule: getRule(module.id, action.id) }))
-              .filter(item => item.rule.enabled);
-            const enabledScopes = new Set(enabledRules.map(item => item.rule.scope));
-            const scopeSummary = enabledRules.length === 0
-              ? 'No permissions enabled'
-              : enabledScopes.size === 1
-                ? `${enabledRules.length} of ${module.actions.length} actions · ${enabledRules[0].rule.scope}`
-                : `${enabledRules.length} of ${module.actions.length} actions · Mixed scopes`;
-            const scopeExpanded = expandedScopeModules.has(module.id);
-
-            return (
-              <section
-                key={module.id}
-                className={cn(
-                  'overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(16,24,40,0.03)] transition-shadow',
-                  scopeExpanded ? 'border-brand/25 shadow-[0_6px_20px_rgba(249,115,22,0.08)]' : 'border-gray-200',
-                )}
+        <div className="bg-[#f8fafc] p-3 sm:p-4">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns: `minmax(220px, 1fr) repeat(${matrixActions.length}, 86px)`,
+                  minWidth: `${Math.max(820, 220 + matrixActions.length * 86)}px`,
+                }}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleScopeModule(module.id)}
-                  aria-expanded={scopeExpanded}
-                  aria-controls={`module-permissions-${module.id}`}
-                  className="group relative flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-orange-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand sm:px-5"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={cn(
-                      'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border transition-colors',
-                      scopeExpanded
-                        ? 'border-brand/20 bg-orange-50 text-brand'
-                        : 'border-gray-200 bg-white text-gray-400 group-hover:border-brand/20 group-hover:text-brand',
-                    )}>
-                      <ChevronDown
-                        size={15}
-                        className={cn('transition-transform duration-200', !scopeExpanded && '-rotate-90')}
-                      />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="text-[13px] font-semibold text-gray-900">{module.label}</h3>
-                      <p className="mt-0.5 text-[10.5px] text-gray-500">{scopeSummary}</p>
-                    </div>
+                <div className="sticky left-0 z-10 flex items-center border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  Module
+                </div>
+                {matrixActions.map(action => (
+                  <div key={action.id} className="flex items-center justify-center border-b border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-500">
+                    {action.label}
                   </div>
-                  <div className="hidden flex-wrap justify-end gap-1.5 sm:flex">
-                    {enabledRules.slice(0, 4).map(({ action }) => (
-                      <span key={action.id} className="rounded-md border border-brand/15 bg-orange-50 px-2 py-1 text-[10px] font-medium text-brand">
-                        {action.label}
-                      </span>
-                    ))}
-                    {enabledRules.length > 4 && (
-                      <span className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-500">
-                        +{enabledRules.length - 4}
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 left-0 h-[3px] rounded-r-full bg-gradient-to-r from-brand to-orange-300 transition-[width] duration-300"
-                    style={{ width: `${Math.max(3, (enabledRules.length / module.actions.length) * 100)}%` }}
-                  />
-                </button>
+                ))}
 
-                {scopeExpanded && (
-                  <div id={`module-permissions-${module.id}`} className="border-t border-orange-100 bg-gradient-to-b from-orange-50/45 to-white px-4 py-4 sm:px-5">
-                    <div className="grid gap-3 xl:grid-cols-2">
-                      {module.actions.map(action => {
+                {filteredModules.map(module => {
+                  const enabledRules = module.actions
+                    .map(action => ({ action, rule: getRule(module.id, action.id) }))
+                    .filter(item => item.rule.enabled);
+                  const enabledScopes = new Set(enabledRules.map(item => item.rule.scope));
+                  const scopeSummary = enabledRules.length === 0
+                    ? 'No permissions enabled'
+                    : enabledScopes.size === 1
+                      ? `${enabledRules.length} of ${module.actions.length} · ${enabledRules[0].rule.scope}`
+                      : `${enabledRules.length} of ${module.actions.length} · Mixed scopes`;
+                  const scopeExpanded = expandedScopeModules.has(module.id);
+
+                  return (
+                    <div key={module.id} className="contents">
+                      <button
+                        type="button"
+                        onClick={() => toggleScopeModule(module.id)}
+                        aria-expanded={scopeExpanded}
+                        aria-controls={`module-permissions-${module.id}`}
+                        className="sticky left-0 z-[5] flex min-w-0 items-center gap-2.5 border-b border-r border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-orange-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                      >
+                        <ChevronDown
+                          size={14}
+                          className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
+                          <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                        </span>
+                      </button>
+
+                      {matrixActions.map(action => {
+                        const supportedAction = module.actions.find(candidate => candidate.id === action.id);
+                        if (!supportedAction) {
+                          return (
+                            <div key={action.id} className="flex items-center justify-center border-b border-gray-100 px-2 py-3">
+                              <span className="text-gray-200">—</span>
+                            </div>
+                          );
+                        }
+
                         const rule = getRule(module.id, action.id);
                         const inheritedRule = basePermissions.find(
                           permission => permission.moduleId === module.id && permission.actionId === action.id,
@@ -367,121 +367,139 @@ function RolePermissionTable({
                         const isInherited = Boolean(inheritedRule?.enabled);
 
                         return (
-                          <div
-                            key={action.id}
-                            className={cn(
-                              'rounded-xl border bg-white p-3.5 transition-colors',
-                              rule.enabled ? 'border-brand/20 shadow-sm' : 'border-gray-200',
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <label className={cn(
-                                'flex min-w-0 items-center gap-2.5',
-                                readOnly || isInherited ? 'cursor-not-allowed' : 'cursor-pointer',
-                              )}>
-                                <input
-                                  type="checkbox"
-                                  checked={rule.enabled}
-                                  onChange={() => toggleAction(module.id, action.id, rule.enabled)}
-                                  disabled={readOnly || isInherited}
-                                  title={isInherited ? `Inherited from ${baseRole?.name}` : `${action.label} ${module.label}`}
-                                  aria-label={`${action.label} permission for ${module.label}`}
-                                  className="h-4 w-4 flex-shrink-0 cursor-pointer rounded border-gray-300 accent-[#F97316] disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                                <span className="text-[12.5px] font-semibold text-gray-800">{action.label}</span>
-                              </label>
-                              {isInherited && (
-                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9.5px] font-medium text-blue-700">
-                                  Inherited
-                                </span>
+                          <div key={action.id} className="flex items-center justify-center border-b border-gray-100 px-2 py-3">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={rule.enabled}
+                              aria-label={`${supportedAction.label} permission for ${module.label}`}
+                              title={isInherited ? `Inherited from ${baseRole?.name}` : `${supportedAction.label} ${module.label}`}
+                              onClick={() => toggleAction(module.id, action.id, rule.enabled)}
+                              disabled={readOnly || isInherited}
+                              className={cn(
+                                'relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+                                rule.enabled ? 'bg-brand' : 'bg-gray-200',
+                                readOnly || isInherited ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                               )}
-                            </div>
-
-                            {rule.enabled && (
-                              <div className="mt-3 border-t border-gray-100 pt-3">
-                                <p className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-400">
-                                  Data scope
-                                </p>
-                                <div className="flex w-fit max-w-full flex-wrap rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
-                                  {module.availableScopes.map(scope => {
-                                    const belowInheritedScope = Boolean(
-                                      inheritedRule?.enabled
-                                      && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
-                                    );
-                                    return (
-                                      <button
-                                        key={scope}
-                                        type="button"
-                                        onClick={() => setScope(module.id, action.id, scope)}
-                                        disabled={readOnly || belowInheritedScope}
-                                        title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
-                                        className={cn(
-                                          'whitespace-nowrap rounded-md px-2.5 py-1.5 text-[10.5px] font-medium transition-all',
-                                          rule.scope === scope
-                                            ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-900',
-                                          (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
-                                        )}
-                                      >
-                                        {scope}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                {rule.scope === 'All' && (
-                                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                                    {rule.exceptions?.map(ex => {
-                                      const targetName = ex.type === 'department'
-                                        ? departments.find(d => d.id === ex.targetId)?.name
-                                        : ex.type === 'service'
-                                          ? verticals.find(v => v.id === ex.targetId)?.name
-                                          : (() => {
-                                              const manager = users.find(user => user.id === ex.targetId);
-                                              return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
-                                            })();
-                                      return (
-                                        <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-brand/20 bg-orange-50 px-2 py-1 text-[10.5px] font-medium text-brand">
-                                          Except: {targetName}
-                                          {!readOnly && !isInherited && (
-                                            <button
-                                              type="button"
-                                              onClick={() => removeException(module.id, action.id, ex.id)}
-                                              aria-label={`Remove ${targetName} exception`}
-                                              className="text-brand/60 hover:text-brand"
-                                            >
-                                              <X size={11} />
-                                            </button>
-                                          )}
-                                        </span>
-                                      );
-                                    })}
-                                    {!readOnly && !isInherited && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setExceptionDialogTarget({
-                                          moduleId: module.id,
-                                          actionId: action.id,
-                                          title: `${module.label} > ${action.label}`,
-                                        })}
-                                        className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-brand hover:underline"
-                                      >
-                                        <Plus size={11} /> Add Exception
-                                      </button>
-                                    )}
-                                  </div>
+                            >
+                              <span
+                                className={cn(
+                                  'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+                                  rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5',
                                 )}
-                              </div>
-                            )}
+                              />
+                            </button>
                           </div>
                         );
                       })}
+
+                      {scopeExpanded && (
+                        <div
+                          id={`module-permissions-${module.id}`}
+                          className="border-b border-orange-100 bg-gradient-to-b from-orange-50/55 to-white px-4 py-4"
+                          style={{ gridColumn: '1 / -1' }}
+                        >
+                          {enabledRules.length === 0 ? (
+                            <p className="text-[11px] text-gray-500">Enable an action to configure its data scope.</p>
+                          ) : (
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                              {enabledRules.map(({ action, rule }) => {
+                                const inheritedRule = basePermissions.find(
+                                  permission => permission.moduleId === module.id && permission.actionId === action.id,
+                                );
+                                const isInherited = Boolean(inheritedRule?.enabled);
+
+                                return (
+                                  <div key={action.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                      <p className="text-[11.5px] font-semibold text-gray-800">{action.label}</p>
+                                      {isInherited && (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
+                                          Inherited
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex w-fit max-w-full flex-wrap rounded-lg border border-gray-200/60 bg-gray-100/80 p-0.5">
+                                      {module.availableScopes.map(scope => {
+                                        const belowInheritedScope = Boolean(
+                                          inheritedRule?.enabled
+                                          && SCOPE_RANK[scope] < SCOPE_RANK[inheritedRule.scope],
+                                        );
+                                        return (
+                                          <button
+                                            key={scope}
+                                            type="button"
+                                            onClick={() => setScope(module.id, action.id, scope)}
+                                            disabled={readOnly || belowInheritedScope}
+                                            title={belowInheritedScope ? `Cannot be narrower than ${inheritedRule?.scope}` : undefined}
+                                            className={cn(
+                                              'whitespace-nowrap rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-all',
+                                              rule.scope === scope
+                                                ? 'border border-gray-200/50 bg-white text-brand shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-900',
+                                              (readOnly || belowInheritedScope) && 'cursor-not-allowed opacity-40',
+                                            )}
+                                          >
+                                            {scope}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    {rule.scope === 'All' && (
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {rule.exceptions?.map(ex => {
+                                          const targetName = ex.type === 'department'
+                                            ? departments.find(d => d.id === ex.targetId)?.name
+                                            : ex.type === 'service'
+                                              ? verticals.find(v => v.id === ex.targetId)?.name
+                                              : (() => {
+                                                  const manager = users.find(user => user.id === ex.targetId);
+                                                  return manager ? `${manager.firstName} ${manager.lastName}` : 'Unavailable account manager';
+                                                })();
+                                          return (
+                                            <span key={ex.id} className="inline-flex items-center gap-1 rounded-md border border-brand/20 bg-orange-50 px-2 py-1 text-[10px] font-medium text-brand">
+                                              Except: {targetName}
+                                              {!readOnly && !isInherited && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeException(module.id, action.id, ex.id)}
+                                                  aria-label={`Remove ${targetName} exception`}
+                                                  className="text-brand/60 hover:text-brand"
+                                                >
+                                                  <X size={11} />
+                                                </button>
+                                              )}
+                                            </span>
+                                          );
+                                        })}
+                                        {!readOnly && !isInherited && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setExceptionDialogTarget({
+                                              moduleId: module.id,
+                                              actionId: action.id,
+                                              title: `${module.label} > ${action.label}`,
+                                            })}
+                                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand hover:underline"
+                                          >
+                                            <Plus size={11} /> Add Exception
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </section>
-            );
-          })}
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
