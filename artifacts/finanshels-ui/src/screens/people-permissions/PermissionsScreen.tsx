@@ -18,6 +18,7 @@ import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
 import { useOrgContext } from '@/contexts/OrgContext';
 import { SearchInput } from '@/components/ui/search-input';
 import { Empty } from '@/components/ui/empty';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -124,15 +125,17 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
               </Select>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer mt-2">
-              <input
-                type="checkbox"
+            <div className="mt-2 flex items-center gap-2">
+              <Checkbox
+                id="hierarchy-applies"
                 checked={hierarchyApplies}
-                onChange={e => setHierarchyApplies(e.target.checked)}
-                className="rounded border-gray-300 text-brand focus:ring-brand"
+                onCheckedChange={checked => setHierarchyApplies(checked === true)}
+                className="h-[14px] w-[14px] rounded-[3px] border-gray-300 shadow-none data-[state=checked]:border-brand data-[state=checked]:bg-brand"
               />
-              <span className="text-[13px] text-gray-700">Reporting hierarchy still applies</span>
-            </label>
+              <label htmlFor="hierarchy-applies" className="cursor-pointer text-[13px] text-gray-700">
+                Reporting hierarchy still applies
+              </label>
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
@@ -315,8 +318,8 @@ function RolePermissionTable({
           <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
         </div>
       ) : (
-        <div className="bg-[#f8fafc] p-3 sm:p-4">
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="bg-white">
+          <div className="overflow-hidden border-t border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table
                 className="w-full min-w-[820px] table-auto"
@@ -327,11 +330,11 @@ function RolePermissionTable({
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-600">
                       Module
                     </th>
                 {matrixActions.map(action => (
-                  <th key={action.id} className="border-b border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-500">
+                  <th key={action.id} className="border-b border-r border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-600 last:border-r-0">
                     {action.label}
                   </th>
                 ))}
@@ -352,14 +355,14 @@ function RolePermissionTable({
 
                   return (
                     <Fragment key={module.id}>
-                      <tr>
-                      <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle">
+                      <tr className="group transition-colors hover:bg-gray-50/70">
+                      <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle transition-colors group-hover:bg-gray-50">
                         <button
                           type="button"
                           onClick={() => toggleScopeModule(module.id)}
                           aria-expanded={scopeExpanded}
                           aria-controls={`module-permissions-${module.id}`}
-                          className="flex w-full min-w-0 items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                          className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
                         >
                           <ChevronDown
                             size={14}
@@ -376,7 +379,7 @@ function RolePermissionTable({
                         const supportedAction = module.actions.find(candidate => candidate.id === action.id);
                         if (!supportedAction) {
                           return (
-                            <td key={action.id} className="border-b border-gray-100 px-2 py-3 text-center align-middle">
+                            <td key={action.id} className="border-b border-r border-gray-100 px-2 py-2.5 text-center align-middle last:border-r-0">
                               <span className="text-gray-200">—</span>
                             </td>
                           );
@@ -389,16 +392,15 @@ function RolePermissionTable({
                         const isInherited = Boolean(inheritedRule?.enabled);
 
                         return (
-                          <td key={action.id} className="border-b border-gray-100 px-2 py-3 text-center align-middle">
-                            <input
-                              type="checkbox"
+                          <td key={action.id} className="border-b border-r border-gray-100 px-2 py-2.5 text-center align-middle last:border-r-0">
+                            <Checkbox
                               checked={rule.enabled}
-                              onChange={() => toggleAction(module.id, action.id, rule.enabled)}
+                              onCheckedChange={() => toggleAction(module.id, action.id, rule.enabled)}
                               disabled={readOnly || isInherited}
                               title={isInherited ? `Inherited from ${baseRole?.name}` : `${supportedAction.label} ${module.label}`}
                               aria-label={`${supportedAction.label} permission for ${module.label}`}
                               className={cn(
-                                'h-4 w-4 rounded border-gray-300 accent-[#F97316] focus:ring-brand',
+                                'mx-auto h-[14px] w-[14px] rounded-[3px] border-gray-300 shadow-none data-[state=checked]:border-brand data-[state=checked]:bg-brand',
                                 readOnly || isInherited ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                               )}
                             />
@@ -423,7 +425,7 @@ function RolePermissionTable({
                                 const isInherited = Boolean(inheritedRule?.enabled);
 
                                 return (
-                                  <div key={action.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                                  <div key={action.id} className="rounded-md border border-gray-200 bg-white p-3">
                                     <div className="mb-2 flex items-center justify-between gap-2">
                                       <p className="text-[11.5px] font-semibold text-gray-800">{action.label}</p>
                                       {isInherited && (
@@ -615,11 +617,11 @@ export function PermissionsScreen() {
           </div>
 
           {selectedRole && (
-            <section className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 px-4 py-3.5 sm:px-5">
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 px-1 py-1">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[14px] font-semibold text-gray-900">{selectedRole.name}</h2>
+                    <h2 className="text-[16px] font-semibold text-gray-900">{selectedRole.name}</h2>
                     {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
                     <span className={cn(
                       'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
@@ -645,13 +647,15 @@ export function PermissionsScreen() {
                   </div>
                 </div>
               </div>
-              <RolePermissionTable
-                key={selectedRole.id}
-                role={selectedRole}
-                roles={roles}
-                filteredModules={filteredModules}
-              />
-            </section>
+              <section className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <RolePermissionTable
+                  key={selectedRole.id}
+                  role={selectedRole}
+                  roles={roles}
+                  filteredModules={filteredModules}
+                />
+              </section>
+            </div>
           )}
         </div>
       )}
