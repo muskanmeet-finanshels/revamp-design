@@ -357,8 +357,13 @@ function RolePermissionTable({
       </div>
 
       {filteredModules.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <Empty icon={SearchX} title="No modules found" description="Try adjusting your search." />
+        <div className="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
+          <Empty
+            icon={SearchX}
+            title="No matching modules"
+            description="Try adjusting your search or filters to find what you’re looking for."
+            className="py-16"
+          />
         </div>
       ) : (
         <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
