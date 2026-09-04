@@ -368,27 +368,18 @@ function RolePermissionTable({
 
                         return (
                           <div key={action.id} className="flex items-center justify-center border-b border-gray-100 px-2 py-3">
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={rule.enabled}
-                              aria-label={`${supportedAction.label} permission for ${module.label}`}
-                              title={isInherited ? `Inherited from ${baseRole?.name}` : `${supportedAction.label} ${module.label}`}
-                              onClick={() => toggleAction(module.id, action.id, rule.enabled)}
+                            <input
+                              type="checkbox"
+                              checked={rule.enabled}
+                              onChange={() => toggleAction(module.id, action.id, rule.enabled)}
                               disabled={readOnly || isInherited}
+                              title={isInherited ? `Inherited from ${baseRole?.name}` : `${supportedAction.label} ${module.label}`}
+                              aria-label={`${supportedAction.label} permission for ${module.label}`}
                               className={cn(
-                                'relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-                                rule.enabled ? 'bg-brand' : 'bg-gray-200',
+                                'h-4 w-4 rounded border-gray-300 accent-[#F97316] focus:ring-brand',
                                 readOnly || isInherited ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                               )}
-                            >
-                              <span
-                                className={cn(
-                                  'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                                  rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5',
-                                )}
-                              />
-                            </button>
+                            />
                           </div>
                         );
                       })}
