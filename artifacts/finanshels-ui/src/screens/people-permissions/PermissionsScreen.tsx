@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown, Lock, Save, SearchX, Plus, X } from 'lucide-react';
+import { ChevronDown, Lock, Pencil, Save, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -160,10 +160,14 @@ function RolePermissionTable({
   role,
   roles,
   filteredModules,
+  editing,
+  onSaved,
 }: {
   role: AppRole;
   roles: AppRole[];
   filteredModules: typeof MODULES;
+  editing: boolean;
+  onSaved: () => void;
 }) {
   const { updateRolePermissions } = useAccessControlContext();
   const { users } = useEmployeeGroupsContext();
@@ -206,7 +210,7 @@ function RolePermissionTable({
   const granted = countGrantedModules(permissions);
   const total = MODULES.length;
   const coverage = Math.round((granted / total) * 100);
-  const readOnly = role.isProtected;
+  const readOnly = role.isProtected || !editing;
 
   function updateRule(moduleId: string, actionId: string, updates: Partial<PermissionRule>) {
     if (readOnly) return;
@@ -293,6 +297,7 @@ function RolePermissionTable({
     updateRolePermissions(role.id, permissions);
     toast.success(`Permissions updated for ${role.name}`);
     setIsSaved(true);
+    onSaved();
   }
 
   return (
@@ -540,6 +545,7 @@ export function PermissionsScreen() {
     ? defaultExpandedRoleId
     : roles[0]?.id;
   const [selectedRoleId, setSelectedRoleId] = useState(initialExpandedRoleId ?? '');
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [permissionSearch, setPermissionSearch] = useState('');
 
   const filteredModules = useMemo(() => {
@@ -584,7 +590,13 @@ export function PermissionsScreen() {
       ) : (
         <div>
           <div className="-mx-6 lg:-mx-8">
-            <Tabs value={selectedRole?.id ?? ''} onValueChange={setSelectedRoleId}>
+            <Tabs
+              value={selectedRole?.id ?? ''}
+              onValueChange={roleId => {
+                setSelectedRoleId(roleId);
+                setEditingRoleId(null);
+              }}
+            >
               <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0 px-6 lg:px-8 flex-nowrap overflow-x-auto scrollbar-none">
                 {roles.map(role => (
                   <TabsTrigger
@@ -621,7 +633,19 @@ export function PermissionsScreen() {
               <div className="flex flex-wrap items-center justify-between gap-4 px-1 py-1">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[16px] font-semibold text-gray-900">{selectedRole.name}</h2>
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="text-[16px] font-semibold text-gray-900">{selectedRole.name}</h2>
+                      <button
+                        type="button"
+                        onClick={() => setEditingRoleId(selectedRole.id)}
+                        disabled={selectedRole.isProtected || editingRoleId === selectedRole.id}
+                        aria-label={`Edit permissions for ${selectedRole.name}`}
+                        title={selectedRole.isProtected ? 'Protected roles cannot be edited' : 'Edit permissions'}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-default disabled:opacity-40"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
                     {selectedRole.isProtected && <Lock size={12} className="text-violet-500" />}
                     <span className={cn(
                       'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
@@ -647,12 +671,14 @@ export function PermissionsScreen() {
                   </div>
                 </div>
               </div>
-              <section className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <section className="mt-3 overflow-hidden">
                 <RolePermissionTable
                   key={selectedRole.id}
                   role={selectedRole}
                   roles={roles}
                   filteredModules={filteredModules}
+                  editing={editingRoleId === selectedRole.id}
+                  onSaved={() => setEditingRoleId(null)}
                 />
               </section>
             </div>
