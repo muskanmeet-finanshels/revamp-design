@@ -507,13 +507,17 @@ function RolePermissionTable({
 export function PermissionsScreen() {
   const searchParams = useSearchParams();
   const { roles } = useAccessControlContext();
-  const requestedRoleId = searchParams.get('roleId') || 'role-admin';
-  const initialRoleId = roles.some(role => role.id === requestedRoleId)
-    ? requestedRoleId
+  const defaultExpandedRoleId = searchParams.get('roleId') || 'role-admin';
+  const initialExpandedRoleId = roles.some(role => role.id === defaultExpandedRoleId)
+    ? defaultExpandedRoleId
     : roles[0]?.id;
-  const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId);
+  const [expandedRoleIds, setExpandedRoleIds] = useState<Set<string>>(
+    () => new Set(initialExpandedRoleId ? [initialExpandedRoleId] : []),
+  );
+  const [mountedRoleIds, setMountedRoleIds] = useState<Set<string>>(
+    () => new Set(initialExpandedRoleId ? [initialExpandedRoleId] : []),
+  );
   const [permissionSearch, setPermissionSearch] = useState('');
-  const selectedRole = roles.find(role => role.id === selectedRoleId) || roles[0];
 
   const filteredModules = useMemo(() => {
     const query = permissionSearch.trim().toLowerCase();
@@ -521,135 +525,121 @@ export function PermissionsScreen() {
     return MODULES.filter(module => module.label.toLowerCase().includes(query));
   }, [permissionSearch]);
 
+  function toggleRole(roleId: string) {
+    setMountedRoleIds(current => {
+      if (current.has(roleId)) return current;
+      const next = new Set(current);
+      next.add(roleId);
+      return next;
+    });
+    setExpandedRoleIds(current => {
+      const next = new Set(current);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }
+
   return (
     <div className="px-6 py-6 lg:px-8">
       <div className="mb-5">
-        <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Roles &amp; Permissions</h1>
+        <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
         <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-gray-500">
-          Select a role to review its access, then expand a module to manage actions, data scope, and exceptions.
+          Expand a role to configure module access, actions, data scope, and specific exceptions.
         </p>
+        <div className="mt-4 w-full sm:max-w-sm">
+          <SearchInput
+            value={permissionSearch}
+            onChange={setPermissionSearch}
+            placeholder="Find a module or permission…"
+            aria-label="Search modules"
+            className="w-full"
+          />
+        </div>
       </div>
 
       {roles.length === 0 ? (
         <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
-      ) : selectedRole ? (
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="min-w-0 lg:sticky lg:top-4 lg:self-start">
-            <div className="overflow-hidden rounded-xl border border-orange-100 bg-[#fffaf5] shadow-[0_4px_18px_rgba(60,38,20,0.05)]">
-              <div className="border-b border-orange-100 bg-[#fff7ed] px-4 py-3">
-                <p className="text-[12px] font-semibold text-gray-900">Roles</p>
-                <p className="mt-0.5 text-[10.5px] text-gray-500">{roles.length} available roles</p>
-              </div>
-              <div className="flex gap-2 overflow-x-auto p-2 lg:max-h-[calc(100vh-235px)] lg:flex-col lg:overflow-y-auto">
-                {roles.map(role => {
-                  const isSelected = role.id === selectedRole.id;
-                  const effectivePermissions = resolveRolePermissions(role, roles);
-                  const enabledModules = countGrantedModules(effectivePermissions);
-                  const coverage = Math.round((enabledModules / MODULES.length) * 100);
+      ) : (
+        <div className="space-y-3">
+          {roles.map(role => {
+            const isExpanded = expandedRoleIds.has(role.id);
+            const effectivePermissions = resolveRolePermissions(role, roles);
+            const enabledModules = countGrantedModules(effectivePermissions);
+            const enabledActions = effectivePermissions.filter(permission => permission.enabled).length;
 
-                  return (
-                  <button
-                     key={role.id}
-                    type="button"
-                     onClick={() => setSelectedRoleId(role.id)}
-                     aria-pressed={isSelected}
-                     className={cn(
-                       'group relative min-w-[210px] overflow-hidden rounded-lg border px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 lg:min-w-0',
-                       isSelected
-                         ? 'border-brand/35 bg-white text-gray-900 shadow-[0_4px_14px_rgba(249,115,22,0.10)]'
-                         : 'border-orange-100/80 bg-white/80 hover:border-brand/25 hover:bg-white',
-                     )}
-                  >
-                     <div className="flex items-start justify-between gap-2">
-                       <div className="min-w-0">
-                         <div className="flex items-center gap-1.5">
-                           <p className="truncate text-[12px] font-semibold text-gray-900">
-                             {role.name}
-                           </p>
-                           {role.isProtected && (
-                             <Lock size={10.5} className="text-violet-500" />
-                           )}
-                         </div>
-                         <p className="mt-1 text-[9.5px] text-gray-400">
-                           {enabledModules} of {MODULES.length} modules · {role.userCount} users
-                         </p>
-                       </div>
+            return (
+              <section
+                key={role.id}
+                className={cn(
+                  'overflow-hidden rounded-xl border bg-white shadow-sm transition-shadow',
+                  isExpanded ? 'border-brand/25 shadow-[0_6px_20px_rgba(249,115,22,0.08)]' : 'border-gray-200',
+                )}
+              >
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  aria-controls={`permissions-${role.id}`}
+                  onClick={() => toggleRole(role.id)}
+                  className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-orange-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand sm:px-5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={cn(
+                      'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors',
+                      isExpanded ? 'border-brand/20 bg-orange-50 text-brand' : 'border-gray-200 text-gray-400',
+                    )}>
+                      <ChevronDown
+                        size={16}
+                        className={cn('transition-transform duration-200', !isExpanded && '-rotate-90')}
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-[14px] font-semibold text-gray-900">{role.name}</h2>
+                        {role.isProtected && <Lock size={12} className="text-violet-500" />}
                         <span className={cn(
-                         'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8.5px] font-medium',
-                         role.type === 'system'
-                           ? 'bg-blue-50 text-blue-700'
-                           : 'bg-orange-50 text-brand',
+                          'rounded-full px-2 py-0.5 text-[9.5px] font-medium',
+                          role.type === 'system' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-brand',
                         )}>
-                         {role.type === 'system' ? 'Base' : 'Specialized'}
+                          {role.type === 'system' ? 'Base role' : 'Specialized'}
                         </span>
                       </div>
-                     <div className="mt-2 h-1 overflow-hidden rounded-full bg-orange-50">
-                       <div
-                         className="h-full rounded-full bg-gradient-to-r from-brand to-orange-300"
-                         style={{ width: `${coverage}%` }}
-                       />
-                     </div>
-                     {isSelected && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brand" />}
-                   </button>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
+                      <p className="mt-0.5 truncate text-[11px] text-gray-500">{role.description}</p>
+                    </div>
+                  </div>
+                  <div className="hidden flex-shrink-0 items-center gap-6 text-right sm:flex">
+                    <div>
+                      <p className="text-[12px] font-semibold text-gray-800">{enabledModules}/{MODULES.length}</p>
+                      <p className="text-[9.5px] text-gray-400">modules</p>
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-semibold text-gray-800">{enabledActions}</p>
+                      <p className="text-[9.5px] text-gray-400">actions</p>
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-semibold text-gray-800">{role.userCount}</p>
+                      <p className="text-[9.5px] text-gray-400">users</p>
+                    </div>
+                  </div>
+                </button>
 
-          <main className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_4px_18px_rgba(16,24,40,0.06)]">
-            <div className="relative overflow-hidden border-b border-orange-100 bg-gradient-to-r from-[#fff7ed] via-white to-white px-4 py-4 sm:px-5">
-              <span className="absolute inset-y-0 left-0 w-1 bg-brand" aria-hidden="true" />
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand text-[13px] font-semibold text-white shadow-sm">
-                    {selectedRole.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[17px] font-semibold text-gray-900">{selectedRole.name}</h2>
-                    {selectedRole.isProtected && <Lock size={13} className="text-violet-500" />}
-                    <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[9.5px] font-medium text-gray-500">
-                      {selectedRole.type === 'system' ? 'Base role' : 'Specialized role'}
-                    </span>
+                {mountedRoleIds.has(role.id) && (
+                  <div
+                    id={`permissions-${role.id}`}
+                    className={cn('border-t border-gray-100', !isExpanded && 'hidden')}
+                  >
+                    <RolePermissionTable
+                      role={role}
+                      roles={roles}
+                      filteredModules={filteredModules}
+                    />
                   </div>
-                  <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-gray-500">{selectedRole.description}</p>
-                  </div>
-                </div>
-                <div className="flex gap-5 text-right">
-                  <div>
-                    <p className="text-[15px] font-semibold text-gray-900">
-                      {countGrantedModules(resolveRolePermissions(selectedRole, roles))}/{MODULES.length}
-                    </p>
-                    <p className="text-[9px] text-gray-400">modules</p>
-                  </div>
-                  <div>
-                    <p className="text-[15px] font-semibold text-gray-900">{selectedRole.userCount}</p>
-                    <p className="text-[9px] text-gray-400">assigned users</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-b border-gray-200 bg-white px-4 py-3 sm:px-5">
-              <SearchInput
-                value={permissionSearch}
-                onChange={setPermissionSearch}
-                placeholder="Find a module or permission…"
-                aria-label="Search modules"
-                className="w-full sm:max-w-sm"
-              />
-            </div>
-
-            <RolePermissionTable
-              key={selectedRole.id}
-              role={selectedRole}
-              roles={roles}
-              filteredModules={filteredModules}
-            />
-          </main>
+                )}
+              </section>
+            );
+          })}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
