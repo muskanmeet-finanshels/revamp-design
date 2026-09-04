@@ -118,6 +118,33 @@ test('permission modules expose the required actions', () => {
   );
 });
 
+test('permission module catalog matches the required user-facing definitions', () => {
+  const requiredCatalog = [
+    { label: 'Dashboard', actions: ['View'] },
+    { label: 'Onboarding', actions: ['View', 'Create', 'Edit', 'Delete', 'Assign Service', 'Manage Requests'] },
+    { label: 'Onboarding Forms', actions: ['View', 'Edit', 'Delete'] },
+    { label: 'Project and Task Configuration', actions: ['View', 'Create', 'Edit', 'Delete'] },
+    { label: 'Clients', actions: ['View', 'Create', 'Edit', 'Delete', 'Send Invitation', 'Reset Password'] },
+    { label: 'Projects & Tasks', actions: ['View', 'Create', 'Edit', 'Delete', 'Reassign', 'Collaborate', 'Extend Deadlines'] },
+    { label: 'Timesheets', actions: ['View', 'Create', 'Edit', 'Delete', 'Submit', 'Approve', 'Reject', 'Comment'] },
+    { label: 'Documents & Reports', actions: ['View', 'Upload', 'Download', 'Delete', 'Export', 'Import'] },
+    { label: 'Audit Trail', actions: ['View', 'Download'] },
+    { label: 'Users & Roles', actions: ['View', 'Create', 'Edit', 'Delete', 'Manage Roles'] },
+    { label: 'Services', actions: ['View', 'Create', 'Edit', 'Delete'] },
+    { label: 'Content Management', actions: ['View', 'Create', 'Edit', 'Delete'] },
+    { label: 'Compliance Settings', actions: ['View', 'Edit'] },
+    { label: 'System Settings', actions: ['View', 'Edit'] },
+  ];
+
+  assert.deepEqual(
+    MODULES.map(module => ({
+      label: module.label,
+      actions: module.actions.map(action => action.label),
+    })),
+    requiredCatalog,
+  );
+});
+
 test('Admin role includes every required Users & Roles action', () => {
   const admin = MOCK_ROLES.find(role => role.id === 'role-admin');
   const enabledUserActions = admin?.permissions
