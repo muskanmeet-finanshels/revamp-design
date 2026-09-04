@@ -97,15 +97,15 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-3rem)] max-w-[420px] rounded-2xl bg-white p-6 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <DialogPrimitive.Title className="text-[16px] font-semibold text-gray-900">
-            Add Exception for {title}
+            Add access filter for {title}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="mt-2 text-[13px] text-gray-500 mb-5">
-            Narrow this All-records permission by department, account manager, service, or team.
+            Narrow this action's record access by department, account manager, service, or team. Reporting hierarchy remains a separate access scope.
           </DialogPrimitive.Description>
 
           <div className="space-y-4">
             <div>
-              <label className="text-[12px] font-medium text-gray-700 mb-1 block">Exception Type</label>
+              <label className="text-[12px] font-medium text-gray-700 mb-1 block">Filter type</label>
               <Select value={type} onValueChange={(v: any) => { setType(v); setTargetId(''); }}>
                 <SelectTrigger className="h-9 w-full rounded-lg border border-gray-200 text-[13px]">
                   <SelectValue />
@@ -120,7 +120,7 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
             </div>
 
             <div>
-              <label className="text-[12px] font-medium text-gray-700 mb-1 block">Target</label>
+              <label className="text-[12px] font-medium text-gray-700 mb-1 block">Filter target</label>
               <Select value={targetId} onValueChange={setTargetId}>
                 <SelectTrigger className="h-9 w-full rounded-lg border border-gray-200 text-[13px]">
                   <SelectValue placeholder="Select target..." />
@@ -155,7 +155,7 @@ function ExceptionDialog({ open, onClose, onAdd, title }: {
               disabled={!isValid}
               className="px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-medium hover:bg-brand-hover disabled:opacity-50"
             >
-              Add Exception
+              Add filter
             </button>
           </div>
         </DialogPrimitive.Content>
@@ -518,8 +518,8 @@ function RolePermissionTable({
                                       <div className="mt-3 border-t border-gray-100 pt-2.5">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                           <div>
-                                            <p className="text-[10.5px] font-semibold text-gray-700">Exceptions</p>
-                                            <p className="text-[9px] text-gray-500">Limit access to selected groups.</p>
+                                            <p className="text-[10.5px] font-semibold text-gray-700">Additional access filters</p>
+                                            <p className="text-[9px] text-gray-500">Limit records by a department, team, AM, or service.</p>
                                           </div>
                                           {!readOnly && !isInherited && (
                                             <button
@@ -531,7 +531,7 @@ function RolePermissionTable({
                                               })}
                                               className="inline-flex min-h-8 items-center gap-1 rounded-md border border-brand/30 px-2.5 text-[10px] font-semibold text-brand transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                                             >
-                                              <Plus size={11} /> Add exception
+                                              <Plus size={11} /> Add access filter
                                             </button>
                                           )}
                                         </div>
@@ -632,7 +632,7 @@ export function PermissionsScreen() {
       <div className="mb-5">
         <h1 className="text-[20px] font-semibold leading-tight text-gray-900 sm:text-[22px]">Permissions Configuration</h1>
         <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-gray-500">
-          Expand a role to configure module access, actions, data scope, and exceptions.
+          Set role actions, record access scopes, and optional business-attribute filters.
         </p>
         <div className="mt-4 w-full sm:max-w-sm">
           <SearchInput
