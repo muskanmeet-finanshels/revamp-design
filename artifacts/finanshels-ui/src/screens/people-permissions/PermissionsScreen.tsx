@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChevronDown, Lock, Save, SearchX, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -317,23 +317,27 @@ function RolePermissionTable({
         <div className="bg-[#f8fafc] p-3 sm:p-4">
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: `minmax(220px, 1fr) repeat(${matrixActions.length}, 86px)`,
-                  minWidth: `${Math.max(820, 220 + matrixActions.length * 86)}px`,
-                }}
+              <table
+                className="w-full min-w-[820px] table-auto"
               >
-                <div className="sticky left-0 z-10 flex items-center border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                  Module
-                </div>
+                <colgroup>
+                  <col className="min-w-[220px]" />
+                  {matrixActions.map(action => <col key={action.id} className="w-[86px]" />)}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                      Module
+                    </th>
                 {matrixActions.map(action => (
-                  <div key={action.id} className="flex items-center justify-center border-b border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-500">
+                  <th key={action.id} className="border-b border-gray-200 bg-gray-50 px-2 py-3 text-center text-[9.5px] font-semibold uppercase tracking-wide text-gray-500">
                     {action.label}
-                  </div>
+                  </th>
                 ))}
-
-                {filteredModules.map(module => {
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredModules.map(module => {
                   const enabledRules = module.actions
                     .map(action => ({ action, rule: getRule(module.id, action.id) }))
                     .filter(item => item.rule.enabled);
@@ -346,31 +350,33 @@ function RolePermissionTable({
                   const scopeExpanded = expandedScopeModules.has(module.id);
 
                   return (
-                    <div key={module.id} className="contents">
-                      <button
-                        type="button"
-                        onClick={() => toggleScopeModule(module.id)}
-                        aria-expanded={scopeExpanded}
-                        aria-controls={`module-permissions-${module.id}`}
-                        className="sticky left-0 z-[5] flex min-w-0 items-center gap-2.5 border-b border-r border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
-                      >
-                        <ChevronDown
-                          size={14}
-                          className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
-                          <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
-                        </span>
-                      </button>
+                    <Fragment key={module.id}>
+                      <td className="sticky left-0 z-[5] min-w-0 border-b border-r border-gray-100 bg-white p-0 align-middle">
+                        <button
+                          type="button"
+                          onClick={() => toggleScopeModule(module.id)}
+                          aria-expanded={scopeExpanded}
+                          aria-controls={`module-permissions-${module.id}`}
+                          className="flex w-full min-w-0 items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                        >
+                          <ChevronDown
+                            size={14}
+                            className={cn('flex-shrink-0 text-gray-400 transition-transform', !scopeExpanded && '-rotate-90')}
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate text-[12px] font-semibold text-gray-900">{module.label}</span>
+                            <span className="mt-0.5 block truncate text-[9.5px] text-gray-400">{scopeSummary}</span>
+                          </span>
+                        </button>
+                      </td>
 
                       {matrixActions.map(action => {
                         const supportedAction = module.actions.find(candidate => candidate.id === action.id);
                         if (!supportedAction) {
                           return (
-                            <div key={action.id} className="flex items-center justify-center border-b border-gray-100 px-2 py-3">
+                            <td key={action.id} className="border-b border-gray-100 px-2 py-3 text-center align-middle">
                               <span className="text-gray-200">—</span>
-                            </div>
+                            </td>
                           );
                         }
 
@@ -399,10 +405,10 @@ function RolePermissionTable({
                       })}
 
                       {scopeExpanded && (
-                        <div
+                        <td
                           id={`module-permissions-${module.id}`}
+                          colSpan={matrixActions.length + 1}
                           className="border-b border-gray-100 bg-gray-50 px-4 py-4"
-                          style={{ gridColumn: '1 / -1' }}
                         >
                           {enabledRules.length === 0 ? (
                             <p className="text-[11px] text-gray-500">Enable an action to configure its data scope.</p>
@@ -499,12 +505,21 @@ function RolePermissionTable({
                               })}
                             </div>
                           )}
-                        </div>
+                        </td>
                       )}
-                    </div>
+                    </tr>
+                    {scopeExpanded && (
+                      <tr>
+                        <td colSpan={matrixActions.length + 1} className="p-0">
+                          <div className="hidden" aria-hidden="true" />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
-              </div>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
