@@ -461,31 +461,40 @@ export function TasksScreen() {
 
   function openDeleteTask(id: string) {
     const task = displayTasks.find(item => item.id === id);
-    if (task) setDeleteTasks([task]);
+    if (task && task.status !== 'Done' && task.status !== 'Completed') {
+      setDeleteTasks([task]);
+    }
   }
 
   function openDeleteSelectedTasks() {
-    const selected = displayTasks.filter(task => selectedIds.has(task.id));
+    const selected = displayTasks.filter(
+      task => selectedIds.has(task.id)
+        && task.status !== 'Done'
+        && task.status !== 'Completed',
+    );
     if (selected.length > 0) setDeleteTasks(selected);
   }
 
   function handleDeleteTasks(reason: string) {
-    if (deleteTasks.length === 0 || !reason.trim()) return;
+    const deletableTasks = deleteTasks.filter(
+      task => task.status !== 'Done' && task.status !== 'Completed',
+    );
+    if (deletableTasks.length === 0 || !reason.trim()) return;
 
     setDeletedTaskIds(prev => {
       const next = new Set(prev);
-      deleteTasks.forEach(task => next.add(task.id));
+      deletableTasks.forEach(task => next.add(task.id));
       return next;
     });
     setSelectedIds(prev => {
       const next = new Set(prev);
-      deleteTasks.forEach(task => next.delete(task.id));
+      deletableTasks.forEach(task => next.delete(task.id));
       return next;
     });
-    deleteTasks.forEach(task => {
+    deletableTasks.forEach(task => {
       localStorage.setItem(`fh_task_delete_reason_${task.id}`, reason.trim());
     });
-    const count = deleteTasks.length;
+    const count = deletableTasks.length;
     setDeleteTasks([]);
     toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} deleted`, {
       description: `Reason: ${reason}`,
@@ -574,6 +583,9 @@ export function TasksScreen() {
   );
   const selectedTasks = displayTasks.filter(task => selectedIds.has(task.id));
   const hasArchivedSelected = selectedTasks.some(task => task.status === 'Archived');
+  const hasCompletedSelected = selectedTasks.some(
+    task => task.status === 'Done' || task.status === 'Completed',
+  );
   const allSelectedOnHold = selectedTasks.length > 0
     && selectedTasks.every(task => task.status === 'On Hold');
 
@@ -1050,7 +1062,7 @@ export function TasksScreen() {
         onReassign={() => setReassignDrawerOpen(true)}
         onChangeStatus={() => setChangeStatusDrawerOpen(true)}
         onEditDeadline={() => setEditDeadlineOpen(true)}
-        onDelete={openDeleteSelectedTasks}
+        onDelete={hasCompletedSelected ? undefined : openDeleteSelectedTasks}
         onClear={clearSelection}
       />
 

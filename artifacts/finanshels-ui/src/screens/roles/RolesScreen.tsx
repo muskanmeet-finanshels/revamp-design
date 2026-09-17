@@ -717,8 +717,8 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                     <p className="font-semibold">Deactivation requires dependency transfer.</p>
                     <p className="mt-0.5 leading-snug text-amber-700">
                       {hasAssignments
-                        ? `${assignedUserCount} user${assignedUserCount !== 1 ? 's' : ''} and ${assignedGroups.length} group${assignedGroups.length !== 1 ? 's are' : ' is'} assigned this role. Select a replacement role before deactivating.`
-                        : 'No users or groups are assigned to this role — you can proceed without transferring.'}
+                        ? `${assignedUserCount} user${assignedUserCount !== 1 ? 's are' : ' is'} assigned this role. Select a replacement role before deactivating.`
+                        : 'No users are assigned to this role — you can proceed without transferring.'}
                     </p>
                   </div>
                 </div>
@@ -823,26 +823,12 @@ function DeactivateRoleDrawer({ role, allRoles, onClose, onConfirm }: {
                         </div>
                       </div>
                     )}
-                    {assignedGroups.length > 0 && (
-                      <div>
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                          Affected Employee Groups
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {assignedGroups.map(group => (
-                            <span key={group.id} className="rounded-md bg-purple-50 px-2.5 py-1 text-[11.5px] font-medium text-purple-700">
-                              {group.name}{transferRole ? ` → ${transferRole.name}` : ''}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
                     <UserCheck size={16} className="text-emerald-500 flex-shrink-0" />
                     <p className="text-[13px] text-emerald-700 font-medium">
-                      No users or groups assigned — safe to deactivate without transfer.
+                      No users assigned — safe to deactivate without transfer.
                     </p>
                   </div>
                 )}

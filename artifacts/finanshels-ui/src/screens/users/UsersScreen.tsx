@@ -33,10 +33,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
-  MOCK_DEPARTMENTS, MOCK_TEAMS, MOCK_VERTICALS,
+  MOCK_DEPARTMENTS, MOCK_VERTICALS,
   MOCK_USER_DEPENDENCIES,
   ALLOW_MULTIPLE_ROLES, ROLE_OPTIONS,
-  type AppUser, type EmployeeGroup, type UserStatus, type UserRole, type UserDependency,
+  type AppUser, type UserStatus, type UserRole, type UserDependency,
 } from './mock-data';
 import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 import { useEmployeeGroupsContext } from '@/contexts/EmployeeGroupsContext';
@@ -452,11 +452,10 @@ interface UserDrawerProps {
   onClose: () => void;
   editUser: AppUser | null;
   allUsers: AppUser[];
-  groups: EmployeeGroup[];
   onSave: (data: Partial<AppUser>, editingUserId?: string) => void;
 }
 
-function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserDrawerProps) {
+function UserDrawer({ open, onClose, editUser, allUsers, onSave }: UserDrawerProps) {
   const { roles: allRolesContext } = useAccessControlContext();
   const [mounted, setMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -470,12 +469,8 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
   const [phone,             setPhone]             = useState('');
   const [jobTitle,          setJobTitle]          = useState('');
   const [employeeId,        setEmployeeId]        = useState('');
-  const [departmentId,      setDepartmentId]      = useState('');
-  const [teamId,            setTeamId]            = useState('');
-  const [verticalIds,       setVerticalIds]       = useState<string[]>([]);
   const [reportingManagerId, setReportingManagerId] = useState('');
   const [roles,             setRoles]             = useState<UserRole[]>([]);
-  const [employeeGroups,    setEmployeeGroups]    = useState<string[]>([]);
   const [joiningDate,       setJoiningDate]       = useState('');
   const [showErrors,        setShowErrors]        = useState(false);
 
@@ -492,22 +487,13 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
         setPhone(editUser.phone ?? '');
         setJobTitle(editUser.jobTitle ?? '');
         setEmployeeId(editUser.employeeId ?? '');
-        setDepartmentId(editUser.departmentId);
-        setTeamId(editUser.teamId ?? '');
-        setVerticalIds(editUser.verticalIds?.length
-          ? [...editUser.verticalIds]
-          : editUser.verticalId
-            ? [editUser.verticalId]
-            : []);
         setReportingManagerId(editUser.reportingManagerId ?? '');
         setRoles([...editUser.roles]);
-        setEmployeeGroups([...editUser.employeeGroups]);
         setJoiningDate(editUser.joiningDate ?? '');
       } else {
         setFirstName(''); setLastName(''); setEmail(''); setPhone('');
-        setJobTitle(''); setEmployeeId(''); setDepartmentId('');
-        setTeamId(''); setVerticalIds([]); setReportingManagerId('');
-        setRoles([]); setEmployeeGroups([]); setJoiningDate('');
+        setJobTitle(''); setEmployeeId(''); setReportingManagerId('');
+        setRoles([]); setJoiningDate('');
       }
     }
   }, [open, editUser]);
@@ -517,9 +503,6 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  /* Cascading selects */
-  const deptTeams     = MOCK_TEAMS.filter(t => t.departmentId === departmentId);
-  const deptVerticals = MOCK_VERTICALS.filter(v => v.departmentId === departmentId);
   const managerOptions = allUsers
     .filter(u => {
       if (u.status !== 'Active') return false;
@@ -533,13 +516,11 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
   const firstNameErr = showErrors && !firstName.trim();
   const lastNameErr  = showErrors && !lastName.trim();
   const emailErr     = showErrors && (!email.trim() || !isValidEmail(email));
-  const deptErr      = showErrors && !departmentId;
   const rolesErr     = showErrors && roles.length === 0;
   const isFormValid =
     Boolean(firstName.trim()) &&
     Boolean(lastName.trim()) &&
     isValidEmail(email) &&
-    Boolean(departmentId) &&
     roles.length > 0;
 
   function handleSave() {
@@ -554,13 +535,8 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
       phone: phone.trim() || undefined,
       jobTitle: jobTitle.trim() || undefined,
       employeeId: employeeId.trim() || undefined,
-      departmentId,
-      teamId: teamId || undefined,
-      verticalIds: verticalIds.length ? verticalIds : undefined,
-      verticalId: verticalIds[0] || undefined,
       reportingManagerId: reportingManagerId || undefined,
       roles,
-      employeeGroups,
       joiningDate: joiningDate || undefined,
     }, editUser?.id);
   }
@@ -611,7 +587,7 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
           <div className="space-y-4 px-5 py-5">
 
             {/* Required notice */}
-            {showErrors && (firstNameErr || lastNameErr || emailErr || deptErr || rolesErr) && (
+            {showErrors && (firstNameErr || lastNameErr || emailErr || rolesErr) && (
               <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                 <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-red-500" />
                 <p className="text-[13px] text-red-700">Please fill in all required fields before saving.</p>
@@ -669,40 +645,6 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
 
             <div className="border-t border-gray-100" />
 
-            {/* Organisation */}
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Organisation</p>
-
-            <DrawerField label="Department" required>
-              <DrawerSelectField
-                value={departmentId}
-                onChange={v => { setDepartmentId(v); setTeamId(''); setVerticalIds([]); }}
-                placeholder="Select department…"
-                options={MOCK_DEPARTMENTS.filter(d => d.status === 'Active').map(d => ({ value: d.id, label: d.name }))}
-                error={deptErr}
-              />
-            </DrawerField>
-            <div className="grid grid-cols-2 gap-3">
-              <DrawerField label="Team">
-                <DrawerSelectField
-                  value={teamId}
-                  onChange={setTeamId}
-                  placeholder="Select team…"
-                  options={deptTeams.map(t => ({ value: t.id, label: t.name }))}
-                />
-              </DrawerField>
-              <DrawerField label="Verticals">
-                <MultiSelectField
-                  selected={verticalIds}
-                  onChange={setVerticalIds}
-                  placeholder="Select verticals…"
-                  summaryNoun="verticals"
-                  options={deptVerticals.map(v => ({ value: v.id, label: v.name }))}
-                />
-              </DrawerField>
-            </div>
-            <p className="-mt-1 text-[11.5px] leading-relaxed text-gray-400">
-              Department and verticals are for organisational classification, filtering, and reporting only. They do not grant permissions or change data access.
-            </p>
             <DrawerField label="Reporting Manager">
               <DrawerSelectField
                 value={reportingManagerId}
@@ -739,19 +681,6 @@ function UserDrawer({ open, onClose, editUser, allUsers, groups, onSave }: UserD
                   ? 'Users can be assigned multiple roles when this setting is enabled. Module access is inherited from all assigned roles.'
                   : 'Each user can have one role. Module access is inherited from the assigned role.'}
               </p>
-            </DrawerField>
-
-            {/* Employee Groups */}
-            <DrawerField label="Assign Employee Groups">
-              <MultiSelectField
-                selected={employeeGroups}
-                onChange={setEmployeeGroups}
-                placeholder="Select employee group…"
-                summaryNoun="groups"
-                options={groups
-                  .filter(group => group.status === 'Active')
-                  .map(group => ({ value: group.name, label: group.name }))}
-              />
             </DrawerField>
 
           </div>
@@ -1157,7 +1086,7 @@ function ExitDrawer({ open, onClose, user, allUsers, onConfirm }: ExitDrawerProp
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { users, groups, saveUser, updateUserStatus } = useEmployeeGroupsContext();
+  const { users, saveUser, updateUserStatus } = useEmployeeGroupsContext();
 
   /* Filters */
   const [search,       setSearch]       = useState('');
@@ -1876,7 +1805,6 @@ export function UsersScreen({ hideHeader = false }: { hideHeader?: boolean }) {
         onClose={() => { setDrawerOpen(false); setEditUser(null); }}
         editUser={editUser}
         allUsers={users}
-        groups={groups}
         onSave={handleSave}
       />
 

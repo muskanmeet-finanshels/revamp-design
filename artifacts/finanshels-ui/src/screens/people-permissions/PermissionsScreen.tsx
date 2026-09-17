@@ -368,7 +368,7 @@ function RolePermissionTable({
         </div>
       ) : (
         <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+            <div className="relative w-full min-w-0 overflow-x-auto overscroll-x-contain">
               <table
                 className="w-full min-w-[1760px] table-auto"
               >
@@ -473,8 +473,9 @@ function RolePermissionTable({
                         <tr id={`module-permissions-${module.id}`} className="border-b border-gray-100">
                           <td
                             colSpan={matrixActions.length + 1}
-                            className="bg-gray-50 px-4 py-4"
+                            className="bg-gray-50 p-0"
                           >
+                          <div className="sticky left-0 w-[calc(100vw-2rem)] max-w-[1180px] px-4 py-4 md:w-[calc(100vw-18rem)]">
                           {enabledRules.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3">
                               <p className="text-[12px] font-medium text-gray-700">No data scope to configure yet</p>
@@ -488,7 +489,7 @@ function RolePermissionTable({
                                   Choose which records each enabled action can access.
                                 </p>
                               </div>
-                              <div className="grid gap-3 md:grid-cols-2">
+                              <div className="space-y-2">
                               {enabledRules.map(({ action, rule }) => {
                                 const inheritedRule = basePermissions.find(
                                   permission => permission.moduleId === module.id && permission.actionId === action.id,
@@ -496,9 +497,9 @@ function RolePermissionTable({
                                 const isInherited = Boolean(inheritedRule?.enabled);
 
                                 return (
-                                  <fieldset key={action.id} className="min-w-0 rounded-lg border border-gray-200 bg-white p-3">
+                                  <fieldset key={action.id} className="grid min-w-0 gap-3 rounded-lg border border-gray-200 bg-white p-3 lg:grid-cols-[160px_minmax(0,1fr)] lg:items-start">
                                     <legend className="sr-only">{action.label} data access</legend>
-                                    <div className="mb-2.5 flex items-start justify-between gap-2">
+                                    <div className="flex items-start justify-between gap-2 lg:pt-1">
                                       <div>
                                         <p className="text-[12px] font-semibold text-gray-900">{action.label}</p>
                                         <p className="mt-0.5 text-[10px] text-gray-500">
@@ -549,7 +550,7 @@ function RolePermissionTable({
                                       })}
                                     </div>
                                     {rule.scope === 'All' && (
-                                      <div className="mt-3 border-t border-gray-100 pt-2.5">
+                                      <div className="border-t border-gray-100 pt-2.5 lg:col-start-2">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                           <div>
                                             <p className="text-[10.5px] font-semibold text-gray-700">Additional access filters</p>
@@ -608,6 +609,7 @@ function RolePermissionTable({
                               </div>
                             </div>
                           )}
+                          </div>
                           </td>
                         </tr>
                       )}

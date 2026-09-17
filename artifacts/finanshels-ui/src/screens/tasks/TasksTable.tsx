@@ -1239,7 +1239,7 @@ export function TasksTable({
                 <TooltipContent side="top" sideOffset={6} className="rounded-md bg-[#082032] px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg">Resume</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          ) : task.status === 'Done' ? (
+          ) : task.status === 'Done' || task.status === 'Completed' ? (
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>
