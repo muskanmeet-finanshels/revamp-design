@@ -219,7 +219,7 @@ export function ProjectsTable({
   }
 
   /* ordered list of visible columns */
-  const orderedVisible = columnOrder.filter(k => visibleColumns.has(k));
+  const orderedVisible = columnOrder.filter(k => k === 'resume' || visibleColumns.has(k));
 
   const sortProps = { currentKey: sortKey, currentDir: sortDir, onSort };
 

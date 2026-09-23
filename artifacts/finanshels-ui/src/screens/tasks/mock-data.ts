@@ -19,6 +19,7 @@ export interface TaskItem {
   isAdHoc?:          boolean;
   frequency?:        string;
   createdAt?:        string;
+  updatedAt?:        string;
   status:            TaskStatus;
   priority:          TaskPriority;
   dueDate:           string;                 // ISO YYYY-MM-DD

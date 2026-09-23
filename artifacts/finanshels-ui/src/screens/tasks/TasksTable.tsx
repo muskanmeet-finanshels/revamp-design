@@ -56,7 +56,8 @@ export type TaskColumnKey =
   | 'action'
   | 'adhoc'
   | 'frequency'
-  | 'createdDate';
+  | 'createdDate'
+  | 'lastUpdated';
 
 export const TASK_COLUMN_OPTIONS: Array<{ key: TaskColumnKey; label: string }> = [
   { key: 'project',          label: 'Project' },
@@ -72,6 +73,7 @@ export const TASK_COLUMN_OPTIONS: Array<{ key: TaskColumnKey; label: string }> =
   { key: 'adhoc',            label: 'Adhoc' },
   { key: 'frequency',        label: 'Frequency' },
   { key: 'createdDate',      label: 'Created Date' },
+  { key: 'lastUpdated',       label: 'Last Updated' },
 ];
 
 export const DEFAULT_TASK_COLUMNS: TaskColumnKey[] = [
@@ -93,6 +95,7 @@ const TASK_COLUMN_WEIGHTS: Record<TaskColumnKey, number> = {
   adhoc:            9,
   frequency:        11,
   createdDate:      14,
+  lastUpdated:      14,
 };
 
 const DEFAULT_VISIBLE_TASK_COLUMNS = new Set<TaskColumnKey>(DEFAULT_TASK_COLUMNS);
@@ -1008,7 +1011,7 @@ export function TasksTable({
   /* ── Drag-and-drop column order ── */
   const activeColumnOrder = columnOrder ?? TASK_COLUMN_OPTIONS.map(({ key }) => key);
   const orderedVisible = activeColumnOrder.filter(k =>
-    activeColumns.has(k) && (k !== 'project' || showProject),
+    (k === 'action' || activeColumns.has(k)) && (k !== 'project' || showProject),
   );
   const dragKey = useRef<TaskColumnKey | null>(null);
   const [dropTarget, setDropTarget] = useState<TaskColumnKey | null>(null);
@@ -1099,8 +1102,10 @@ export function TasksTable({
           <span className="text-[12px] text-gray-700">{task.frequency || '—'}</span>
         </TableCell>
       );
-      case 'createdDate': {
-        const date = task.createdAt ? new Date(`${task.createdAt.slice(0, 10)}T00:00:00`) : null;
+      case 'createdDate':
+      case 'lastUpdated': {
+        const value = key === 'createdDate' ? task.createdAt : task.updatedAt;
+        const date = value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
         const label = date && !Number.isNaN(date.getTime())
           ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
           : '—';
@@ -1303,7 +1308,7 @@ export function TasksTable({
   const taskColumnWeight = 18;
   const visibleColumnWeight = TASK_COLUMN_OPTIONS.reduce(
     (total, { key }) => total + (
-      activeColumns.has(key) && (key !== 'project' || showProject)
+       (key === 'action' || activeColumns.has(key)) && (key !== 'project' || showProject)
         ? TASK_COLUMN_WEIGHTS[key]
         : 0
     ),

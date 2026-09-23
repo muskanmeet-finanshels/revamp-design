@@ -376,6 +376,7 @@ export function TasksScreen() {
   }
 
   function toggleColumn(column: TaskColumnKey) {
+    if (column === 'action') return;
     setVisibleColumns(prev => {
       const next = new Set(prev);
       if (next.has(column)) next.delete(column);
@@ -387,7 +388,7 @@ export function TasksScreen() {
   function toggleAllColumns() {
     setVisibleColumns(prev =>
       prev.size === TASK_COLUMN_OPTIONS.length
-        ? new Set<TaskColumnKey>()
+        ? new Set<TaskColumnKey>(['action'])
         : new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key)),
     );
   }
@@ -603,7 +604,7 @@ export function TasksScreen() {
     try {
       downloadCsv('tasks.csv', [
         'Task', 'Projects', 'Assignee', 'Reassignment Note', 'Due Date',
-        'Status', 'Time Spent (seconds)', 'Priority', 'Adhoc', 'Frequency', 'Created Date',
+        'Status', 'Time Spent (seconds)', 'Priority', 'Adhoc', 'Frequency', 'Created Date', 'Last Updated',
       ], downloadTasks.map(task => [
         task.name,
         task.projects.map(getProjectDisplayName).join(', '),
@@ -616,6 +617,7 @@ export function TasksScreen() {
         task.isAdHoc == null ? '' : task.isAdHoc ? 'Yes' : 'No',
         task.frequency,
         task.createdAt,
+        task.updatedAt,
       ]));
       const count = downloadTasks.length;
       setDownloadTasks(null);
@@ -878,13 +880,18 @@ export function TasksScreen() {
                     const option = TASK_COLUMN_OPTIONS.find(o => o.key === key);
                     if (!option) return null;
                     const { label } = option;
-                    const checked = visibleColumns.has(key);
+                    const required = key === 'action';
+                    const checked = required || visibleColumns.has(key);
                     return (
                       <button
                         key={key}
                         type="button"
+                        disabled={required}
                         onClick={() => toggleColumn(key)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] transition-colors',
+                          required ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-50',
+                        )}
                       >
                         <span className={cn(
                           'flex h-4 w-4 items-center justify-center rounded border',
@@ -893,6 +900,7 @@ export function TasksScreen() {
                           {checked && <Check size={11} strokeWidth={3} />}
                         </span>
                         {label}
+                        {required && <span className="ml-auto text-[10px] text-gray-400">Required</span>}
                       </button>
                     );
                   })}

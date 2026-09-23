@@ -391,6 +391,7 @@ export function ProjectTasksScreen() {
   );
 
   function toggleColumn(column: TaskColumnKey) {
+    if (column === 'action') return;
     setVisibleColumns(prev => {
       const next = new Set(prev);
       if (next.has(column)) next.delete(column);
@@ -402,7 +403,7 @@ export function ProjectTasksScreen() {
   function toggleAllColumns() {
     setVisibleColumns(prev =>
       prev.size === PROJECT_TASK_COLUMN_OPTIONS.length
-        ? new Set<TaskColumnKey>()
+        ? new Set<TaskColumnKey>(['action'])
         : new Set(PROJECT_TASK_COLUMN_OPTIONS.map(({ key }) => key)),
     );
   }
@@ -858,13 +859,18 @@ export function ProjectTasksScreen() {
                 </button>
                 <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'min(250px, 45vh)' }}>
                   {PROJECT_TASK_COLUMN_OPTIONS.map(({ key, label }) => {
-                    const checked = visibleColumns.has(key);
+                    const required = key === 'action';
+                    const checked = required || visibleColumns.has(key);
                     return (
                       <button
                         key={key}
                         type="button"
+                        disabled={required}
                         onClick={() => toggleColumn(key)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] transition-colors',
+                          required ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-50',
+                        )}
                       >
                         <span className={cn(
                           'flex h-4 w-4 items-center justify-center rounded border',
@@ -873,6 +879,7 @@ export function ProjectTasksScreen() {
                           {checked && <Check size={11} strokeWidth={3} />}
                         </span>
                         {label}
+                        {required && <span className="ml-auto text-[10px] text-gray-400">Required</span>}
                       </button>
                     );
                   })}
