@@ -625,6 +625,14 @@ export function ProjectTasksScreen() {
     );
 
     const af = appliedFilters;
+    if (af.taskCategories?.length) {
+      list = list.filter(task =>
+        af.taskCategories.some(category => matchesStatusView(task, category as StatusView)),
+      );
+    }
+    if (af.taskStatuses?.length) {
+      list = list.filter(task => af.taskStatuses.includes(task.status));
+    }
     if (af.clients.length   > 0) list = list.filter(t => t.projects.some(p => af.clients.includes(p.clientName)));
     if (af.assignees.length > 0) list = list.filter(t => af.assignees.includes(t.assignee?.name ?? ''));
 
@@ -666,10 +674,10 @@ export function ProjectTasksScreen() {
   const safePage   = Math.min(page, totalPages);
   const activeFilterChips: ActiveFilterChip[] = [];
   const taskArrayChip = (
-    key: keyof Pick<TaskFilterState, 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>,
+    key: keyof Pick<TaskFilterState, 'taskCategories' | 'taskStatuses' | 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'services' | 'assignees' | 'tags'>,
     label: string,
   ) => {
-    const values = appliedFilters[key];
+    const values = appliedFilters[key] ?? [];
     if (values.length === 0) return;
     values.forEach(value => activeFilterChips.push({
       key: makeActiveFilterChipKey(key, value),
@@ -677,6 +685,8 @@ export function ProjectTasksScreen() {
       value,
     }));
   };
+  taskArrayChip('taskCategories', 'Task Category');
+  taskArrayChip('taskStatuses', 'Task Status');
   taskArrayChip('taskNames', 'Task');
   taskArrayChip('frequencies', 'Frequency');
   taskArrayChip('clients', 'Client');
@@ -696,13 +706,13 @@ export function ProjectTasksScreen() {
 
   function removeTaskFilter(key: string) {
     const { filterKey, value } = parseActiveFilterChipKey(key);
-    const arrayKeys = ['taskNames', 'frequencies', 'clients', 'projectNames', 'services', 'assignees', 'tags'] as const;
+    const arrayKeys = ['taskCategories', 'taskStatuses', 'taskNames', 'frequencies', 'clients', 'projectNames', 'services', 'assignees', 'tags'] as const;
     const next = { ...appliedFilters };
     if ((arrayKeys as readonly string[]).includes(filterKey)) {
       const arrayKey = filterKey as typeof arrayKeys[number];
       next[arrayKey] = value === null
         ? []
-        : appliedFilters[arrayKey].filter(option => option !== value);
+        : (appliedFilters[arrayKey] ?? []).filter(option => option !== value);
     } else if (filterKey === 'dueDateFilter') {
       next.dueDateFilter = 'All dates';
       next.dueDateStart = '';

@@ -23,6 +23,8 @@ import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 /* ─────────────────────────────── option lists ───────────────────────────── */
 
 export const TASK_FILTER_OPTIONS = {
+  taskCategories: ['Overdue', 'Today', 'Next 30 days', 'Completed', 'Upcoming', 'On Hold', 'Archived'] as const,
+  taskStatuses: ['To Do', 'In Progress', 'Done', 'Overdue', 'On Hold', 'Archived', 'In Review', 'Completed'] as const,
   taskNames: [
     'VAT Filing', 'Bookkeeping', 'CT Registration', 'Payroll Management',
     'Audit Review', 'Compliance Check', 'Financial Statements', 'Tax Return',
@@ -76,6 +78,12 @@ function useSavedFilters(storageKey: string) {
           filters: {
             ...filter.filters,
             projectNames: normalizeProjectFilterNames(filter.filters?.projectNames),
+            taskCategories: Array.isArray(filter.filters?.taskCategories)
+              ? filter.filters.taskCategories.filter(value => (TASK_FILTER_OPTIONS.taskCategories as readonly string[]).includes(value))
+              : [],
+            taskStatuses: Array.isArray(filter.filters?.taskStatuses)
+              ? filter.filters.taskStatuses.filter(value => (TASK_FILTER_OPTIONS.taskStatuses as readonly string[]).includes(value))
+              : [],
           },
         }));
         setSaved(normalized);
@@ -130,6 +138,8 @@ function useSavedFilters(storageKey: string) {
 /* ─────────────────────────────── filter state ───────────────────────────── */
 
 export interface TaskFilterState {
+  taskCategories: string[];
+  taskStatuses: string[];
   taskNames:    string[];
   frequencies:  string[];
   clients:      string[];
@@ -144,6 +154,7 @@ export interface TaskFilterState {
 }
 
 export const EMPTY_TASK_FILTERS: TaskFilterState = {
+  taskCategories: [], taskStatuses: [],
   taskNames: [], frequencies: [], clients: [], projectNames: [],
   departments: [], services: [], assignees: [], tags: [],
   dueDateFilter: 'All dates',
@@ -153,6 +164,8 @@ export const EMPTY_TASK_FILTERS: TaskFilterState = {
 
 export function countActiveTaskFilters(f: TaskFilterState): number {
   return (
+    ((f.taskCategories?.length ?? 0) > 0 ? 1 : 0) +
+    ((f.taskStatuses?.length ?? 0) > 0 ? 1 : 0) +
     (f.taskNames.length > 0 ? 1 : 0) +
     (f.frequencies.length > 0 ? 1 : 0) +
     (f.clients.length > 0 ? 1 : 0) +
@@ -988,6 +1001,24 @@ export function TaskFilterDrawer({
 
             {/* Continuous two-column flow keeps every field aligned without blank grid cells. */}
             <div className="grid grid-cols-2 gap-4">
+              <MultiSelectDropdown
+                label="Task Category"
+                placeholder="Select categories..."
+                options={TASK_FILTER_OPTIONS.taskCategories}
+                selected={pending.taskCategories ?? []}
+                onChange={v => set('taskCategories', v)}
+                searchPlaceholder="Search categories..."
+                drawerOpen={open}
+              />
+              <MultiSelectDropdown
+                label="Task Status"
+                placeholder="Select statuses..."
+                options={TASK_FILTER_OPTIONS.taskStatuses}
+                selected={pending.taskStatuses ?? []}
+                onChange={v => set('taskStatuses', v)}
+                searchPlaceholder="Search statuses..."
+                drawerOpen={open}
+              />
               <MultiSelectDropdown
                 label="Task Name"
                 placeholder="Select tasks..."
