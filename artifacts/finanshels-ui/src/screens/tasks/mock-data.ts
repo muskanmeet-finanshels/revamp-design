@@ -16,6 +16,9 @@ export interface TaskItem {
   projects:          TaskProject[];          // supports multiple
   assignee:          { initials: string; name: string } | null;
   reassignmentNote?: string;
+  isAdHoc?:          boolean;
+  frequency?:        string;
+  createdAt?:        string;
   status:            TaskStatus;
   priority:          TaskPriority;
   dueDate:           string;                 // ISO YYYY-MM-DD

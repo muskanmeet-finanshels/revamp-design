@@ -53,7 +53,10 @@ export type TaskColumnKey =
   | 'timer'
   | 'comments'
   | 'tags'
-  | 'action';
+  | 'action'
+  | 'adhoc'
+  | 'frequency'
+  | 'createdDate';
 
 export const TASK_COLUMN_OPTIONS: Array<{ key: TaskColumnKey; label: string }> = [
   { key: 'project',          label: 'Project' },
@@ -66,6 +69,14 @@ export const TASK_COLUMN_OPTIONS: Array<{ key: TaskColumnKey; label: string }> =
   { key: 'comments',         label: 'Comments' },
   { key: 'tags',             label: 'Tags' },
   { key: 'action',           label: 'Action' },
+  { key: 'adhoc',            label: 'Adhoc' },
+  { key: 'frequency',        label: 'Frequency' },
+  { key: 'createdDate',      label: 'Created Date' },
+];
+
+export const DEFAULT_TASK_COLUMNS: TaskColumnKey[] = [
+  'project', 'assignee', 'reassignmentNote', 'dueDate', 'status',
+  'timeSpent', 'timer', 'comments', 'tags', 'action',
 ];
 
 const TASK_COLUMN_WEIGHTS: Record<TaskColumnKey, number> = {
@@ -79,11 +90,12 @@ const TASK_COLUMN_WEIGHTS: Record<TaskColumnKey, number> = {
   comments:         7,
   tags:             12,
   action:           6,
+  adhoc:            9,
+  frequency:        11,
+  createdDate:      14,
 };
 
-const DEFAULT_VISIBLE_TASK_COLUMNS = new Set<TaskColumnKey>(
-  TASK_COLUMN_OPTIONS.map(({ key }) => key),
-);
+const DEFAULT_VISIBLE_TASK_COLUMNS = new Set<TaskColumnKey>(DEFAULT_TASK_COLUMNS);
 
 const TAG_BADGE: Record<string, string> = {
   a1: 'bg-red-100    text-red-600',
@@ -1077,6 +1089,27 @@ export function TasksTable({
     const tag          = getTag(task.id);
     const hasTags      = Boolean(tag.priority);
     switch (key) {
+      case 'adhoc': return (
+        <TableCell key={key} className="py-3">
+          <span className="text-[12px] text-gray-700">{task.isAdHoc == null ? '—' : task.isAdHoc ? 'Yes' : 'No'}</span>
+        </TableCell>
+      );
+      case 'frequency': return (
+        <TableCell key={key} className="py-3">
+          <span className="text-[12px] text-gray-700">{task.frequency || '—'}</span>
+        </TableCell>
+      );
+      case 'createdDate': {
+        const date = task.createdAt ? new Date(`${task.createdAt.slice(0, 10)}T00:00:00`) : null;
+        const label = date && !Number.isNaN(date.getTime())
+          ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '—';
+        return (
+          <TableCell key={key} className="py-3">
+            <span className="whitespace-nowrap text-[12px] text-gray-700">{label}</span>
+          </TableCell>
+        );
+      }
       case 'project': return (
         <TableCell key={key} className="py-3">
           <TooltipProvider delayDuration={150}>
@@ -1387,7 +1420,10 @@ export function TasksTable({
   return (
     <>
     <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 bg-white shadow-sm">
-      <Table className="w-full min-w-[1220px] table-auto">
+      <Table
+        className="w-full table-auto"
+        style={{ minWidth: 1220 + Math.max(0, orderedVisible.length - DEFAULT_TASK_COLUMNS.length + (showProject ? 0 : 1)) * 130 }}
+      >
 
         <TableHeader className="whitespace-nowrap">
           <TableRow className="border-b border-gray-200 bg-gray-50 hover:bg-gray-50">

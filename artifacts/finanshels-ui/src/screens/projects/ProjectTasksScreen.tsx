@@ -31,6 +31,7 @@ import {
 import {
   TasksTable,
   TASK_COLUMN_OPTIONS,
+  DEFAULT_TASK_COLUMNS,
   type SortKey,
   type TaskColumnKey,
 } from '../tasks/TasksTable';
@@ -386,7 +387,7 @@ export function ProjectTasksScreen() {
   }
 
   const [visibleColumns, setVisibleColumns] = useState<Set<TaskColumnKey>>(
-    () => new Set(PROJECT_TASK_COLUMN_OPTIONS.map(({ key }) => key)),
+    () => new Set(DEFAULT_TASK_COLUMNS.filter(key => key !== 'project')),
   );
 
   function toggleColumn(column: TaskColumnKey) {
@@ -405,6 +406,10 @@ export function ProjectTasksScreen() {
         : new Set(PROJECT_TASK_COLUMN_OPTIONS.map(({ key }) => key)),
     );
   }
+
+  const projectTaskDefaultColumns = DEFAULT_TASK_COLUMNS.filter(key => key !== 'project');
+  const columnsCustomized = visibleColumns.size !== projectTaskDefaultColumns.length
+    || projectTaskDefaultColumns.some(key => !visibleColumns.has(key));
 
   /* pagination + selection */
   const [page, setPage] = useState(1);
@@ -796,14 +801,14 @@ export function ProjectTasksScreen() {
                       aria-label="Select columns"
                       className={cn(
                         'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
-                        visibleColumns.size < PROJECT_TASK_COLUMN_OPTIONS.length
+                        columnsCustomized
                           ? 'border-brand text-brand hover:bg-orange-50/50'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
                       )}
                     >
                       <Columns3
                         size={13}
-                        className={visibleColumns.size < PROJECT_TASK_COLUMN_OPTIONS.length ? 'text-brand' : 'text-gray-500'}
+                        className={columnsCustomized ? 'text-brand' : 'text-gray-500'}
                       />
                       Columns
                     </button>
@@ -851,25 +856,27 @@ export function ProjectTasksScreen() {
                   Task
                   <span className="ml-auto text-[10px] text-gray-400">Required</span>
                 </button>
-                {PROJECT_TASK_COLUMN_OPTIONS.map(({ key, label }) => {
-                  const checked = visibleColumns.has(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleColumn(key)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <span className={cn(
-                        'flex h-4 w-4 items-center justify-center rounded border',
-                        checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
-                      )}>
-                        {checked && <Check size={11} strokeWidth={3} />}
-                      </span>
-                      {label}
-                    </button>
-                  );
-                })}
+                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'min(250px, 45vh)' }}>
+                  {PROJECT_TASK_COLUMN_OPTIONS.map(({ key, label }) => {
+                    const checked = visibleColumns.has(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleColumn(key)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        <span className={cn(
+                          'flex h-4 w-4 items-center justify-center rounded border',
+                          checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
+                        )}>
+                          {checked && <Check size={11} strokeWidth={3} />}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </PopoverContent>
             </Popover>
           </TooltipProvider>

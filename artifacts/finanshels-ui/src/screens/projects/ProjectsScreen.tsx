@@ -49,6 +49,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { useOrgContext } from '@/contexts/OrgContext';
+import { downloadCsv } from '@/lib/download-csv';
+import { DownloadConfirmationDialog } from '@/components/DownloadConfirmationDialog';
 
 const PROJECT_COLUMN_ORDER_STORAGE_KEY = 'fh_projects_column_order';
 const LEGACY_PROJECT_COLUMN_ORDER: ProjectColumnKey[] = [
@@ -375,6 +377,7 @@ export function ProjectsScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [downloadProjects, setDownloadProjects] = useState<Project[] | null>(null);
   function toggleSelect(id: string) {
     const project = MOCK_PROJECTS.find(p => p.id === id);
     if (project?.status === 'Completed' || project?.status === 'Archived') return;
@@ -641,6 +644,44 @@ export function ProjectsScreen() {
   const safePage = Math.min(page, totalPages);
   const pageProjects = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  function confirmDownloadProjects() {
+    if (!downloadProjects?.length) return;
+    try {
+      downloadCsv('projects.csv', [
+        'Project', 'Client', 'Department', 'Service', 'Service Type', 'Account Manager',
+        'Team Lead', 'Assignees', 'Progress (%)', 'Tasks Completed', 'Tasks Total',
+        'Revenue (AED)', 'Due Date', 'Status', 'Start Date', 'Project Completed Date',
+        'Delivery Status', 'Last Task Completed', 'Created Date', 'Last Updated',
+      ], downloadProjects.map(project => [
+        getProjectDisplayName(project),
+        project.client.name,
+        project.serviceType.label,
+        project.service,
+        project.serviceType.label,
+        project.accountManager?.name,
+        project.teamLeads.map(member => member.name).join(', '),
+        project.assignees.map(member => member.name).join(', '),
+        project.progress,
+        project.tasksCompleted,
+        project.tasksTotal,
+        project.revenue,
+        project.dueDate.replace(/^Due\s+/i, ''),
+        project.status,
+        project.startDate,
+        project.completedDate,
+        project.deliveryStatus,
+        project.lastTaskCompletedAt,
+        project.createdAt,
+        project.updatedAt,
+      ]));
+      const count = downloadProjects.length;
+      setDownloadProjects(null);
+      toast.success(`${count} ${count === 1 ? 'project' : 'projects'} downloaded`);
+    } catch {
+      toast.error('Unable to download projects. Please try again.');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white px-4 pt-5 pb-10 sm:px-6 sm:pt-6">
 
@@ -721,7 +762,9 @@ export function ProjectsScreen() {
               <button
                 type="button"
                 aria-label="Download data"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none"
+                onClick={() => setDownloadProjects([...filtered])}
+                disabled={filtered.length === 0}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Download size={14} />
               </button>
@@ -1306,6 +1349,14 @@ export function ProjectsScreen() {
       />
 
       {/* ── Bulk resume confirmation ── */}
+      <DownloadConfirmationDialog
+        open={downloadProjects !== null}
+        onOpenChange={open => { if (!open) setDownloadProjects(null); }}
+        item="project"
+        count={downloadProjects?.length ?? 0}
+        onConfirm={confirmDownloadProjects}
+      />
+
       <Dialog
         open={resumeDialogOpen}
         onOpenChange={open => {

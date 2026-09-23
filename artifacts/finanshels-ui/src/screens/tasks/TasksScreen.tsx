@@ -31,6 +31,7 @@ import {
 import {
   TasksTable,
   TASK_COLUMN_OPTIONS,
+  DEFAULT_TASK_COLUMNS,
   type SortKey,
   type TaskColumnKey,
 } from './TasksTable';
@@ -42,6 +43,8 @@ import { AdHocTaskDialog } from '@/components/AdHocTaskDialog';
 import { TaskReassignDrawer } from './TaskReassignDrawer';
 import { TaskReasonDrawer } from './TaskReasonDrawer';
 import { toast } from 'sonner';
+import { downloadCsv } from '@/lib/download-csv';
+import { DownloadConfirmationDialog } from '@/components/DownloadConfirmationDialog';
 import {
   ActiveFilterChips,
   makeActiveFilterChipKey,
@@ -317,7 +320,7 @@ export function TasksScreen() {
   const [sortKey, setSortKey] = useState<SortKey>('dueDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [visibleColumns, setVisibleColumns] = useState<Set<TaskColumnKey>>(
-    () => new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key)),
+    () => new Set(DEFAULT_TASK_COLUMNS),
   );
   const [taskColumnOrder, setTaskColumnOrder] = useState<TaskColumnKey[]>(
     () => TASK_COLUMN_OPTIONS.map(({ key }) => key),
@@ -388,6 +391,9 @@ export function TasksScreen() {
         : new Set(TASK_COLUMN_OPTIONS.map(({ key }) => key)),
     );
   }
+
+  const columnsCustomized = visibleColumns.size !== DEFAULT_TASK_COLUMNS.length
+    || DEFAULT_TASK_COLUMNS.some(key => !visibleColumns.has(key));
 
   /* pagination + selection */
   const [page, setPage] = useState(1);
@@ -543,6 +549,7 @@ export function TasksScreen() {
 
   /* ad-hoc task dialog */
   const [adHocOpen, setAdHocOpen] = useState(false);
+  const [downloadTasks, setDownloadTasks] = useState<TaskItem[] | null>(null);
 
   /* filter drawer */
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -590,6 +597,33 @@ export function TasksScreen() {
 
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
+
+  function confirmDownloadTasks() {
+    if (!downloadTasks?.length) return;
+    try {
+      downloadCsv('tasks.csv', [
+        'Task', 'Projects', 'Assignee', 'Reassignment Note', 'Due Date',
+        'Status', 'Time Spent (seconds)', 'Priority', 'Adhoc', 'Frequency', 'Created Date',
+      ], downloadTasks.map(task => [
+        task.name,
+        task.projects.map(getProjectDisplayName).join(', '),
+        task.assignee?.name,
+        task.reassignmentNote,
+        task.dueDate,
+        task.status,
+        task.timeSpentSeconds,
+        task.priority,
+        task.isAdHoc == null ? '' : task.isAdHoc ? 'Yes' : 'No',
+        task.frequency,
+        task.createdAt,
+      ]));
+      const count = downloadTasks.length;
+      setDownloadTasks(null);
+      toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} downloaded`);
+    } catch {
+      toast.error('Unable to download tasks. Please try again.');
+    }
+  }
   const activeFilterChips: ActiveFilterChip[] = [];
   const taskArrayChip = (
     key: keyof Pick<TaskFilterState, 'taskCategories' | 'taskStatuses' | 'taskNames' | 'frequencies' | 'clients' | 'projectNames' | 'departments' | 'services' | 'assignees' | 'tags'>,
@@ -738,7 +772,9 @@ export function TasksScreen() {
                 <button
                   type="button"
                   aria-label="Download data"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none"
+                  onClick={() => setDownloadTasks([...tasks])}
+                  disabled={tasks.length === 0}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Download size={14} />
                 </button>
@@ -783,14 +819,14 @@ export function TasksScreen() {
                       aria-label="Select columns"
                       className={cn(
                         'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
-                        visibleColumns.size < TASK_COLUMN_OPTIONS.length
+                        columnsCustomized
                           ? 'border-brand text-brand hover:bg-orange-50/50'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
                       )}
                     >
                       <Columns3
                         size={13}
-                        className={visibleColumns.size < TASK_COLUMN_OPTIONS.length ? 'text-brand' : 'text-gray-500'}
+                        className={columnsCustomized ? 'text-brand' : 'text-gray-500'}
                       />
                       Columns
                     </button>
@@ -837,28 +873,30 @@ export function TasksScreen() {
                   Task
                   <span className="ml-auto text-[10px] text-gray-400">Required</span>
                 </button>
-                {taskColumnOrder.map(key => {
-                  const option = TASK_COLUMN_OPTIONS.find(o => o.key === key);
-                  if (!option) return null;
-                  const { label } = option;
-                  const checked = visibleColumns.has(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleColumn(key)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <span className={cn(
-                        'flex h-4 w-4 items-center justify-center rounded border',
-                        checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
-                      )}>
-                        {checked && <Check size={11} strokeWidth={3} />}
-                      </span>
-                      {label}
-                    </button>
-                  );
-                })}
+                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'min(250px, 45vh)' }}>
+                  {taskColumnOrder.map(key => {
+                    const option = TASK_COLUMN_OPTIONS.find(o => o.key === key);
+                    if (!option) return null;
+                    const { label } = option;
+                    const checked = visibleColumns.has(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleColumn(key)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        <span className={cn(
+                          'flex h-4 w-4 items-center justify-center rounded border',
+                          checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
+                        )}>
+                          {checked && <Check size={11} strokeWidth={3} />}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </PopoverContent>
             </Popover>
           </TooltipProvider>
@@ -1021,6 +1059,14 @@ export function TasksScreen() {
       />
 
       {/* ── Confirm resuming selected tasks ── */}
+      <DownloadConfirmationDialog
+        open={downloadTasks !== null}
+        onOpenChange={open => { if (!open) setDownloadTasks(null); }}
+        item="task"
+        count={downloadTasks?.length ?? 0}
+        onConfirm={confirmDownloadTasks}
+      />
+
       <Dialog
         open={resumeDialogOpen}
         onOpenChange={open => {
