@@ -8,6 +8,7 @@ import {
   Pencil, RotateCcw, Search, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SelectAllOption } from '@/components/ui/select-all-option';
 import { DrawerInput } from '@/components/ui/drawer-fields';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
@@ -376,6 +377,7 @@ function MultiSelectDropdown({
       </div>
 
       {/* Options */}
+      <SelectAllOption visible={visible} selected={selected} onChange={onChange} filtered={Boolean(query)} />
       <ul className="max-h-[220px] overflow-y-auto p-2 pt-1">
         {visible.length > 0
           ? visible.map(opt => {

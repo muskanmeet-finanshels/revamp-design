@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { SelectAllOption } from '@/components/ui/select-all-option';
 import { Empty } from '@/components/ui/empty';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -2799,6 +2800,7 @@ function MemberFilterDropdown({
       </div>
 
       {/* Options */}
+      <SelectAllOption visible={visible} selected={selected} onChange={onChange} filtered={Boolean(query)} />
       <ul className="max-h-[220px] overflow-y-auto p-2 pt-1">
         {visible.length > 0
           ? visible.map(opt => {

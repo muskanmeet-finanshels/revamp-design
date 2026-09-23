@@ -7,6 +7,7 @@ import {
   Pencil, RotateCcw, Search, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SelectAllOption } from '@/components/ui/select-all-option';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
@@ -320,6 +321,7 @@ function MultiSelectDropdown({
           )}
         </div>
       </div>
+      <SelectAllOption visible={visible} selected={selected} onChange={onChange} filtered={Boolean(query)} />
       <ul className="max-h-[220px] overflow-y-auto p-2 pt-1">
         {visible.length > 0
           ? visible.map(opt => {
