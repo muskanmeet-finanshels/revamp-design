@@ -1,4 +1,4 @@
-import { getProjectDisplayName } from '../projects/mock-data';
+import { getProjectDisplayName } from '../projects/mock-data.ts';
 import type { TaskItem } from './mock-data';
 
 export function includesSelectedValue(values: string[], candidates: string[]): boolean {

@@ -18,15 +18,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from '../tasks/mock-data';
+import { type TaskItem, type TaskPriority, type TaskStatus } from '../tasks/mock-data';
 import { getProjectDisplayName, MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
 import { useOrgContext } from '@/contexts/OrgContext';
 import {
-  includesSelectedValue, matchesTaskFrequency, matchesTaskService, matchesTaskTag,
-} from '../tasks/task-filter-matchers';
-import {
   TaskFilterDrawer, EMPTY_TASK_FILTERS, countActiveTaskFilters, type TaskFilterState,
 } from '../tasks/TaskFilterDrawer';
+import {
+  buildProjectTaskList, filterProjectTasks, getProjectTaskStatusCounts,
+  matchesStatusView, removeProjectTaskFilter, STATUSES, type StatusView,
+} from './project-task-filters';
 import {
   TasksTable,
   TASK_COLUMN_OPTIONS,
@@ -44,7 +45,6 @@ import {
 import {
   ActiveFilterChips,
   makeActiveFilterChipKey,
-  parseActiveFilterChipKey,
   type ActiveFilterChip,
 } from '@/components/ActiveFilterChips';
 
@@ -344,160 +344,10 @@ function ProjectDetailCard({ project }: { project: Project }) {
 
 const DEFAULT_PAGE_SIZE = 20;
 
-type StatusView =
-  | 'All' | 'Overdue' | 'Today' | 'Next 30 days'
-  | 'Completed' | 'Upcoming' | 'On Hold' | 'Archived';
-
-const STATUSES: Array<{ value: StatusView; label: string }> = [
-  { value: 'All',          label: 'All Status'   },
-  { value: 'Overdue',      label: 'Overdue'      },
-  { value: 'Today',        label: 'Today'        },
-  { value: 'Next 30 days', label: 'Next 30 Days' },
-  { value: 'Completed',    label: 'Completed'    },
-  { value: 'Upcoming',     label: 'Upcoming'     },
-  { value: 'On Hold',      label: 'On Hold'      },
-  { value: 'Archived',     label: 'Archived'     },
-];
-
 const PRIORITY_ORDER: Record<TaskPriority, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
 const STATUS_ORDER = {
   Overdue: 0, 'In Progress': 1, 'To Do': 2, Done: 3, 'On Hold': 4, Archived: 5,
 } as Record<string, number>;
-
-function matchesStatusView(task: { status: string; dueDate: string }, view: StatusView): boolean {
-  if (view === 'All') return true;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const due   = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
-  const days  = Math.round((due.getTime() - today.getTime()) / 86_400_000);
-  switch (view) {
-    case 'Overdue':      return task.status !== 'Done' && task.status !== 'Archived' && days < 0;
-    case 'Today':        return days === 0 && task.status !== 'Done' && task.status !== 'Archived';
-    case 'Next 30 days': return days >= 1 && days <= 30 && task.status !== 'Done' && task.status !== 'Archived';
-    case 'Completed':    return task.status === 'Done';
-    case 'Upcoming':     return days > 30 && task.status !== 'Done' && task.status !== 'Archived';
-    case 'On Hold':      return task.status === 'On Hold';
-    case 'Archived':     return task.status === 'Archived';
-    default:             return true;
-  }
-}
-
-function projectDueDate(dueDate: string): string {
-  const parsed = new Date(dueDate.replace(/^Due\s+/i, ''));
-  return Number.isNaN(parsed.getTime()) ? '2026-12-31' : parsed.toISOString().slice(0, 10);
-}
-
-function buildProjectTaskList(project: (typeof MOCK_PROJECTS)[number]): TaskItem[] {
-  const linkedTasks = MOCK_TASKS.filter(task =>
-    task.projects.some(taskProject => taskProject.id === project.id),
-  );
-
-  const tasks = linkedTasks.slice(0, project.tasksTotal);
-  const additionalCount = Math.max(0, project.tasksTotal - tasks.length);
-  const linkedCompletedCount = tasks.filter(task => task.status === 'Done').length;
-  const additionalCompletedCount = Math.max(
-    0,
-    Math.min(additionalCount, project.tasksCompleted - linkedCompletedCount),
-  );
-  const dueDate = projectDueDate(project.dueDate);
-  const displayName = getProjectDisplayName(project);
-  const assignee = project.assignees[0]
-    ? { initials: project.assignees[0].initials, name: project.assignees[0].name }
-    : null;
-
-  for (let index = 0; index < additionalCount; index += 1) {
-    tasks.push({
-      id: `${project.id}-task-${index + 1}`,
-      name: `${displayName} — Task ${index + 1}`,
-      projects: [{
-        id: project.id,
-        title: displayName,
-        clientName: project.client.name,
-        clientColor: project.client.color,
-      }],
-      assignee,
-      status: index < additionalCompletedCount ? 'Done' : 'To Do',
-      priority: 'Medium',
-      dueDate,
-      timeSpentSeconds: 0,
-      comments: 0,
-    });
-  }
-
-  return tasks;
-}
-
-function filterProjectTasks(
-  taskList: TaskItem[],
-  project: Project | undefined,
-  search: string,
-  filters: TaskFilterState,
-  activeDepartmentIds: Set<string>,
-): TaskItem[] {
-  let list = taskList;
-  const q = search.trim().toLowerCase();
-  if (q) list = list.filter(task =>
-    task.name.toLowerCase().includes(q) ||
-    task.projects.some(p => getProjectDisplayName(p).toLowerCase().includes(q)) ||
-    (task.assignee?.name ?? '').toLowerCase().includes(q),
-  );
-
-  if (filters.taskNames.length > 0) {
-    list = list.filter(task => includesSelectedValue(
-      filters.taskNames, [task.name, ...task.projects.map(getProjectDisplayName)],
-    ));
-  }
-  if (filters.taskCategories?.length) {
-    list = list.filter(task =>
-      filters.taskCategories.some(category => matchesStatusView(task, category as StatusView)),
-    );
-  }
-  if (filters.taskStatuses?.length) {
-    list = list.filter(task => filters.taskStatuses.includes(task.status));
-  }
-  if (filters.frequencies.length > 0) {
-    list = list.filter(task => filters.frequencies.some(frequency => matchesTaskFrequency(task, frequency)));
-  }
-  if (filters.clients.length > 0) {
-    list = list.filter(task => task.projects.some(p => filters.clients.includes(p.clientName)));
-  }
-  if (filters.projectNames.length > 0) {
-    list = list.filter(task => task.projects.some(p =>
-      includesSelectedValue(filters.projectNames, [getProjectDisplayName(p)]),
-    ));
-  }
-  if (filters.departments.length > 0) {
-    list = list.filter(() => !!project &&
-      filters.departments.includes(project.serviceType.departmentId) &&
-      activeDepartmentIds.has(project.serviceType.departmentId),
-    );
-  }
-  if (filters.services.length > 0) {
-    list = list.filter(task => filters.services.some(service => matchesTaskService(task, service)));
-  }
-  if (filters.assignees.length > 0) {
-    list = list.filter(task => filters.assignees.includes(task.assignee?.name ?? ''));
-  }
-  if (filters.tags.length > 0) {
-    list = list.filter(task => filters.tags.some(tag => matchesTaskTag(task, tag)));
-  }
-
-  if (filters.dueDateFilter && filters.dueDateFilter !== 'All dates') {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    list = list.filter(task => {
-      const due = new Date(task.dueDate);
-      const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
-      if (filters.dueDateFilter === 'Today') return days === 0;
-      if (filters.dueDateFilter === 'This Week') return days >= 0 && days <= 7;
-      if (filters.dueDateFilter === 'This Month') return days >= 0 && days <= 30;
-      if (filters.dueDateFilter === 'Custom Date Range') {
-        return (!filters.dueDateStart || task.dueDate >= filters.dueDateStart) &&
-          (!filters.dueDateEnd || task.dueDate <= filters.dueDateEnd);
-      }
-      return true;
-    });
-  }
-  return list;
-}
 
 /* ── screen ── */
 
@@ -684,10 +534,7 @@ export function ProjectTasksScreen() {
     const activeDepartmentIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
     return filterProjectTasks(displayTasks, project, search, appliedFilters, activeDepartmentIds);
   }, [displayTasks, project, search, appliedFilters, orgDepts]);
-  const statusCounts = STATUSES.reduce<Record<StatusView, number>>((counts, { value }) => {
-    counts[value] = filteredTasksForCounts.filter(task => matchesStatusView(task, value)).length;
-    return counts;
-  }, {} as Record<StatusView, number>);
+  const statusCounts = getProjectTaskStatusCounts(filteredTasksForCounts);
 
   /* reset page + selection on filter changes */
   useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [search, status, sortKey, sortDir, appliedFilters]);
@@ -755,21 +602,7 @@ export function ProjectTasksScreen() {
   }
 
   function removeTaskFilter(key: string) {
-    const { filterKey, value } = parseActiveFilterChipKey(key);
-    const arrayKeys = ['taskCategories', 'taskStatuses', 'taskNames', 'frequencies', 'clients', 'projectNames', 'departments', 'services', 'assignees', 'tags'] as const;
-    const next = { ...appliedFilters };
-    if ((arrayKeys as readonly string[]).includes(filterKey)) {
-      const arrayKey = filterKey as typeof arrayKeys[number];
-      next[arrayKey] = value === null
-        ? []
-        : (appliedFilters[arrayKey] ?? []).filter(option => option !== value);
-    } else if (filterKey === 'dueDateFilter') {
-      next.dueDateFilter = 'All dates';
-      next.dueDateStart = '';
-      next.dueDateEnd = '';
-    } else if (filterKey === 'dueDateStart' || filterKey === 'dueDateEnd') {
-      next[filterKey] = '';
-    }
+    const next = removeProjectTaskFilter(appliedFilters, key);
     setAppliedFilters(next);
     setPendingFilters(next);
     setPage(1);

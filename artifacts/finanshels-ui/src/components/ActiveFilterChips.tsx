@@ -2,25 +2,12 @@
 
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+export { makeActiveFilterChipKey, parseActiveFilterChipKey } from './active-filter-chip-key';
 
 export interface ActiveFilterChip {
   key: string;
   label: string;
   value: string;
-}
-
-export function makeActiveFilterChipKey(filterKey: string, value: string) {
-  return `${filterKey}::${encodeURIComponent(value)}`;
-}
-
-export function parseActiveFilterChipKey(key: string) {
-  const separator = key.indexOf('::');
-  if (separator === -1) return { filterKey: key, value: null };
-
-  return {
-    filterKey: key.slice(0, separator),
-    value: decodeURIComponent(key.slice(separator + 2)),
-  };
 }
 
 interface ActiveFilterChipsProps {

@@ -1,4 +1,4 @@
-import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
+import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data.ts';
 
 export type TaskStatus   = 'To Do' | 'In Progress' | 'Done' | 'Overdue' | 'On Hold' | 'Archived' | 'In Review' | 'Completed';
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
