@@ -25,6 +25,7 @@ import { ProjectCard } from './ProjectCard';
 import {
   ProjectsTable,
   PROJECT_COLUMN_OPTIONS,
+  DEFAULT_PROJECT_COLUMNS,
   type ProjectColumnKey,
   type ProjectSortKey,
 } from './ProjectsTable';
@@ -50,9 +51,17 @@ import {
 import { useOrgContext } from '@/contexts/OrgContext';
 
 const PROJECT_COLUMN_ORDER_STORAGE_KEY = 'fh_projects_column_order';
+const LEGACY_PROJECT_COLUMN_ORDER: ProjectColumnKey[] = [
+  'client', 'department', 'revenue', 'accountManager', 'teamLead',
+  'assignees', 'progress', 'tasks', 'dueDate', 'status', 'tags',
+  'resume', 'reassignNote',
+];
 
 function normalizeProjectColumnOrder(value: unknown): ProjectColumnKey[] | null {
   if (!Array.isArray(value)) return null;
+  if (JSON.stringify(value) === JSON.stringify(LEGACY_PROJECT_COLUMN_ORDER)) {
+    return PROJECT_COLUMN_OPTIONS.map(({ key }) => key);
+  }
 
   const availableKeys = new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key));
   const storedKeys = value.filter(
@@ -281,7 +290,7 @@ export function ProjectsScreen() {
   const [listPageSize, setListPageSize] = useState(PAGE_SIZE_LIST);
   const pageSize = view === 'grid' ? gridPageSize : listPageSize;
   const [visibleColumns, setVisibleColumns] = useState<Set<ProjectColumnKey>>(
-    () => new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key)),
+    () => new Set(DEFAULT_PROJECT_COLUMNS),
   );
   const [columnOrder, setColumnOrder] = useState<ProjectColumnKey[]>(
     () => PROJECT_COLUMN_OPTIONS.map(({ key }) => key),
@@ -454,6 +463,9 @@ export function ProjectsScreen() {
         : new Set(PROJECT_COLUMN_OPTIONS.map(({ key }) => key)),
     );
   }
+
+  const columnsCustomized = visibleColumns.size !== DEFAULT_PROJECT_COLUMNS.length
+    || DEFAULT_PROJECT_COLUMNS.some(key => !visibleColumns.has(key));
 
   function handleHeaderSort(key: ProjectSortKey) {
     const nextOrder =
@@ -867,12 +879,12 @@ export function ProjectsScreen() {
                       aria-label="Select columns"
                       className={cn(
                         'flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium transition-colors focus:outline-none',
-                        visibleColumns.size < PROJECT_COLUMN_OPTIONS.length
+                        columnsCustomized
                           ? 'border-brand text-brand hover:bg-orange-50/50'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
                       )}
                     >
-                      <Columns3 size={13} className={visibleColumns.size < PROJECT_COLUMN_OPTIONS.length ? 'text-brand' : 'text-gray-500'} />
+                      <Columns3 size={13} className={columnsCustomized ? 'text-brand' : 'text-gray-500'} />
                       Columns
                     </button>
                   </PopoverTrigger>
@@ -918,26 +930,28 @@ export function ProjectsScreen() {
                   Project
                   <span className="ml-auto text-[10px] text-gray-400">Required</span>
                 </button>
-                {columnOrder.map(key => {
-                  const col     = PROJECT_COLUMN_OPTIONS.find(c => c.key === key)!;
-                  const checked = visibleColumns.has(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleColumn(key)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <span className={cn(
-                        'flex h-4 w-4 items-center justify-center rounded border',
-                        checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
-                      )}>
-                        {checked && <Check size={11} strokeWidth={3} />}
-                      </span>
-                      {col.label}
-                    </button>
-                  );
-                })}
+                <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'min(250px, 45vh)' }}>
+                  {columnOrder.map(key => {
+                    const col     = PROJECT_COLUMN_OPTIONS.find(c => c.key === key)!;
+                    const checked = visibleColumns.has(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleColumn(key)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12.5px] text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        <span className={cn(
+                          'flex h-4 w-4 items-center justify-center rounded border',
+                          checked ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white',
+                        )}>
+                          {checked && <Check size={11} strokeWidth={3} />}
+                        </span>
+                        {col.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </PopoverContent>
             </Popover>
           </TooltipProvider>
@@ -1167,11 +1181,7 @@ export function ProjectsScreen() {
         <ProjectsTable
           projects={pageProjects}
           selectedIds={selectedIds}
-          visibleColumns={
-            status === 'Completed'
-              ? new Set([...visibleColumns].filter(c => c !== 'reassignNote'))
-              : visibleColumns
-          }
+          visibleColumns={visibleColumns}
           columnOrder={columnOrder}
           onColumnReorder={setColumnOrder}
           onToggle={toggleSelect}

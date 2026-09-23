@@ -54,32 +54,54 @@ export type ProjectSortKey =
 export type ProjectColumnKey =
   | 'client'
   | 'department'
-  | 'revenue'
   | 'accountManager'
   | 'teamLead'
   | 'assignees'
   | 'progress'
   | 'tasks'
+  | 'revenue'
   | 'dueDate'
   | 'status'
   | 'tags'
   | 'resume'
-  | 'reassignNote';
+  | 'reassignNote'
+  | 'service'
+  | 'serviceType'
+  | 'startDate'
+  | 'completedDate'
+  | 'deliveryStatus'
+  | 'lastTaskCompleted'
+  | 'createdDate'
+  | 'lastUpdated';
 
 export const PROJECT_COLUMN_OPTIONS: Array<{ key: ProjectColumnKey; label: string }> = [
   { key: 'client',         label: 'Client' },
   { key: 'department',     label: 'Department' },
-  { key: 'revenue',        label: 'Revenue' },
   { key: 'accountManager', label: 'Account Manager' },
   { key: 'teamLead',       label: 'Team Lead' },
   { key: 'assignees',      label: 'Assignees' },
   { key: 'progress',       label: 'Progress' },
   { key: 'tasks',          label: 'Tasks' },
+  { key: 'revenue',        label: 'Revenue' },
   { key: 'dueDate',        label: 'Due Date' },
   { key: 'status',         label: 'Status' },
   { key: 'tags',           label: 'Tags' },
   { key: 'resume',         label: 'Actions' },
   { key: 'reassignNote',   label: 'Reassignment Note' },
+  { key: 'service',        label: 'Service' },
+  { key: 'serviceType',    label: 'Service Type' },
+  { key: 'startDate',      label: 'Start Date' },
+  { key: 'completedDate',  label: 'Project Completed Date' },
+  { key: 'deliveryStatus', label: 'Delivery Status' },
+  { key: 'lastTaskCompleted', label: 'Last Task Completed' },
+  { key: 'createdDate',    label: 'Created Date' },
+  { key: 'lastUpdated',    label: 'Last Updated' },
+];
+
+export const DEFAULT_PROJECT_COLUMNS: ProjectColumnKey[] = [
+  'client', 'department', 'accountManager', 'teamLead', 'assignees',
+  'progress', 'tasks', 'revenue', 'dueDate', 'status', 'tags',
+  'resume', 'reassignNote',
 ];
 
 const COLUMN_LABEL: Record<ProjectColumnKey, string> = Object.fromEntries(
@@ -101,7 +123,18 @@ const PROJECT_COLUMN_WEIGHTS: Record<ProjectColumnKey, number> = {
   progress: 14, tasks: 13, dueDate: 18,
   status: 11, tags: 13, resume: 11,
   reassignNote: 12,
+  service: 12, serviceType: 12, startDate: 15,
+  completedDate: 21, deliveryStatus: 15,
+  lastTaskCompleted: 18, createdDate: 15, lastUpdated: 15,
 };
+
+function formatOptionalDate(value?: string): string {
+  if (!value) return '—';
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 interface Props {
   projects:             Project[];
@@ -272,6 +305,36 @@ export function ProjectsTable({
     const hasTags = Boolean(tag.priority || tag.severity);
 
     switch (key) {
+      case 'service':
+      case 'serviceType':
+      case 'deliveryStatus': {
+        const value = key === 'service' ? p.service
+          : key === 'serviceType' ? p.serviceType.label
+          : p.deliveryStatus;
+        return (
+          <TableCell key={key} className="max-w-0 py-3">
+            <span className="block truncate text-[12.5px] text-gray-700" title={value || undefined}>
+              {value || '—'}
+            </span>
+          </TableCell>
+        );
+      }
+      case 'startDate':
+      case 'completedDate':
+      case 'lastTaskCompleted':
+      case 'createdDate':
+      case 'lastUpdated': {
+        const value = key === 'startDate' ? p.startDate
+          : key === 'completedDate' ? p.completedDate
+          : key === 'lastTaskCompleted' ? p.lastTaskCompletedAt
+          : key === 'createdDate' ? p.createdAt
+          : p.updatedAt;
+        return (
+          <TableCell key={key} className="py-3">
+            <span className="whitespace-nowrap text-[12.5px] text-gray-700">{formatOptionalDate(value)}</span>
+          </TableCell>
+        );
+      }
       case 'client':
         return (
           <TableCell key={key} className="max-w-0 py-3">
@@ -458,7 +521,10 @@ export function ProjectsTable({
   return (
     <div className="mt-3 min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
-        <Table className="w-full min-w-[1500px] table-auto">
+        <Table
+          className="w-full table-auto"
+          style={{ minWidth: 1500 + Math.max(0, orderedVisible.length - DEFAULT_PROJECT_COLUMNS.length) * 150 }}
+        >
           <colgroup>
             <col style={{ width: colW(selectColumnWeight) }} />
             <col style={{ width: colW(projectColumnWeight) }} />

@@ -27,6 +27,12 @@ export interface Project {
   status: ProjectStatus;
   client: { name: string; color: string };
   serviceType: { label: string; departmentId: string; color?: string };
+  /** Service name, if recorded separately from the service type. */
+  service?: string;
+  deliveryStatus?: string;
+  lastTaskCompletedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
   /** Optional account manager responsible for the client relationship. */
   accountManager?: TeamMember;
   teamLeads: TeamMember[];
