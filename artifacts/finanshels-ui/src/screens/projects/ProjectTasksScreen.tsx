@@ -20,6 +20,10 @@ import {
 } from '@/components/ui/dialog';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from '../tasks/mock-data';
 import { getProjectDisplayName, MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
+import { useOrgContext } from '@/contexts/OrgContext';
+import {
+  includesSelectedValue, matchesTaskFrequency, matchesTaskService, matchesTaskTag,
+} from '../tasks/task-filter-matchers';
 import {
   TaskFilterDrawer, EMPTY_TASK_FILTERS, countActiveTaskFilters, type TaskFilterState,
 } from '../tasks/TaskFilterDrawer';
@@ -422,9 +426,83 @@ function buildProjectTaskList(project: (typeof MOCK_PROJECTS)[number]): TaskItem
   return tasks;
 }
 
+function filterProjectTasks(
+  taskList: TaskItem[],
+  project: Project | undefined,
+  search: string,
+  filters: TaskFilterState,
+  activeDepartmentIds: Set<string>,
+): TaskItem[] {
+  let list = taskList;
+  const q = search.trim().toLowerCase();
+  if (q) list = list.filter(task =>
+    task.name.toLowerCase().includes(q) ||
+    task.projects.some(p => getProjectDisplayName(p).toLowerCase().includes(q)) ||
+    (task.assignee?.name ?? '').toLowerCase().includes(q),
+  );
+
+  if (filters.taskNames.length > 0) {
+    list = list.filter(task => includesSelectedValue(
+      filters.taskNames, [task.name, ...task.projects.map(getProjectDisplayName)],
+    ));
+  }
+  if (filters.taskCategories?.length) {
+    list = list.filter(task =>
+      filters.taskCategories.some(category => matchesStatusView(task, category as StatusView)),
+    );
+  }
+  if (filters.taskStatuses?.length) {
+    list = list.filter(task => filters.taskStatuses.includes(task.status));
+  }
+  if (filters.frequencies.length > 0) {
+    list = list.filter(task => filters.frequencies.some(frequency => matchesTaskFrequency(task, frequency)));
+  }
+  if (filters.clients.length > 0) {
+    list = list.filter(task => task.projects.some(p => filters.clients.includes(p.clientName)));
+  }
+  if (filters.projectNames.length > 0) {
+    list = list.filter(task => task.projects.some(p =>
+      includesSelectedValue(filters.projectNames, [getProjectDisplayName(p)]),
+    ));
+  }
+  if (filters.departments.length > 0) {
+    list = list.filter(() => !!project &&
+      filters.departments.includes(project.serviceType.departmentId) &&
+      activeDepartmentIds.has(project.serviceType.departmentId),
+    );
+  }
+  if (filters.services.length > 0) {
+    list = list.filter(task => filters.services.some(service => matchesTaskService(task, service)));
+  }
+  if (filters.assignees.length > 0) {
+    list = list.filter(task => filters.assignees.includes(task.assignee?.name ?? ''));
+  }
+  if (filters.tags.length > 0) {
+    list = list.filter(task => filters.tags.some(tag => matchesTaskTag(task, tag)));
+  }
+
+  if (filters.dueDateFilter && filters.dueDateFilter !== 'All dates') {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    list = list.filter(task => {
+      const due = new Date(task.dueDate);
+      const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
+      if (filters.dueDateFilter === 'Today') return days === 0;
+      if (filters.dueDateFilter === 'This Week') return days >= 0 && days <= 7;
+      if (filters.dueDateFilter === 'This Month') return days >= 0 && days <= 30;
+      if (filters.dueDateFilter === 'Custom Date Range') {
+        return (!filters.dueDateStart || task.dueDate >= filters.dueDateStart) &&
+          (!filters.dueDateEnd || task.dueDate <= filters.dueDateEnd);
+      }
+      return true;
+    });
+  }
+  return list;
+}
+
 /* ── screen ── */
 
 export function ProjectTasksScreen() {
+  const { departments: orgDepts } = useOrgContext();
   /* read project ID from the route */
   const params = useParams();
   const projectId = (params?.id as string) ?? '';
@@ -597,62 +675,26 @@ export function ProjectTasksScreen() {
   const hasArchivedSelected = selectedTasks.some(task => task.status === 'Archived');
   const allSelectedOnHold = selectedTasks.length > 0
     && selectedTasks.every(task => task.status === 'On Hold');
-  const statusCounts = STATUSES.reduce<Record<StatusView, number>>((counts, { value }) => {
-    counts[value] = displayTasks.filter(task => matchesStatusView(task, value)).length;
-    return counts;
-  }, {} as Record<StatusView, number>);
-
   /* filter drawer */
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [pendingFilters,   setPendingFilters]    = useState<TaskFilterState>(EMPTY_TASK_FILTERS);
   const [appliedFilters,   setAppliedFilters]    = useState<TaskFilterState>(EMPTY_TASK_FILTERS);
   const filterActiveCount = countActiveTaskFilters(appliedFilters);
+  const filteredTasksForCounts = useMemo(() => {
+    const activeDepartmentIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    return filterProjectTasks(displayTasks, project, search, appliedFilters, activeDepartmentIds);
+  }, [displayTasks, project, search, appliedFilters, orgDepts]);
+  const statusCounts = STATUSES.reduce<Record<StatusView, number>>((counts, { value }) => {
+    counts[value] = filteredTasksForCounts.filter(task => matchesStatusView(task, value)).length;
+    return counts;
+  }, {} as Record<StatusView, number>);
 
   /* reset page + selection on filter changes */
   useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [search, status, sortKey, sortDir, appliedFilters]);
 
   /* filtered + sorted list */
   const tasks = useMemo(() => {
-    let list = [...displayTasks];
-
-    list = list.filter(t => matchesStatusView(t, status));
-
-    const q = search.trim().toLowerCase();
-    if (q) list = list.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.projects.some(p => p.title.toLowerCase().includes(q)) ||
-      (t.assignee?.name ?? '').toLowerCase().includes(q),
-    );
-
-    const af = appliedFilters;
-    if (af.taskCategories?.length) {
-      list = list.filter(task =>
-        af.taskCategories.some(category => matchesStatusView(task, category as StatusView)),
-      );
-    }
-    if (af.taskStatuses?.length) {
-      list = list.filter(task => af.taskStatuses.includes(task.status));
-    }
-    if (af.clients.length   > 0) list = list.filter(t => t.projects.some(p => af.clients.includes(p.clientName)));
-    if (af.assignees.length > 0) list = list.filter(t => af.assignees.includes(t.assignee?.name ?? ''));
-
-    if (af.dueDateFilter && af.dueDateFilter !== 'All dates') {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      list = list.filter(t => {
-        const due  = new Date(t.dueDate);
-        const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
-        if (af.dueDateFilter === 'Today')        return days === 0;
-        if (af.dueDateFilter === 'This Week')    return days >= 0 && days <= 7;
-        if (af.dueDateFilter === 'This Month')   return days >= 0 && days <= 30;
-        if (af.dueDateFilter === 'Custom Date Range') {
-          const dueDate = t.dueDate;
-          const startsAfterStart = !af.dueDateStart || dueDate >= af.dueDateStart;
-          const endsBeforeEnd = !af.dueDateEnd || dueDate <= af.dueDateEnd;
-          return startsAfterStart && endsBeforeEnd;
-        }
-        return true;
-      });
-    }
+    const list = filteredTasksForCounts.filter(task => matchesStatusView(task, status));
 
     const dir = sortDir === 'asc' ? 1 : -1;
     list.sort((a, b) => {
@@ -668,7 +710,7 @@ export function ProjectTasksScreen() {
     });
 
     return list;
-  }, [search, status, sortKey, sortDir, appliedFilters, displayTasks]);
+  }, [status, sortKey, sortDir, filteredTasksForCounts]);
 
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
@@ -691,6 +733,14 @@ export function ProjectTasksScreen() {
   taskArrayChip('frequencies', 'Frequency');
   taskArrayChip('clients', 'Client');
   taskArrayChip('projectNames', 'Project');
+  const deptIdToName = Object.fromEntries(orgDepts.map(d => [d.id, d.name]));
+  appliedFilters.departments.forEach(deptId => {
+    activeFilterChips.push({
+      key: makeActiveFilterChipKey('departments', deptId),
+      label: 'Department',
+      value: deptIdToName[deptId] ?? deptId,
+    });
+  });
   taskArrayChip('services', 'Service');
   taskArrayChip('assignees', 'Assignee');
   taskArrayChip('tags', 'Tags');
@@ -706,7 +756,7 @@ export function ProjectTasksScreen() {
 
   function removeTaskFilter(key: string) {
     const { filterKey, value } = parseActiveFilterChipKey(key);
-    const arrayKeys = ['taskCategories', 'taskStatuses', 'taskNames', 'frequencies', 'clients', 'projectNames', 'services', 'assignees', 'tags'] as const;
+    const arrayKeys = ['taskCategories', 'taskStatuses', 'taskNames', 'frequencies', 'clients', 'projectNames', 'departments', 'services', 'assignees', 'tags'] as const;
     const next = { ...appliedFilters };
     if ((arrayKeys as readonly string[]).includes(filterKey)) {
       const arrayKey = filterKey as typeof arrayKeys[number];
