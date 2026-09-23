@@ -89,6 +89,7 @@ function useSavedFilters(storageKey: string) {
 /* ─────────────────────────────── option lists ───────────────────────────── */
 
 export const FILTER_OPTIONS = {
+  projectStatuses: ['Current', 'Overdue', 'Completed', 'On Hold', 'Archived'],
   departments: ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
   services:    ['Accounting', 'Finance', 'IT', 'Technology', 'HR', 'Compliance', 'Audit'],
   revenueTypes: ['Main Revenue', 'Internal Revenue'],
@@ -123,6 +124,7 @@ export const REVENUE_NO_FILTER = 'No revenue filter';
 /* ─────────────────────────────── filter state ───────────────────────────── */
 
 export interface FilterState {
+  projectStatuses: string[];
   departments:    string[];
   services:       string[];
   revenueType:    string;
@@ -142,6 +144,7 @@ export interface FilterState {
 }
 
 export const EMPTY_FILTERS: FilterState = {
+  projectStatuses: [],
   departments: [], services: [], revenueType: 'Main Revenue', revenueCondition: REVENUE_NO_FILTER,
   revenueValue: '', revenueValueTo: '',
   revenueRanges: [], dueDays: [], overdueDays: [],
@@ -173,6 +176,7 @@ export function countActiveFilters(f: FilterState): number {
   const revenueCondition = f.revenueCondition || revenueRanges[0] || REVENUE_NO_FILTER;
 
   return (
+    ((f.projectStatuses?.length ?? 0) > 0 ? 1 : 0) +
     (f.departments.length > 0 ? 1 : 0) +
     (f.services.length > 0 ? 1 : 0) +
     (revenueCondition !== REVENUE_NO_FILTER && isRevenueFilterComplete(f) ? 1 : 0) +
@@ -190,10 +194,11 @@ export function countActiveFilters(f: FilterState): number {
    Strips any stored values that no longer exist and returns the cleaned
    state plus a record of { fieldLabel → removedCount } for user feedback. */
 const FILTER_OPTION_KEYS: Array<{
-  key:     keyof Pick<FilterState, 'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
+  key:     keyof Pick<FilterState, 'projectStatuses'|'services'|'revenueRanges'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>;
   options: readonly string[];
   label:   string;
 }> = [
+  { key: 'projectStatuses', options: FILTER_OPTIONS.projectStatuses, label: 'Project Status' },
   { key: 'services',       options: FILTER_OPTIONS.services,       label: 'Service' },
   { key: 'revenueRanges',  options: FILTER_OPTIONS.revenueRanges,  label: 'Revenue' },
   { key: 'dueDays',        options: FILTER_OPTIONS.dueDays,        label: 'Due Days' },
@@ -1060,6 +1065,15 @@ export function FilterDrawer({
             <SectionHeader icon={<Building2 size={20} strokeWidth={1.8} />} label="Business Information" />
             <div className="space-y-4">
               <MultiSelectDropdown
+                label="Project Status"
+                placeholder="All Project Status"
+                options={FILTER_OPTIONS.projectStatuses}
+                selected={pending.projectStatuses ?? []}
+                onChange={v => set('projectStatuses', v)}
+                searchPlaceholder="Search project status..."
+                drawerOpen={open}
+              />
+              <MultiSelectDropdown
                 label="Department"
                 placeholder="All Department"
                 options={activeDepartmentNames}
@@ -1271,6 +1285,7 @@ export function sanitizeSavedFilter(
 } {
   const sanitized: FilterState = {
     ...filters,
+    projectStatuses: Array.isArray(filters.projectStatuses) ? filters.projectStatuses : [],
     revenueRanges: Array.isArray(filters.revenueRanges) ? filters.revenueRanges : [],
     revenueType: filters.revenueType || 'Main Revenue',
     revenueCondition: filters.revenueCondition || REVENUE_NO_FILTER,

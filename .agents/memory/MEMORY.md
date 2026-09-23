@@ -11,3 +11,4 @@
 - [Shared empty states](shared-empty-states.md) — use the shared Empty component for list/table empty and filtered-empty states across modules.
 - [Role access model](role-access-model.md) — users may have multiple roles when enabled; roles grant access to whole modules, never individual actions.
 - [TypeScript 7 config and React 19 types](typescript7-config-and-react19.md) — remove mobile baseUrl and keep React 19 type packages on the Expo runtime line.
+- [Searchable filter bulk selection](searchable-filter-bulk-selection.md) — user approved Select all scoped to visible search matches, preserving hidden selections.

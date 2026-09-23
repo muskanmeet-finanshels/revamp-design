@@ -247,12 +247,11 @@ const STATUSES: Array<{ value: StatusOption; label: string }> = [
   { value: 'Archived',   label: 'Archived'   },
 ];
 
-function matchesStatusTab(project: Project, status: StatusOption): boolean {
+function matchesStatusTab(project: Project, status: StatusOption, includeArchived = false): boolean {
   return (
-    (status === 'All' && project.status !== 'Archived') ||
+    (status === 'All' && (project.status !== 'Archived' || includeArchived)) ||
     status === 'Next Month' ||
     status === 'Upcoming' ||
-    status === 'Archived' ||
     project.status === status
   );
 }
@@ -482,11 +481,11 @@ export function ProjectsScreen() {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  const matchesProjectFilters = (p: Project, statusFilter: StatusOption): boolean => {
+  const matchesProjectFilters = (p: Project, statusFilter: StatusOption, ignoreStatusTab = false): boolean => {
     const q = search.toLowerCase();
 
     /* status tab */
-    const statusMatch = matchesStatusTab(p, statusFilter);
+    const statusMatch = ignoreStatusTab || matchesStatusTab(p, statusFilter, (appliedFilters.projectStatuses ?? []).includes('Archived'));
 
     /* search */
     const searchMatch =
@@ -494,6 +493,7 @@ export function ProjectsScreen() {
 
     /* drawer filters */
     const af = appliedFilters;
+    const projectStatusMatch = !af.projectStatuses?.length || af.projectStatuses.includes(p.status);
 
     const activeDeptIdSet = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
     const selectedDeptIds = af.departments.filter(id => activeDeptIdSet.has(id));
@@ -583,14 +583,17 @@ export function ProjectsScreen() {
       return true;
     })();
 
-    return statusMatch && searchMatch &&
+    return statusMatch && projectStatusMatch && searchMatch &&
       deptMatch && svcMatch && revenueMatch && clientMatch && assigneeMatch &&
       dueDaysMatch && overdueDaysMatch && periodMatch;
   };
 
-  const filteredWithoutStatus = displayProjects.filter(p => matchesProjectFilters(p, 'All'));
+  const filteredWithoutStatus = displayProjects.filter(p => matchesProjectFilters(p, 'All', true));
   const statusCounts = STATUSES.reduce<Record<StatusOption, number>>((counts, { value }) => {
-    counts[value] = filteredWithoutStatus.filter(project => matchesStatusTab(project, value)).length;
+    counts[value] = filteredWithoutStatus.filter(project =>
+      (value !== 'Next Month' && value !== 'Upcoming' || project.status !== 'Archived')
+      && matchesStatusTab(project, value, (appliedFilters.projectStatuses ?? []).includes('Archived')),
+    ).length;
     return counts;
   }, {} as Record<StatusOption, number>);
 
@@ -1001,7 +1004,7 @@ export function ProjectsScreen() {
         const chips: ActiveFilterChip[] = [];
 
         const arrayChip = (
-          key: keyof Pick<FilterState, 'departments'|'services'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>,
+          key: keyof Pick<FilterState, 'projectStatuses'|'departments'|'services'|'dueDays'|'overdueDays'|'clients'|'assignees'|'tags'|'dueDatePresets'>,
           label: string,
         ) => {
           const vals = af[key] as string[];
@@ -1014,6 +1017,7 @@ export function ProjectsScreen() {
         };
 
         const deptIdToName = Object.fromEntries(orgDepts.map(d => [d.id, d.name]));
+        arrayChip('projectStatuses', 'Project Status');
         af.departments.forEach(deptId => {
           const name = deptIdToName[deptId] ?? deptId;
           chips.push({ key: makeActiveFilterChipKey('departments', deptId), label: 'Department', value: name });
@@ -1046,7 +1050,7 @@ export function ProjectsScreen() {
         if (af.periodTo)   chips.push({ key: 'periodTo',   label: 'To',   value: af.periodTo });
 
         function removeChip(key: string) {
-          const arrayKeys = ['departments','services','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
+          const arrayKeys = ['projectStatuses','departments','services','dueDays','overdueDays','clients','assignees','tags','dueDatePresets'] as const;
           const parsed = parseActiveFilterChipKey(key);
           if ((arrayKeys as readonly string[]).includes(parsed.filterKey)) {
             const arrayKey = parsed.filterKey as typeof arrayKeys[number];
