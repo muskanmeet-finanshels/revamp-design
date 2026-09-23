@@ -8,6 +8,7 @@
     "test:admin-storage": "node --test --experimental-strip-types src/contexts/employee-groups-storage.test.ts",
     "test:role-inheritance": "node --test --experimental-strip-types src/screens/roles/role-inheritance.test.ts",
     "test:project-task-filters": "node --test --experimental-strip-types src/screens/projects/project-task-filters.test.ts",
+    "test:global-task-filters": "node --test --experimental-strip-types src/screens/tasks/global-task-filters.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

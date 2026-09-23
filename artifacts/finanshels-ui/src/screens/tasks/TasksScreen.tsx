@@ -17,10 +17,10 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from './mock-data';
-import { getProjectDisplayName, MOCK_PROJECTS } from '../projects/mock-data';
 import {
-  includesSelectedValue, matchesTaskFrequency, matchesTaskService, matchesTaskTag,
-} from './task-filter-matchers';
+  filterTasksByAppliedFilters, getGlobalTaskStatusCounts, matchesStatusView,
+  STATUSES, type StatusView,
+} from './global-task-filters';
 import { useOrgContext } from '@/contexts/OrgContext';
 import {
   TaskFilterDrawer,
@@ -57,29 +57,6 @@ import {
 const DEFAULT_PAGE_SIZE = 20;
 
 /* ─────────────────── status options ─────────────────── */
-
-type StatusView =
-  | 'All'
-  | 'Not Started'
-  | 'Overdue'
-  | 'Today'
-  | 'Next 30 days'
-  | 'Completed'
-  | 'Upcoming'
-  | 'On Hold'
-  | 'Archived';
-
-const STATUSES: Array<{ value: StatusView; label: string }> = [
-  { value: 'All',          label: 'All Status'   },
-  { value: 'Not Started',  label: 'Not Started'  },
-  { value: 'Overdue',      label: 'Overdue'      },
-  { value: 'Today',        label: 'Today'        },
-  { value: 'Next 30 days', label: 'Next 30 Days' },
-  { value: 'Completed',    label: 'Completed'    },
-  { value: 'Upcoming',     label: 'Upcoming'     },
-  { value: 'On Hold',      label: 'On Hold'      },
-  { value: 'Archived',     label: 'Archived'     },
-];
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
 const STATUS_ORDER = { Overdue: 0, 'In Progress': 1, 'To Do': 2, Done: 3, 'On Hold': 4, Archived: 5 } as Record<string, number>;
@@ -181,126 +158,6 @@ function buildTaskUrgencyCards(
   }
 
   return { cards, scheme };
-}
-
-/* ─────────────────── status-view filter helper ─────────────────── */
-
-function matchesStatusView(task: { status: string; dueDate: string; timeSpentSeconds?: number }, view: StatusView): boolean {
-  if (view === 'All') return true;
-
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const due   = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
-  const days  = Math.round((due.getTime() - today.getTime()) / 86_400_000);
-
-  switch (view) {
-    case 'Not Started':  return task.status === 'To Do' && (task.timeSpentSeconds ?? 0) === 0;
-    case 'Overdue':      return task.status !== 'Done' && task.status !== 'Completed' && task.status !== 'Archived' && days < 0;
-    case 'Today':        return days === 0 && task.status !== 'Archived';
-    case 'Next 30 days': return days >= 1 && days <= 30 && task.status !== 'Done' && task.status !== 'Archived';
-    case 'Completed':    return task.status === 'Done';
-    case 'Upcoming':     return days > 30 && task.status !== 'Done' && task.status !== 'Archived';
-    case 'On Hold':      return task.status === 'On Hold';
-    case 'Archived':     return task.status === 'Archived';
-    default:             return true;
-  }
-}
-
-/** Stable projectId → departmentId lookup built from the project mock data. */
-const PROJECT_DEPT_MAP: Record<string, string> = Object.fromEntries(
-  MOCK_PROJECTS.map(p => [p.id, p.serviceType.departmentId]),
-);
-
-function filterTasksByAppliedFilters(
-  taskList: TaskItem[],
-  statusView: StatusView,
-  searchValue: string,
-  appliedFilters: TaskFilterState,
-  /** Resolved dept IDs for the selected department names (from org context). */
-  resolvedDeptIds: string[],
-): TaskItem[] {
-  let list = taskList.filter(task => matchesStatusView(task, statusView));
-
-  const q = searchValue.trim().toLowerCase();
-  if (q) {
-    list = list.filter(task =>
-      task.name.toLowerCase().includes(q) ||
-      task.projects.some(project => getProjectDisplayName(project).toLowerCase().includes(q)) ||
-      (task.assignee?.name ?? '').toLowerCase().includes(q),
-    );
-  }
-
-  if (appliedFilters.taskNames.length > 0) {
-    list = list.filter(task => includesSelectedValue(
-      appliedFilters.taskNames,
-      [task.name, ...task.projects.map(getProjectDisplayName)],
-    ));
-  }
-  if (appliedFilters.taskCategories?.length) {
-    list = list.filter(task =>
-      appliedFilters.taskCategories.some(category => matchesStatusView(task, category as StatusView)),
-    );
-  }
-  if (appliedFilters.taskStatuses?.length) {
-    list = list.filter(task => appliedFilters.taskStatuses.includes(task.status));
-  }
-  if (appliedFilters.frequencies.length > 0) {
-    list = list.filter(task =>
-      appliedFilters.frequencies.some(frequency => matchesTaskFrequency(task, frequency)),
-    );
-  }
-  if (appliedFilters.clients.length > 0) {
-    list = list.filter(task =>
-      task.projects.some(project => appliedFilters.clients.includes(project.clientName)),
-    );
-  }
-  if (appliedFilters.projectNames.length > 0) {
-    list = list.filter(task =>
-      task.projects.some(project =>
-        includesSelectedValue(appliedFilters.projectNames, [getProjectDisplayName(project)]),
-      ),
-    );
-  }
-  if (appliedFilters.departments.length > 0) {
-    list = list.filter(task =>
-      resolvedDeptIds.length > 0 &&
-      task.projects.some(tp => resolvedDeptIds.includes(PROJECT_DEPT_MAP[tp.id] ?? '')),
-    );
-  }
-  if (appliedFilters.services.length > 0) {
-    list = list.filter(task =>
-      appliedFilters.services.some(service => matchesTaskService(task, service)),
-    );
-  }
-  if (appliedFilters.assignees.length > 0) {
-    list = list.filter(task =>
-      appliedFilters.assignees.includes(task.assignee?.name ?? ''),
-    );
-  }
-  if (appliedFilters.tags.length > 0) {
-    list = list.filter(task =>
-      appliedFilters.tags.some(tag => matchesTaskTag(task, tag)),
-    );
-  }
-
-  if (appliedFilters.dueDateFilter && appliedFilters.dueDateFilter !== 'All dates') {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    list = list.filter(task => {
-      const due = new Date(task.dueDate);
-      const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
-      if (appliedFilters.dueDateFilter === 'Today') return days === 0;
-      if (appliedFilters.dueDateFilter === 'This Week') return days >= 0 && days <= 7;
-      if (appliedFilters.dueDateFilter === 'This Month') return days >= 0 && days <= 30;
-      if (appliedFilters.dueDateFilter === 'Custom Date Range') {
-        const startsAfterStart = !appliedFilters.dueDateStart || task.dueDate >= appliedFilters.dueDateStart;
-        const endsBeforeEnd = !appliedFilters.dueDateEnd || task.dueDate <= appliedFilters.dueDateEnd;
-        return startsAfterStart && endsBeforeEnd;
-      }
-      return true;
-    });
-  }
-
-  return list;
 }
 
 /* ─────────────────── screen ─────────────────── */
@@ -562,10 +419,7 @@ export function TasksScreen() {
     const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
     return filterTasksByAppliedFilters(displayTasks, 'All', search, appliedFilters, rDeptIds);
   }, [displayTasks, search, appliedFilters, orgDepts]);
-  const statusCounts = STATUSES.reduce<Record<StatusView, number>>((counts, { value }) => {
-    counts[value] = filteredTasksForCounts.filter(task => matchesStatusView(task, value)).length;
-    return counts;
-  }, {} as Record<StatusView, number>);
+  const statusCounts = getGlobalTaskStatusCounts(filteredTasksForCounts);
 
   /* reset page + selection whenever filters change */
   useEffect(() => {
