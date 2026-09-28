@@ -6,7 +6,7 @@ const replitChromium = '/repl/tools/bin/chromium';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'projects-download.spec.ts',
+  testMatch: ['projects-download.spec.ts', 'projects-filter-dropdowns.spec.ts'],
   outputDir: 'test-results',
   fullyParallel: false,
   workers: 1,
@@ -23,6 +23,6 @@ export default defineConfig({
     command: `PORT=${port} pnpm dev`,
     url: `http://127.0.0.1:${port}/projects`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
   },
 });

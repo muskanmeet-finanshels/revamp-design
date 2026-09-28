@@ -13,6 +13,7 @@ This artifact runs Next.js 14 inside a shell originally scaffolded as a react-vi
 ## Dev server
 - Command: `next dev -p $PORT -H 0.0.0.0`
 - First compile after a cold restart can take 60–180 s and may trigger the workflow health-check timeout. If `WorkflowsRestart` says it failed, check logs — the server is usually fine; restart once more with a 120 s timeout.
+- Browser checks that wait on the `/projects` route can spend over two minutes in the first compilation (including retries for external font requests); allow a longer server-readiness window or prewarm the route rather than treating a cold-start timeout as a UI failure.
 - `allowedDevOrigins` key does not exist in Next.js 14.2.x `experimental` — do not add it.
 
 ## Static export
