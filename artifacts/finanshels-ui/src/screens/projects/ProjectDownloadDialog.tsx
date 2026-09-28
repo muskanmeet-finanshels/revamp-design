@@ -5,6 +5,7 @@ import { Download } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PROJECT_EXPORT_COLUMNS, type ProjectExportColumnKey } from './project-export';
 
 interface Props {
@@ -46,22 +47,33 @@ export function ProjectDownloadDialog({ count, defaultColumns, onClose, onConfir
             <span className="text-[12px] font-semibold text-gray-700">
               CSV columns <span className="font-normal text-gray-500">({selected.size} selected)</span>
             </span>
-            <div className="flex items-center gap-3 text-[12px] font-medium text-brand">
-              <button type="button" onClick={() => setSelected(new Set(PROJECT_EXPORT_COLUMNS.map(({ key }) => key)))}>
+            <div className="flex items-center gap-3 text-[12px] font-medium">
+              <button
+                type="button"
+                disabled={selected.size === PROJECT_EXPORT_COLUMNS.length}
+                onClick={() => setSelected(new Set(PROJECT_EXPORT_COLUMNS.map(({ key }) => key)))}
+                className="text-brand hover:text-brand-hover disabled:cursor-not-allowed disabled:text-gray-400"
+              >
                 Select all
               </button>
-              <button type="button" onClick={() => setSelected(new Set())}>Clear</button>
+              <button
+                type="button"
+                disabled={selected.size === 0}
+                onClick={() => setSelected(new Set())}
+                className="text-brand hover:text-brand-hover disabled:cursor-not-allowed disabled:text-gray-400"
+              >
+                Clear
+              </button>
             </div>
           </div>
           <div className="max-h-[min(300px,40vh)] overflow-y-auto overscroll-contain rounded-lg border border-gray-200 p-2">
             <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
               {PROJECT_EXPORT_COLUMNS.map(({ key, label }) => (
-                <label key={key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-gray-700 hover:bg-gray-50">
-                  <input
-                    type="checkbox"
+                <label key={key} htmlFor={`project-export-${key}`} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-gray-700 hover:bg-gray-50">
+                  <Checkbox
+                    id={`project-export-${key}`}
                     checked={selected.has(key)}
-                    onChange={() => toggle(key)}
-                    className="h-4 w-4 shrink-0 accent-orange-500"
+                    onCheckedChange={() => toggle(key)}
                   />
                   {label}
                 </label>
