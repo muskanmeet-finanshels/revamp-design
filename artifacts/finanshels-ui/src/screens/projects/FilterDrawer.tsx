@@ -208,17 +208,11 @@ const FILTER_OPTION_KEYS: Array<{
   { key: 'tags',           options: FILTER_OPTIONS.tags,           label: 'Tags' },
   { key: 'dueDatePresets', options: FILTER_OPTIONS.dueDatePresets, label: 'Due Date' },
 ];
-function Checkbox({
-  checked, onChange,
-}: {
-  checked: boolean;
-  onChange: () => void;
-}) {
+function Checkbox({ checked }: { checked: boolean }) {
   return (
     <span
-      onClick={e => { e.preventDefault(); onChange(); }}
       className={cn(
-        'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] cursor-pointer transition-colors',
+        'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[4px] border-[1.5px] transition-colors',
         checked ? 'bg-brand border-brand' : 'border-gray-300 bg-white',
       )}
     >
@@ -228,6 +222,32 @@ function Checkbox({
 }
 
 /* ─────────────────────────────── multi-select dropdown ─────────────────── */
+
+function getDropdownPosition(trigger: HTMLButtonElement | null, panel: HTMLDivElement | null): React.CSSProperties | null {
+  if (!trigger || !panel) return null;
+  const rect = trigger.getBoundingClientRect();
+  const margin = 8;
+  const gap = 4;
+  const above = Math.max(0, rect.top - gap - margin);
+  const below = Math.max(0, window.innerHeight - rect.bottom - gap - margin);
+
+  // Measure the unconstrained menu so resizing back to a taller viewport restores its height.
+  const previousMaxHeight = panel.style.maxHeight;
+  panel.style.maxHeight = 'none';
+  const height = panel.offsetHeight;
+  panel.style.maxHeight = previousMaxHeight;
+  const placeAbove = above > below && (rect.top >= window.innerHeight / 2 || height > below);
+  const available = placeAbove ? above : below;
+
+  return {
+    position: 'fixed',
+    top: placeAbove ? rect.top - gap - Math.min(height, available) : rect.bottom + gap,
+    left: rect.left,
+    width: rect.width,
+    maxHeight: available,
+    zIndex: 9999,
+  };
+}
 
 function MultiSelectDropdown({
   label, placeholder, options, selected, onChange, searchPlaceholder, drawerOpen,
@@ -246,7 +266,6 @@ function MultiSelectDropdown({
   const triggerRef  = useRef<HTMLButtonElement>(null);
   const panelRef    = useRef<HTMLDivElement>(null);
   const searchRef   = useRef<HTMLInputElement>(null);
-  const scrollerRef = useRef<Element | null>(null);
 
   /* Force-close panel when drawer closes */
   useEffect(() => {
@@ -256,18 +275,12 @@ function MultiSelectDropdown({
     }
   }, [drawerOpen]);
 
-  function getPosition() {
-    if (!triggerRef.current) return null;
-    const r = triggerRef.current.getBoundingClientRect();
-    return { position: 'fixed' as const, top: r.bottom + 4, left: r.left, width: r.width, zIndex: 9999 };
-  }
-
-  /* Position the fixed panel under the trigger button */
+  /* Measure after the portal mounts, then keep the menu inside the viewport. */
   useLayoutEffect(() => {
     if (!open) return;
-    const pos = getPosition();
+    const pos = getDropdownPosition(triggerRef.current, panelRef.current);
     if (pos) setPanelStyle(pos);
-  }, [open]);
+  }, [open, query, selected.length]);
 
   /* Focus the search without asking the drawer/page to scroll it into view */
   useEffect(() => {
@@ -319,23 +332,12 @@ function MultiSelectDropdown({
   useEffect(() => {
     if (!open) return;
     function reposition() {
-      const pos = getPosition();
+      const pos = getDropdownPosition(triggerRef.current, panelRef.current);
       if (pos) setPanelStyle(pos);
     }
-    /* Find the nearest scrollable ancestor once and cache it */
-    if (!scrollerRef.current && triggerRef.current) {
-      let el: Element | null = triggerRef.current.parentElement;
-      while (el) {
-        const { overflowY } = window.getComputedStyle(el);
-        if (overflowY === 'auto' || overflowY === 'scroll') { scrollerRef.current = el; break; }
-        el = el.parentElement;
-      }
-    }
-    scrollerRef.current?.addEventListener('scroll', reposition);
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
     return () => {
-      scrollerRef.current?.removeEventListener('scroll', reposition);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
@@ -360,10 +362,10 @@ function MultiSelectDropdown({
     <div
       ref={panelRef}
       style={{ position: 'fixed', ...panelStyle }}
-      className="fixed overflow-hidden overscroll-contain rounded-xl border border-gray-100 bg-white shadow-xl"
+      className="fixed flex flex-col overflow-hidden overscroll-contain rounded-xl border border-gray-100 bg-white shadow-xl"
     >
       {/* Search */}
-      <div className="p-2 pb-1.5">
+      <div className="shrink-0 p-2 pb-1.5">
         <div className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3">
           <Search size={13} className="flex-shrink-0 text-gray-400" />
           <input
@@ -382,23 +384,25 @@ function MultiSelectDropdown({
       </div>
 
       {/* Options */}
-      <SelectAllOption visible={visible} selected={selected} onChange={onChange} filtered={Boolean(query)} />
-      <ul className="max-h-[220px] overflow-y-auto p-2 pt-1">
+      <div className="shrink-0">
+        <SelectAllOption visible={visible} selected={selected} onChange={onChange} filtered={Boolean(query)} />
+      </div>
+      <ul className="min-h-0 max-h-[220px] overflow-y-auto p-2 pt-1">
         {visible.length > 0
           ? visible.map(opt => {
               const isChecked = selected.includes(opt);
               return (
                 <li key={opt}>
-                  <label className={cn(
-                    'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 transition-colors',
+                  <button type="button" aria-pressed={isChecked} onClick={() => toggle(opt)} className={cn(
+                    'flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
                     isChecked ? 'bg-orange-50' : 'hover:bg-gray-100',
                   )}>
-                    <Checkbox checked={isChecked} onChange={() => toggle(opt)} />
+                    <Checkbox checked={isChecked} />
                     <span className={cn(
                       'text-[13px] select-none',
                       isChecked ? 'font-medium text-brand' : 'text-gray-800',
                     )}>{opt}</span>
-                  </label>
+                  </button>
                 </li>
               );
             })
@@ -409,11 +413,11 @@ function MultiSelectDropdown({
       {/* "Clear N selected" footer */}
       {selected.length > 0 && (
         <>
-          <div className="border-t border-gray-100" />
+          <div className="shrink-0 border-t border-gray-100" />
           <button
             type="button"
             onClick={() => { onChange([]); setOpen(false); setQuery(''); }}
-            className="w-full px-3 py-3 text-left text-[13px] font-medium text-brand hover:bg-orange-50/40 transition-colors"
+            className="w-full shrink-0 px-3 py-3 text-left text-[13px] font-medium text-brand hover:bg-orange-50/40 transition-colors"
           >
             Clear {selected.length} selected
           </button>
@@ -472,21 +476,9 @@ function SingleSelectDropdown({
     if (!drawerOpen) setOpen(false);
   }, [drawerOpen]);
 
-  function getPosition() {
-    if (!triggerRef.current) return null;
-    const rect = triggerRef.current.getBoundingClientRect();
-    return {
-      position: 'fixed' as const,
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 9999,
-    };
-  }
-
   useLayoutEffect(() => {
     if (!open) return;
-    const position = getPosition();
+    const position = getDropdownPosition(triggerRef.current, panelRef.current);
     if (position) setPanelStyle(position);
   }, [open]);
 
@@ -508,7 +500,7 @@ function SingleSelectDropdown({
   useEffect(() => {
     if (!open) return;
     function reposition() {
-      const position = getPosition();
+      const position = getDropdownPosition(triggerRef.current, panelRef.current);
       if (position) setPanelStyle(position);
     }
     window.addEventListener('resize', reposition);
@@ -523,7 +515,7 @@ function SingleSelectDropdown({
     <div
       ref={panelRef}
       style={{ position: 'fixed', ...panelStyle }}
-      className="fixed overflow-hidden rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
+      className="fixed overflow-y-auto overscroll-contain rounded-xl border border-gray-100 bg-white p-2 shadow-xl"
     >
       <ul>
         {options.map(option => (
