@@ -23,6 +23,7 @@ export const SEVERITY_OPTIONS = [
 
 export type PriorityValue = typeof PRIORITY_OPTIONS[number]['value'] | '';
 export type SeverityValue = typeof SEVERITY_OPTIONS[number]['value'] | '';
+export type ProjectTagSelection = { priority: PriorityValue; severity: SeverityValue };
 
 /* ── props ── */
 interface AddTagsDialogProps {

@@ -146,6 +146,14 @@ test('tab counts follow filters, status overrides and removed chips, independent
   assert.equal(all.Upcoming, 1);
   assert.equal(all.Archived, 0);
 
+  const withArchived = scopedTasks.map(item =>
+    item.id === 'payroll' ? { ...item, status: 'Archived' as const } : item,
+  );
+  const archivedCounts = getProjectTaskStatusCounts(withArchived);
+  assert.equal(archivedCounts.All, 3);
+  assert.equal(archivedCounts.Archived, 1);
+  assert.deepEqual(ids(withArchived.filter(item => matchesStatusView(item, 'All'))), ['audit', 'vat', 'onboarding']);
+
   const active = filters({ tags: ['Payroll', 'Audit'] });
   const matching = filterProjectTasks(scopedTasks, project, '', active, activeDepartments);
   assert.equal(getProjectTaskStatusCounts(matching).All, 2);

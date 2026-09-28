@@ -17,6 +17,7 @@ import {
   AddTagsDialog,
   type PriorityValue,
   type SeverityValue,
+  type ProjectTagSelection,
 } from './AddTagsDialog';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -45,7 +46,7 @@ const SEVERITY_BADGE: Record<string, string> = {
 const PRIORITY_SHORT: Record<string, string> = { p0: 'P0', p1: 'P1', p2: 'P2', p3: 'P3' };
 const SEVERITY_SHORT: Record<string, string> = { s1: 'S1', s2: 'S2' };
 
-interface TagEntry { priority: PriorityValue; severity: SeverityValue }
+type TagEntry = ProjectTagSelection;
 
 export type ProjectSortKey =
   | 'project-name' | 'client-name' | 'department'
@@ -150,6 +151,8 @@ interface Props {
   /** Called when user finishes a drag-drop reorder */
   onColumnReorder:      (newOrder: ProjectColumnKey[]) => void;
   onResume:             (id: string) => void;
+  tags:                 Record<string, ProjectTagSelection>;
+  onTagChange:          (id: string, priority: PriorityValue, severity: SeverityValue) => void;
   disableAllSelection?: boolean;
 }
 
@@ -189,10 +192,9 @@ export function ProjectsTable({
   projects, selectedIds, onToggle, onSelectAll,
   sortKey, sortDir, onSort,
   visibleColumns, columnOrder, onColumnReorder,
-  onResume, disableAllSelection = false,
+  onResume, tags, onTagChange, disableAllSelection = false,
 }: Props) {
   const router = useRouter();
-  const [tags, setTags]   = useState<Record<string, TagEntry>>({});
   const [openId, setOpenId] = useState<string | null>(null);
   const [reassignNotes, setReassignNotes] = useState<Record<string, string>>({});
 
@@ -215,7 +217,7 @@ export function ProjectsTable({
     return tags[id] ?? { priority: '', severity: '' };
   }
   function saveTag(id: string, priority: PriorityValue, severity: SeverityValue) {
-    setTags(prev => ({ ...prev, [id]: { priority, severity } }));
+    onTagChange(id, priority, severity);
   }
 
   /* ordered list of visible columns */

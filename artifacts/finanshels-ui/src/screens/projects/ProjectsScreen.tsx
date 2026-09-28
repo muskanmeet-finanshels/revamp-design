@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import { getProjectDisplayName, MOCK_PROJECTS, type Project, type ProjectStatus } from './mock-data';
 import { ProjectCard } from './ProjectCard';
+import type { PriorityValue, SeverityValue, ProjectTagSelection } from './AddTagsDialog';
 import {
   ProjectsTable,
   PROJECT_COLUMN_OPTIONS,
@@ -50,7 +51,8 @@ import {
 } from '@/components/ui/dialog';
 import { useOrgContext } from '@/contexts/OrgContext';
 import { downloadCsv } from '@/lib/download-csv';
-import { DownloadConfirmationDialog } from '@/components/DownloadConfirmationDialog';
+import { ProjectDownloadDialog } from './ProjectDownloadDialog';
+import { PROJECT_EXPORT_COLUMNS, projectExportValue, type ProjectExportColumnKey } from './project-export';
 
 const PROJECT_COLUMN_ORDER_STORAGE_KEY = 'fh_projects_column_order';
 const LEGACY_PROJECT_COLUMN_ORDER: ProjectColumnKey[] = [
@@ -258,11 +260,10 @@ const STATUSES: Array<{ value: StatusOption; label: string }> = [
   { value: 'Archived',   label: 'Archived'   },
 ];
 
-function matchesStatusTab(project: Project, status: StatusOption, includeArchived = false): boolean {
+function matchesStatusTab(project: Project, status: StatusOption): boolean {
   return (
-    (status === 'All' && (project.status !== 'Archived' || includeArchived)) ||
-    status === 'Next Month' ||
-    status === 'Upcoming' ||
+    (status === 'All' && project.status !== 'Archived') ||
+    ((status === 'Next Month' || status === 'Upcoming') && project.status !== 'Archived') ||
     project.status === status
   );
 }
@@ -378,6 +379,10 @@ export function ProjectsScreen() {
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [downloadProjects, setDownloadProjects] = useState<Project[] | null>(null);
+  const [projectTags, setProjectTags] = useState<Record<string, ProjectTagSelection>>({});
+  function updateProjectTags(id: string, priority: PriorityValue, severity: SeverityValue) {
+    setProjectTags(previous => ({ ...previous, [id]: { priority, severity } }));
+  }
   function toggleSelect(id: string) {
     const project = MOCK_PROJECTS.find(p => p.id === id);
     if (project?.status === 'Completed' || project?.status === 'Archived') return;
@@ -501,7 +506,7 @@ export function ProjectsScreen() {
     const q = search.toLowerCase();
 
     /* status tab */
-    const statusMatch = ignoreStatusTab || matchesStatusTab(p, statusFilter, (appliedFilters.projectStatuses ?? []).includes('Archived'));
+    const statusMatch = ignoreStatusTab || matchesStatusTab(p, statusFilter);
 
     /* search */
     const searchMatch =
@@ -607,8 +612,7 @@ export function ProjectsScreen() {
   const filteredWithoutStatus = displayProjects.filter(p => matchesProjectFilters(p, 'All', true));
   const statusCounts = STATUSES.reduce<Record<StatusOption, number>>((counts, { value }) => {
     counts[value] = filteredWithoutStatus.filter(project =>
-      (value !== 'Next Month' && value !== 'Upcoming' || project.status !== 'Archived')
-      && matchesStatusTab(project, value, (appliedFilters.projectStatuses ?? []).includes('Archived')),
+      matchesStatusTab(project, value),
     ).length;
     return counts;
   }, {} as Record<StatusOption, number>);
@@ -645,36 +649,14 @@ export function ProjectsScreen() {
   const safePage = Math.min(page, totalPages);
   const pageProjects = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  function confirmDownloadProjects() {
-    if (!downloadProjects?.length) return;
+  function confirmDownloadProjects(columns: ProjectExportColumnKey[]) {
+    if (!downloadProjects?.length || columns.length === 0) return;
     try {
-      downloadCsv('projects.csv', [
-        'Project', 'Client', 'Department', 'Service', 'Service Type', 'Account Manager',
-        'Team Lead', 'Assignees', 'Progress (%)', 'Tasks Completed', 'Tasks Total',
-        'Revenue (AED)', 'Due Date', 'Status', 'Start Date', 'Project Completed Date',
-        'Delivery Status', 'Last Task Completed', 'Created Date', 'Last Updated',
-      ], downloadProjects.map(project => [
-        getProjectDisplayName(project),
-        project.client.name,
-        project.serviceType.label,
-        project.service,
-        project.serviceType.label,
-        project.accountManager?.name,
-        project.teamLeads.map(member => member.name).join(', '),
-        project.assignees.map(member => member.name).join(', '),
-        project.progress,
-        project.tasksCompleted,
-        project.tasksTotal,
-        project.revenue,
-        project.dueDate.replace(/^Due\s+/i, ''),
-        project.status,
-        project.startDate,
-        project.completedDate,
-        project.deliveryStatus,
-        project.lastTaskCompletedAt,
-        project.createdAt,
-        project.updatedAt,
-      ]));
+      downloadCsv(
+        'projects.csv',
+        columns.map(key => PROJECT_EXPORT_COLUMNS.find(option => option.key === key)!.label),
+        downloadProjects.map(project => columns.map(key => projectExportValue(project, key, projectTags[project.id]))),
+      );
       const count = downloadProjects.length;
       setDownloadProjects(null);
       toast.success(`${count} ${count === 1 ? 'project' : 'projects'} downloaded`);
@@ -1238,6 +1220,8 @@ export function ProjectsScreen() {
           sortKey={appliedSortBy}
           sortDir={appliedSortOrder}
           onSort={handleHeaderSort}
+          tags={projectTags}
+          onTagChange={updateProjectTags}
           disableAllSelection={status === 'Archived'}
           onResume={(id) => {
             setResumeTargetId(id);
@@ -1274,6 +1258,8 @@ export function ProjectsScreen() {
               key={p.id}
               project={p}
               isSelected={selectedIds.has(p.id)}
+              tag={projectTags[p.id]}
+              onTagChange={(priority, severity) => updateProjectTags(p.id, priority, severity)}
               onToggle={() => toggleSelect(p.id)}
               disableAllSelection={status === 'Archived'}
               onResume={p.status === 'On Hold' ? () => handleResume(p.id) : undefined}
@@ -1355,15 +1341,19 @@ export function ProjectsScreen() {
         }}
       />
 
-      {/* ── Bulk resume confirmation ── */}
-      <DownloadConfirmationDialog
-        open={downloadProjects !== null}
-        onOpenChange={open => { if (!open) setDownloadProjects(null); }}
-        item="project"
-        count={downloadProjects?.length ?? 0}
-        onConfirm={confirmDownloadProjects}
-      />
+      {downloadProjects && (
+        <ProjectDownloadDialog
+          count={downloadProjects.length}
+          defaultColumns={[
+            'project',
+            ...columnOrder.filter((key): key is Exclude<ProjectColumnKey, 'resume'> => key !== 'resume' && visibleColumns.has(key)),
+          ]}
+          onClose={() => setDownloadProjects(null)}
+          onConfirm={confirmDownloadProjects}
+        />
+      )}
 
+      {/* ── Bulk resume confirmation ── */}
       <Dialog
         open={resumeDialogOpen}
         onOpenChange={open => {

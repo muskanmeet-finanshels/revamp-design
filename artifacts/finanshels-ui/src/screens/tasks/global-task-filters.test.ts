@@ -72,11 +72,16 @@ test('multi-select ORs within a field and combines fields with search and status
 });
 
 test('status counts use the filtered cross-project task list before selecting a tab', () => {
-  const all = getGlobalTaskStatusCounts(filtered({}));
+  const all = getGlobalTaskStatusCounts(
+    filterTasksByAppliedFilters(tasks, 'All', '', filters(), [], true),
+  );
   assert.deepEqual(all, {
-    All: 5, 'Not Started': 1, Overdue: 1, Today: 0, 'Next 30 days': 1,
+    All: 4, 'Not Started': 1, Overdue: 1, Today: 0, 'Next 30 days': 1,
     Completed: 1, Upcoming: 1, 'On Hold': 1, Archived: 1,
   });
+  assert.equal(filtered({}).some(task => task.status === 'Archived'), false);
+  assert.deepEqual(ids(filtered({}, 'Archived')), ['archived']);
+  assert.deepEqual(ids(filtered({ taskStatuses: ['Archived'] })), []);
   const financeTasks = filtered({ projectNames: [getProjectDisplayName(finance)] });
   const counts = getGlobalTaskStatusCounts(financeTasks);
   assert.equal(counts.All, 2); // The shared task counts once, despite its two project links.

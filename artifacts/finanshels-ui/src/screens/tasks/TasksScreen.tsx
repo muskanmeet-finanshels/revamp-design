@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from './mock-data';
+import { getProjectDisplayName } from '../projects/mock-data';
 import {
   filterTasksByAppliedFilters, getGlobalTaskStatusCounts, matchesStatusView,
   STATUSES, type StatusView,
@@ -417,7 +418,7 @@ export function TasksScreen() {
   const filteredTasksForCounts = useMemo(() => {
     const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
     const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
-    return filterTasksByAppliedFilters(displayTasks, 'All', search, appliedFilters, rDeptIds);
+    return filterTasksByAppliedFilters(displayTasks, 'All', search, appliedFilters, rDeptIds, true);
   }, [displayTasks, search, appliedFilters, orgDepts]);
   const statusCounts = getGlobalTaskStatusCounts(filteredTasksForCounts);
 

@@ -22,7 +22,7 @@ export const STATUSES: Array<{ value: StatusView; label: string }> = [
 ];
 
 export function matchesStatusView(task: { status: string; dueDate: string; timeSpentSeconds?: number }, view: StatusView): boolean {
-  if (view === 'All') return true;
+  if (view === 'All') return task.status !== 'Archived';
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const due = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
@@ -51,8 +51,9 @@ export function filterTasksByAppliedFilters(
   searchValue: string,
   appliedFilters: TaskFilterState,
   resolvedDeptIds: string[],
+  includeArchivedForCounts = false,
 ): TaskItem[] {
-  let list = taskList.filter(task => matchesStatusView(task, statusView));
+  let list = taskList.filter(task => includeArchivedForCounts || matchesStatusView(task, statusView));
 
   const q = searchValue.trim().toLowerCase();
   if (q) {

@@ -22,7 +22,7 @@ export const STATUSES: Array<{ value: StatusView; label: string }> = [
 ];
 
 export function matchesStatusView(task: { status: string; dueDate: string }, view: StatusView): boolean {
-  if (view === 'All') return true;
+  if (view === 'All') return task.status !== 'Archived';
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const due = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
   const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);

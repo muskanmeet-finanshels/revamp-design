@@ -15,6 +15,7 @@ import {
   AddTagsDialog,
   type PriorityValue,
   type SeverityValue,
+  type ProjectTagSelection,
 } from './AddTagsDialog';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -48,18 +49,20 @@ interface Props {
   isSelected:           boolean;
   onToggle:             () => void;
   onResume?:            () => void;
+  tag?:                 ProjectTagSelection;
+  onTagChange:          (priority: PriorityValue, severity: SeverityValue) => void;
   disableAllSelection?: boolean;
 }
 
-export function ProjectCard({ project, isSelected, onToggle, onResume, disableAllSelection = false }: Props) {
+export function ProjectCard({ project, isSelected, onToggle, onResume, tag, onTagChange, disableAllSelection = false }: Props) {
   const router    = useRouter();
   const chip      = STATUS_CHIP[project.status];
   const indicator = getDateIndicator(project);
   const displayName = getProjectDisplayName(project);
   const isSelectionDisabled = disableAllSelection || project.status === 'Completed' || project.status === 'Archived';
 
-  const [priority, setPriority]           = useState<PriorityValue>('');
-  const [severity, setSeverity]           = useState<SeverityValue>('');
+  const priority = tag?.priority ?? '';
+  const severity = tag?.severity ?? '';
   const [tagsOpen, setTagsOpen]           = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
 
@@ -293,7 +296,7 @@ export function ProjectCard({ project, isSelected, onToggle, onResume, disableAl
       <AddTagsDialog
         open={tagsOpen}
         onClose={() => setTagsOpen(false)}
-        onSave={(p, s) => { setPriority(p); setSeverity(s); }}
+        onSave={onTagChange}
         projectTitle={displayName}
         initialPriority={priority}
         initialSeverity={severity}
