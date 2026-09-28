@@ -39,7 +39,7 @@ const TASK_PRIORITY_OPTIONS = [
   { value: 'a3', label: 'A3' },
 ] as const;
 
-type TaskPriorityTag = typeof TASK_PRIORITY_OPTIONS[number]['value'] | '';
+export type TaskPriorityTag = typeof TASK_PRIORITY_OPTIONS[number]['value'] | '';
 
 interface TaskTagEntry { priority: TaskPriorityTag }
 
@@ -986,6 +986,8 @@ interface Props {
   columnOrder?:     TaskColumnKey[];
   onColumnReorder?: (order: TaskColumnKey[]) => void;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
+  taskTags?: Record<string, TaskPriorityTag>;
+  onTagChange?: (taskId: string, priority: TaskPriorityTag) => void;
 }
 
 export function TasksTable({
@@ -1004,6 +1006,8 @@ export function TasksTable({
   columnOrder,
   onColumnReorder,
   onStatusChange,
+  taskTags: controlledTaskTags,
+  onTagChange,
 }: Props) {
   const sortProps = { currentKey: sortKey, currentDir: sortDir, onSort };
   const activeColumns = visibleColumns ?? DEFAULT_VISIBLE_TASK_COLUMNS;
@@ -1317,17 +1321,18 @@ export function TasksTable({
   const columnWidth = (weight: number) => `${(weight / visibleColumnWeight) * 100}%`;
 
   /* per-row tag state */
-  const [taskTags,   setTaskTags]   = useState<Record<string, TaskTagEntry>>({});
+  const [localTaskTags, setLocalTaskTags] = useState<Record<string, TaskTagEntry>>({});
   const [openTagId,  setOpenTagId]  = useState<string | null>(null);
   const [incompleteTask, setIncompleteTask] = useState<{ id: string; name: string } | null>(null);
   const [completeTask, setCompleteTask] = useState<{ id: string; name: string } | null>(null);
   const [resumeTask, setResumeTask] = useState<{ id: string; name: string } | null>(null);
 
   function getTag(id: string): TaskTagEntry {
-    return taskTags[id] ?? { priority: '' };
+    return controlledTaskTags ? { priority: controlledTaskTags[id] ?? '' } : localTaskTags[id] ?? { priority: '' };
   }
   function saveTag(id: string, priority: TaskPriorityTag) {
-    setTaskTags(prev => ({ ...prev, [id]: { priority } }));
+    if (onTagChange) onTagChange(id, priority);
+    else setLocalTaskTags(prev => ({ ...prev, [id]: { priority } }));
   }
 
   /* comment state — render deterministic seed first, then hydrate from localStorage */

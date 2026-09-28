@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { MOCK_TASKS, type TaskItem, type TaskPriority, type TaskStatus } from './mock-data';
-import { getProjectDisplayName } from '../projects/mock-data';
 import {
   filterTasksByAppliedFilters, getGlobalTaskStatusCounts, matchesStatusView,
   STATUSES, type StatusView,
@@ -35,7 +34,10 @@ import {
   DEFAULT_TASK_COLUMNS,
   type SortKey,
   type TaskColumnKey,
+  type TaskPriorityTag,
 } from './TasksTable';
+import { ColumnDownloadDialog } from '@/components/ColumnDownloadDialog';
+import { TASK_EXPORT_COLUMNS, taskExportValue, type TaskExportColumnKey } from './task-export';
 import { ProjectsPagination } from '../projects/ProjectsPagination';
 import { TaskBulkActionBar } from './TaskBulkActionBar';
 import { ChangeTaskStatusDrawer } from './ChangeTaskStatusDrawer';
@@ -45,7 +47,6 @@ import { TaskReassignDrawer } from './TaskReassignDrawer';
 import { TaskReasonDrawer } from './TaskReasonDrawer';
 import { toast } from 'sonner';
 import { downloadCsv } from '@/lib/download-csv';
-import { DownloadConfirmationDialog } from '@/components/DownloadConfirmationDialog';
 import {
   ActiveFilterChips,
   makeActiveFilterChipKey,
@@ -409,6 +410,7 @@ export function TasksScreen() {
   /* ad-hoc task dialog */
   const [adHocOpen, setAdHocOpen] = useState(false);
   const [downloadTasks, setDownloadTasks] = useState<TaskItem[] | null>(null);
+  const [taskTags, setTaskTags] = useState<Record<string, TaskPriorityTag>>({});
 
   /* filter drawer */
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -454,26 +456,27 @@ export function TasksScreen() {
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
 
-  function confirmDownloadTasks() {
-    if (!downloadTasks?.length) return;
+  function confirmDownloadTasks(columns: TaskExportColumnKey[]) {
+    if (!downloadTasks?.length || columns.length === 0) return;
     try {
-      downloadCsv('tasks.csv', [
-        'Task', 'Projects', 'Assignee', 'Reassignment Note', 'Due Date',
-        'Status', 'Time Spent (seconds)', 'Priority', 'Adhoc', 'Frequency', 'Created Date', 'Last Updated',
-      ], downloadTasks.map(task => [
-        task.name,
-        task.projects.map(getProjectDisplayName).join(', '),
-        task.assignee?.name,
-        task.reassignmentNote,
-        task.dueDate,
-        task.status,
-        task.timeSpentSeconds,
-        task.priority,
-        task.isAdHoc == null ? '' : task.isAdHoc ? 'Yes' : 'No',
-        task.frequency,
-        task.createdAt,
-        task.updatedAt,
-      ]));
+      let savedComments: Record<string, unknown> = {};
+      if (columns.includes('comments')) {
+        try {
+          const parsed: unknown = JSON.parse(localStorage.getItem('fh_task_comments') ?? '{}');
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) savedComments = parsed as Record<string, unknown>;
+        } catch { /* use the task's initial comment count when no saved comments exist */ }
+      }
+      downloadCsv(
+        'tasks.csv',
+        columns.map(key => TASK_EXPORT_COLUMNS.find(column => column.key === key)!.label),
+        downloadTasks.map(task => {
+          const comments = savedComments[task.id];
+          return columns.map(key => taskExportValue(
+            task, key, taskTags[task.id],
+            Array.isArray(comments) ? comments.length : undefined,
+          ));
+        }),
+      );
       const count = downloadTasks.length;
       setDownloadTasks(null);
       toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} downloaded`);
@@ -875,6 +878,8 @@ export function TasksScreen() {
               visibleColumns={visibleColumns}
               columnOrder={taskColumnOrder}
               onColumnReorder={setTaskColumnOrder}
+              taskTags={taskTags}
+              onTagChange={(id, priority) => setTaskTags(prev => ({ ...prev, [id]: priority }))}
               onStatusChange={(id, status) =>
                 setStatusOverrides(prev => ({ ...prev, [id]: status }))
               }
@@ -921,14 +926,20 @@ export function TasksScreen() {
         onClear={clearSelection}
       />
 
-      {/* ── Confirm resuming selected tasks ── */}
-      <DownloadConfirmationDialog
-        open={downloadTasks !== null}
-        onOpenChange={open => { if (!open) setDownloadTasks(null); }}
-        item="task"
-        count={downloadTasks?.length ?? 0}
-        onConfirm={confirmDownloadTasks}
-      />
+      {downloadTasks && (
+        <ColumnDownloadDialog
+          item="task"
+          count={downloadTasks.length}
+          columns={TASK_EXPORT_COLUMNS}
+          defaultColumns={[
+            'task',
+            ...taskColumnOrder.filter((key): key is Exclude<TaskColumnKey, 'timer' | 'action'> =>
+              key !== 'timer' && key !== 'action' && visibleColumns.has(key)),
+          ]}
+          onClose={() => setDownloadTasks(null)}
+          onConfirm={confirmDownloadTasks}
+        />
+      )}
 
       <Dialog
         open={resumeDialogOpen}
