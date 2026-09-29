@@ -72,7 +72,7 @@ test('Projects CSV respects filters across pages, export columns, and archived t
   // Exercise the real drawer + search + pagination, not just an isolated exporter.
   await page.getByRole('button', { name: 'Filters' }).click();
   await page.getByRole('button', { name: 'All Project Status' }).click();
-  await page.getByRole('listitem').filter({ hasText: 'Current' }).locator('label > span').first().click();
+  await page.getByRole('button', { name: 'Current', exact: true }).click();
   await page.getByRole('button', { name: 'Apply Filter' }).click();
   await page.getByPlaceholder('Search by...').fill('Review');
   const filteredCount = Number((await allTab.innerText()).match(/\d+/)?.[0]);
@@ -95,9 +95,10 @@ test('Projects CSV respects filters across pages, export columns, and archived t
   await dialog.getByRole('checkbox', { name: 'Project', exact: true }).check();
   await dialog.getByRole('checkbox', { name: 'Client', exact: true }).check();
   await dialog.getByRole('checkbox', { name: 'Tasks Completed' }).check();
+  await dialog.getByRole('button', { name: 'Move Tasks Completed up' }).click();
   const filteredRows = await downloadRows(page, filteredCount);
-  expect(filteredRows[0]).toEqual(['Project', 'Client', 'Tasks Completed']);
-  expect(filteredRows.slice(1).every(row => row[0].includes('Review') && row[0].startsWith(`${row[1]}- `) && /^\d+$/.test(row[2]))).toBe(true);
+  expect(filteredRows[0]).toEqual(['Project', 'Tasks Completed', 'Client']);
+  expect(filteredRows.slice(1).every(row => row[0].includes('Review') && row[0].startsWith(`${row[2]}- `) && /^\d+$/.test(row[1]))).toBe(true);
   for (const name of secondPageNames) {
     expect(filteredRows.slice(1).map(row => row[0])).toContain(name.trim());
   }
