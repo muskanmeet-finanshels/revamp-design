@@ -13,3 +13,4 @@
 - [TypeScript 7 config and React 19 types](typescript7-config-and-react19.md) — remove mobile baseUrl and keep React 19 type packages on the Expo runtime line.
 - [Searchable filter bulk selection](searchable-filter-bulk-selection.md) — user approved Select all scoped to visible search matches, preserving hidden selections.
 - [Task category meaning](task-category-meaning.md) — Task Category means the seven urgency/status buckets, not a separate stored taxonomy.
+- [Orphaned artifact server](orphaned-artifact-server.md) — a finished workflow can leave a child holding its port; diagnose EADDRINUSE before changing routes.
