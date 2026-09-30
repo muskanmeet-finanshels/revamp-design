@@ -97,6 +97,44 @@ async function visibleTasks(page: Page): Promise<VisibleTask[]> {
   });
 }
 
+test('Tasks CSV preserves reversed Task sort order across pages', async ({ page }) => {
+  await page.goto('/tasks');
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+  const allCount = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
+  expect(allCount).toBeGreaterThan(20);
+
+  const taskSort = page.locator('thead').getByRole('button', { name: 'Task', exact: true });
+  await taskSort.click(); // default is Due Date; first click sorts Task ascending
+  await expect.poll(async () => {
+    const names = (await visibleTasks(page)).map(row => row.task);
+    return names.length > 1 && names.every((name, i) => i === 0 || names[i - 1].localeCompare(name) <= 0);
+  }).toBe(true);
+  const ascendingFirstPage = (await visibleTasks(page)).map(row => row.task);
+
+  await taskSort.click(); // reverse Task sort to descending
+  await expect.poll(async () => (await visibleTasks(page)).map(row => row.task))
+    .not.toEqual(ascendingFirstPage);
+  const expected: string[][] = [];
+  for (;;) {
+    expected.push(...(await visibleTasks(page)).map(({ task, projects }) => [task, projects]));
+    const next = page.getByRole('button', { name: 'Next', exact: true });
+    if (await next.isDisabled()) break;
+    await next.click();
+  }
+  expect(expected).toHaveLength(allCount);
+  expect(expected.map(row => row[0])).toEqual(
+    expected.map(row => row[0]).sort((a, b) => b.localeCompare(a)),
+  );
+
+  const dialog = await openDownload(page, allCount);
+  await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Task', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Projects', exact: true }).check();
+  const rows = await downloadRows(page, allCount);
+  expect(rows[0]).toEqual(['Task', 'Projects']);
+  expect(rows.slice(1)).toEqual(expected);
+});
+
 test('Tasks CSV contains the filtered results across pages with independent columns and live comments/tags', async ({ page }) => {
   let downloads = 0;
   page.on('download', () => { downloads++; });
