@@ -1,12 +1,33 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
-test('Tasks CSV uses the column order chosen in the download dialog', async ({ page }) => {
+test('Tasks CSV exports hidden column values in dialog order without changing the reordered table', async ({ page }) => {
+  // Keep both drag endpoints in view so horizontal auto-scrolling cannot change the drop target.
+  await page.setViewportSize({ width: 1800, height: 900 });
   await page.goto('/tasks');
   await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
   const allCount = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
   expect(allCount).toBeGreaterThan(0);
-  const tableHeaders = await page.locator('thead th').allTextContents();
+  const initialHeaders = await page.locator('thead th').allTextContents();
+  const statusIndex = initialHeaders.findIndex(header => header.trim() === 'Status');
+  expect(statusIndex).toBeGreaterThan(0);
+  const visibleStatuses = await page.locator('tbody tr').evaluateAll((rows, index) =>
+    rows.map(row => ({
+      task: row.querySelectorAll('td')[1].textContent?.trim() ?? '',
+      status: row.querySelectorAll('td')[index].textContent?.trim() ?? '',
+    })), statusIndex);
+  expect(visibleStatuses.length).toBeGreaterThan(0);
+  expect(visibleStatuses.every(row => row.task && row.status)).toBe(true);
+
+  await page.getByRole('button', { name: 'Select columns' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Status', exact: true }).click();
+  await page.getByRole('button', { name: 'Select columns' }).click();
+  const headers = page.locator('thead th');
+  await headers.filter({ hasText: 'Due Date' }).dragTo(headers.filter({ hasText: 'Project' }));
+  const tableHeaders = await headers.allTextContents();
+  expect(tableHeaders).not.toEqual(initialHeaders);
+  expect(tableHeaders.map(header => header.trim()).slice(1, 4)).toEqual(['Task', 'Due Date', 'Project']);
+  expect(tableHeaders.some(header => header.trim() === 'Status')).toBe(false);
 
   await page.getByRole('button', { name: 'Download data' }).click();
   const dialog = page.getByRole('dialog', { name: 'Download Tasks' });
@@ -19,16 +40,15 @@ test('Tasks CSV uses the column order chosen in the download dialog', async ({ p
   await dialog.getByTitle('Drag Due Date to reorder')
     .dragTo(dialog.getByRole('button', { name: 'Move Status up' }).locator('..'));
 
-  const downloaded = page.waitForEvent('download');
-  await dialog.getByRole('button', { name: `Download ${allCount} tasks` }).click();
-  const file = await downloaded;
-  expect(file.suggestedFilename()).toBe('tasks.csv');
-  const csv = (await readFile(await file.path(), 'utf8')).replace(/^\uFEFF/, '');
-  const rows = csv.trimEnd().split(/\r?\n/);
-  expect(rows[0]).toBe('"Due Date","Status","Task"');
-  expect(rows.slice(1)).toHaveLength(allCount);
-  expect(rows.slice(1).every(row => !row.includes(',"Archived",'))).toBe(true);
-  expect(await page.locator('thead th').allTextContents()).toEqual(tableHeaders);
+  const rows = await downloadRows(page, allCount);
+  expect(rows[0]).toEqual(['Due Date', 'Status', 'Task']);
+  expect(rows.slice(1).every(row => row[1] !== 'Archived')).toBe(true);
+  for (const { task, status } of visibleStatuses) {
+    const exported = rows.slice(1).filter(row => row[2] === task);
+    expect(exported).toHaveLength(1);
+    expect(exported[0][1]).toBe(status);
+  }
+  await expect(headers).toHaveText(tableHeaders);
 });
 
 // Read the browser's downloaded file, including quoted commas and the UTF-8 BOM.
