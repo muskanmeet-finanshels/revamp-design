@@ -10,6 +10,7 @@
     "test:project-task-filters": "node --test --experimental-strip-types src/screens/projects/project-task-filters.test.ts",
     "test:projects-download": "playwright test -c playwright.config.ts projects-download.spec.ts",
     "test:projects-filter-dropdowns": "playwright test -c playwright.config.ts projects-filter-dropdowns.spec.ts",
+    "test:tasks-download": "playwright test -c playwright.config.ts tasks-download.spec.ts",
     "test:global-task-filters": "node --test --experimental-strip-types src/screens/tasks/global-task-filters.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

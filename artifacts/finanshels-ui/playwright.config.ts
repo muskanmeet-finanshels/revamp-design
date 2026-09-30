@@ -3,10 +3,9 @@ import { defineConfig } from '@playwright/test';
 
 const port = 3107;
 const replitChromium = '/repl/tools/bin/chromium';
-
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['projects-download.spec.ts', 'tasks-download.spec.ts', 'projects-filter-dropdowns.spec.ts'],
+  testMatch: ['projects-download.spec.ts', 'projects-filter-dropdowns.spec.ts', 'tasks-download.spec.ts'],
   outputDir: 'test-results',
   fullyParallel: false,
   workers: 1,
