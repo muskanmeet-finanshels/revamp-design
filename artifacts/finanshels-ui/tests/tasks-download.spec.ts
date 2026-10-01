@@ -2,9 +2,92 @@ import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 test.describe('Tasks column order persistence', () => {
-  // A fresh context keeps this test independent of downloads or any saved storage state.
+  // A fresh context keeps these tests independent of downloads or any saved storage state.
   // Do not clear storage in an init script: it would also erase the order on reload.
   test.use({ storageState: { cookies: [], origins: [] } });
+
+  const columnLabels = {
+    project: 'Project',
+    assignee: 'Assignee',
+    reassignmentNote: 'Reassignment Note',
+    dueDate: 'Due Date',
+    status: 'Status',
+    timeSpent: 'Time Spent',
+    timer: 'Timer',
+    comments: 'Comments',
+    tags: '', // Tags intentionally has an unlabelled table header.
+    action: 'Action',
+    adhoc: 'Adhoc',
+    frequency: 'Frequency',
+    createdDate: 'Created Date',
+    lastUpdated: 'Last Updated',
+  };
+  type ColumnKey = keyof typeof columnLabels;
+  const allColumns = Object.keys(columnLabels) as ColumnKey[];
+  const defaultVisibleColumns = allColumns.slice(0, 10);
+  const recoveryCases: Array<{ name: string; saved: string; retained: ColumnKey[] }> = [
+    { name: 'malformed JSON', saved: '["dueDate",', retained: [] },
+    {
+      name: 'duplicate column keys',
+      saved: JSON.stringify(['status', 'dueDate', 'status', 'project', 'dueDate', 'lastUpdated']),
+      retained: ['status', 'dueDate', 'project', 'lastUpdated'],
+    },
+    {
+      name: 'unknown and non-string column keys',
+      saved: JSON.stringify(['lastUpdated', 'removedColumn', null, 'comments', 42, {}, 'project']),
+      retained: ['lastUpdated', 'comments', 'project'],
+    },
+    {
+      name: 'an older order missing newly available columns',
+      saved: JSON.stringify(['dueDate', 'project', 'status', 'assignee', 'reassignmentNote',
+        'timeSpent', 'timer', 'comments', 'tags', 'action']),
+      retained: ['dueDate', 'project', 'status', 'assignee', 'reassignmentNote',
+        'timeSpent', 'timer', 'comments', 'tags', 'action'],
+    },
+    { name: 'an order with no known columns', saved: '["removedColumn", null, 42]', retained: [] },
+    { name: 'a non-array JSON value', saved: '{"project":true}', retained: [] },
+  ];
+
+  for (const { name, saved, retained } of recoveryCases) {
+    test(`Tasks recovers a complete column order from ${name}`, async ({ page }) => {
+      // Seed before hydration, but never overwrite the repaired order on reload.
+      await page.addInitScript(value => {
+        if (localStorage.getItem('fh_tasks_column_order') === null) {
+          localStorage.setItem('fh_tasks_column_order', value);
+        }
+      }, saved);
+      const expectedOrder = [
+        ...retained,
+        ...allColumns.filter(key => !retained.includes(key)),
+      ];
+      await page.goto('/tasks');
+
+      for (const phase of ['initial load', 'reload']) {
+        await test.step(phase, async () => {
+          await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+          // Exact equality checks completeness, uniqueness, relative order, and persistence.
+          await expect.poll(() => page.evaluate(() =>
+            localStorage.getItem('fh_tasks_column_order'),
+          )).toBe(JSON.stringify(expectedOrder));
+          await expect(page.locator('thead th[draggable="true"]')).toHaveText(
+            expectedOrder.filter(key => defaultVisibleColumns.includes(key))
+              .map(key => columnLabels[key]),
+          );
+          await expect(page.locator('tbody tr').first()).toBeVisible();
+
+          // Include normally hidden/new columns so storage alone cannot mask a rendering bug.
+          await page.getByRole('button', { name: 'Select columns' }).click();
+          await page.getByRole('dialog').getByRole('button', { name: 'Select All', exact: true }).click();
+          await page.getByRole('button', { name: 'Select columns' }).click();
+          await expect(page.locator('thead th[draggable="true"]')).toHaveText(
+            expectedOrder.map(key => columnLabels[key]),
+          );
+          await expect(page.locator('tbody tr').first().locator('td')).toHaveCount(allColumns.length + 2);
+        });
+        if (phase === 'initial load') await page.reload();
+      }
+    });
+  }
 
   test('Tasks keeps the complete reordered header sequence after reload', async ({ page }) => {
     // Both drag endpoints must stay visible to avoid horizontal auto-scrolling.
