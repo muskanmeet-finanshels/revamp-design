@@ -198,7 +198,7 @@ test('Tasks CSV exports hidden column values in dialog order without changing th
 
   await page.getByRole('button', { name: 'Download data' }).click();
   const dialog = page.getByRole('dialog', { name: 'Download Tasks' });
-  await expect(dialog).toContainText(`${allCount} tasks matching`);
+  await expect(dialog).toContainText(`Showing ${allCount} of ${allCount} tasks`);
   await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
   await dialog.getByRole('checkbox', { name: 'Task', exact: true }).check();
   await dialog.getByRole('checkbox', { name: 'Status', exact: true }).check();
@@ -250,7 +250,7 @@ function parseCsv(text: string): string[][] {
 async function openDownload(page: Page, count: number) {
   await page.getByRole('button', { name: 'Download data' }).click();
   const dialog = page.getByRole('dialog', { name: 'Download Tasks' });
-  await expect(dialog).toContainText(`${count} ${count === 1 ? 'task' : 'tasks'} matching`);
+  await expect(dialog).toContainText(new RegExp(`Showing ${count} of \\d+ tasks`));
   return dialog;
 }
 
@@ -416,4 +416,118 @@ test('Tasks CSV contains the filtered results across pages with independent colu
   expect(archivedRows[0]).toEqual(['Task', 'Status']);
   expect(archivedRows.slice(1)).toEqual(archivedNames.map(name => [name, 'Archived']));
   expect(downloads).toBe(3);
+});
+
+test('Tasks download applies saved filters across All Status without changing the view', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('finanshels-tasks-filters', JSON.stringify([
+      { id: 'finovo-view', name: 'Finovo portfolio', isDefault: true, createdAt: 1, filters: { clients: ['Finovo'] } },
+      { id: 'nexora-done', name: 'Nexora completed tasks', createdAt: 2, filters: { clients: ['Nexora'], taskStatuses: ['Done'] } },
+      { id: 'no-results', name: 'Future tasks', createdAt: 3, filters: {
+        dueDateFilter: 'Custom Date Range', dueDateStart: '2099-01-01', dueDateEnd: '2099-01-31',
+      } },
+    ]));
+  });
+  await page.goto('/tasks');
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+  const allTab = page.getByRole('tab', { name: /All Status/ });
+  const total = Number((await allTab.innerText()).match(/\d+/)?.[0]);
+  expect(total).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('button', { name: 'Select clients...' }).click();
+  await page.getByRole('listitem').filter({ hasText: 'Finovo' }).locator('label > span').first().click();
+  await page.getByRole('button', { name: 'Apply Filter' }).click();
+  const onHoldTab = page.getByRole('tab', { name: /^On Hold/ });
+  await onHoldTab.click();
+  await page.getByPlaceholder('Search by...').fill('Finovo');
+  const currentCount = Number((await onHoldTab.innerText()).match(/\d+/)?.[0]);
+  expect(currentCount).toBeGreaterThan(0);
+  const beforeRows = await page.locator('tbody tr').allTextContents();
+  const beforeHeaders = await page.locator('thead th').allTextContents();
+  const beforeAllCount = await allTab.innerText();
+
+  const dialog = await openDownload(page, currentCount);
+  await expect(dialog).toContainText(`Showing ${currentCount} of ${total} tasks`);
+  const select = dialog.getByRole('combobox', { name: 'Saved filter', exact: true });
+  await expect(select).toContainText('Current view — Finovo portfolio');
+  await expect(select.getByText('Default', { exact: true })).toBeVisible();
+  await select.click();
+  const defaultOption = page.getByRole('option', { name: /^Finovo portfolio/ });
+  await expect(defaultOption.getByText('Default', { exact: true })).toBeVisible();
+  await page.getByRole('option', { name: 'Nexora completed tasks', exact: true }).click();
+  await expect(dialog).toContainText('matching “Nexora completed tasks” across All Status.');
+  await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
+  for (const label of ['Status', 'Task', 'Projects']) {
+    await dialog.getByRole('checkbox', { name: label, exact: true }).check();
+  }
+  await dialog.getByRole('button', { name: 'Move Projects up' }).click();
+  const downloadButton = dialog.getByRole('button', { name: /^Download \d+ tasks?$/ });
+  const exportCount = Number((await downloadButton.innerText()).match(/\d+/)?.[0]);
+  expect(exportCount).toBeGreaterThan(0);
+  await expect(dialog).toContainText(`Showing ${exportCount} of ${total} tasks`);
+  await page.screenshot({ path: test.info().outputPath('tasks-saved-filter-download.png') });
+  const rows = await downloadRows(page, exportCount);
+  expect(rows[0]).toEqual(['Status', 'Projects', 'Task']);
+  expect(rows.slice(1).every(row => row[0] === 'Done' && row[1].includes('Nexora- '))).toBe(true);
+  expect(await page.locator('tbody tr').allTextContents()).toEqual(beforeRows);
+  expect(await page.locator('thead th').allTextContents()).toEqual(beforeHeaders);
+  expect(await allTab.innerText()).toBe(beforeAllCount);
+  await expect(onHoldTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByPlaceholder('Search by...')).toHaveValue('Finovo');
+
+  await openDownload(page, currentCount);
+  await expect(select).toContainText('Current view — Finovo portfolio');
+  await select.click();
+  await page.getByRole('option', { name: 'Future tasks', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Download 0 tasks', exact: true })).toBeDisabled();
+  await expect(dialog).toContainText(`Showing 0 of ${total} tasks`);
+  await select.click();
+  await page.getByRole('option', { name: 'All Status (no filters)', exact: true }).click();
+  await expect(dialog).toContainText(`Showing ${total} of ${total} tasks`);
+  await expect(dialog.getByRole('button', { name: `Download ${total} tasks`, exact: true })).toBeEnabled();
+  await select.click();
+  await page.getByRole('option', { name: /^Current view/ }).click();
+  await expect(dialog).toContainText(`Showing ${currentCount} of ${total} tasks`);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await page.locator('tbody tr').allTextContents()).toEqual(beforeRows);
+
+  // An empty current view can still open the modal and choose another export filter.
+  await page.getByPlaceholder('Search by...').fill('no-task-can-match-this-search');
+  await openDownload(page, 0);
+  await expect(dialog.getByRole('button', { name: 'Download 0 tasks', exact: true })).toBeDisabled();
+  await select.click();
+  await page.getByRole('option', { name: 'Nexora completed tasks', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: `Download ${exportCount} tasks`, exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+});
+
+for (const [name, saved] of [
+  ['malformed JSON', '[broken'],
+  ['invalid filter fields', JSON.stringify([{ id: 'broken', name: 'Broken filter', filters: { clients: 42 } }])],
+]) {
+  test(`Tasks download reports ${name} without blocking the current view`, async ({ page }) => {
+    await page.addInitScript(value => localStorage.setItem('finanshels-tasks-filters', value), saved);
+    await page.goto('/tasks');
+    const total = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
+    const dialog = await openDownload(page, total);
+    await expect(dialog.getByRole('combobox', { name: 'Saved filter', exact: true })).toContainText('Current view');
+    await expect(dialog.getByRole('alert')).toContainText('Saved filters could not be loaded.');
+    await dialog.getByRole('button', { name: 'About saved filters', exact: true }).hover();
+    await expect(page.getByRole('tooltip').filter({ hasText: 'Saved filters could not be loaded.' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: `Download ${total} tasks`, exact: true })).toBeEnabled();
+  });
+}
+
+test('Tasks download warns when unavailable saved filter options are removed', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('finanshels-tasks-filters', JSON.stringify([
+    { id: 'stale', name: 'Old department tasks', filters: { clients: ['Nexora'], departments: ['removed-department'] } },
+  ])));
+  await page.goto('/tasks');
+  const total = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
+  const dialog = await openDownload(page, total);
+  await dialog.getByRole('combobox', { name: 'Saved filter', exact: true }).click();
+  await page.getByRole('option', { name: 'Old department tasks', exact: true }).click();
+  await expect(page.getByText('Unavailable options removed', { exact: true })).toBeVisible();
+  await expect(page.getByText('Department. Check download count.', { exact: true })).toBeVisible();
+  await expect(dialog).toContainText('matching “Old department tasks” across All Status.');
 });

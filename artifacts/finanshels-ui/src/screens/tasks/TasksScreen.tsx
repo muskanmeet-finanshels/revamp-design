@@ -36,7 +36,7 @@ import {
   type TaskColumnKey,
   type TaskPriorityTag,
 } from './TasksTable';
-import { ColumnDownloadDialog } from '@/components/ColumnDownloadDialog';
+import { TaskDownloadDialog } from './TaskDownloadDialog';
 import { TASK_EXPORT_COLUMNS, taskExportValue, type TaskExportColumnKey } from './task-export';
 import { ProjectsPagination } from '../projects/ProjectsPagination';
 import { TaskBulkActionBar } from './TaskBulkActionBar';
@@ -410,6 +410,7 @@ export function TasksScreen() {
   /* ad-hoc task dialog */
   const [adHocOpen, setAdHocOpen] = useState(false);
   const [downloadTasks, setDownloadTasks] = useState<TaskItem[] | null>(null);
+  const [downloadFilters, setDownloadFilters] = useState<TaskFilterState | null>(null);
   const [taskTags, setTaskTags] = useState<Record<string, TaskPriorityTag>>({});
 
   /* filter drawer */
@@ -430,13 +431,7 @@ export function TasksScreen() {
     setSelectedIds(new Set());
   }, [search, status, sortKey, sortDir, appliedFilters]);
 
-  /* filtered + sorted list */
-  const tasks = useMemo(() => {
-    const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
-    const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
-    const list = filterTasksByAppliedFilters(displayTasks, status, search, appliedFilters, rDeptIds);
-
-    // sort
+  function sortTasks(list: TaskItem[]) {
     const dir = sortDir === 'asc' ? 1 : -1;
     list.sort((a, b) => {
       switch (sortKey) {
@@ -451,13 +446,27 @@ export function TasksScreen() {
     });
 
     return list;
+  }
+
+  /* filtered + sorted list */
+  const tasks = useMemo(() => {
+    const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    const rDeptIds = appliedFilters.departments.filter(id => activeIds.has(id));
+    return sortTasks(filterTasksByAppliedFilters(displayTasks, status, search, appliedFilters, rDeptIds));
   }, [search, status, sortKey, sortDir, appliedFilters, displayTasks, orgDepts]);
+
+  const downloadRows = useMemo(() => {
+    if (!downloadTasks || !downloadFilters) return downloadTasks;
+    const activeIds = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+    const rDeptIds = downloadFilters.departments.filter(id => activeIds.has(id));
+    return sortTasks(filterTasksByAppliedFilters(displayTasks, 'All', '', downloadFilters, rDeptIds));
+  }, [downloadTasks, downloadFilters, displayTasks, orgDepts, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
   const safePage   = Math.min(page, totalPages);
 
   function confirmDownloadTasks(columns: TaskExportColumnKey[]) {
-    if (!downloadTasks?.length || columns.length === 0) return;
+    if (!downloadRows?.length || columns.length === 0) return;
     try {
       let savedComments: Record<string, unknown> = {};
       if (columns.includes('comments')) {
@@ -469,7 +478,7 @@ export function TasksScreen() {
       downloadCsv(
         'tasks.csv',
         columns.map(key => TASK_EXPORT_COLUMNS.find(column => column.key === key)!.label),
-        downloadTasks.map(task => {
+        downloadRows.map(task => {
           const comments = savedComments[task.id];
           return columns.map(key => taskExportValue(
             task, key, taskTags[task.id],
@@ -477,7 +486,7 @@ export function TasksScreen() {
           ));
         }),
       );
-      const count = downloadTasks.length;
+      const count = downloadRows.length;
       setDownloadTasks(null);
       toast.success(`${count} ${count === 1 ? 'task' : 'tasks'} downloaded`);
     } catch {
@@ -632,8 +641,10 @@ export function TasksScreen() {
                 <button
                   type="button"
                   aria-label="Download data"
-                  onClick={() => setDownloadTasks([...tasks])}
-                  disabled={tasks.length === 0}
+                  onClick={() => {
+                    setDownloadFilters(null);
+                    setDownloadTasks([...tasks]);
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Download size={14} />
@@ -927,10 +938,10 @@ export function TasksScreen() {
       />
 
       {downloadTasks && (
-        <ColumnDownloadDialog
-          item="task"
-          count={downloadTasks.length}
-          columns={TASK_EXPORT_COLUMNS}
+        <TaskDownloadDialog
+          count={downloadRows?.length ?? 0}
+          totalCount={displayTasks.filter(task => matchesStatusView(task, 'All')).length}
+          currentFilters={appliedFilters}
           defaultColumns={[
             'task',
             ...taskColumnOrder.filter((key): key is Exclude<TaskColumnKey, 'timer' | 'action'> =>
@@ -938,6 +949,7 @@ export function TasksScreen() {
           ]}
           onClose={() => setDownloadTasks(null)}
           onConfirm={confirmDownloadTasks}
+          onFilterChange={setDownloadFilters}
         />
       )}
 
