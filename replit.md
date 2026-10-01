@@ -48,13 +48,6 @@ Frontend implementation system for converting provided UI wireframes/designs int
 - Projects and Tasks downloads initially show the applied view filters. Changing the export filter applies it independently across All Status, ignoring the view's tab and search; describe the result as "Showing X of Y", where Y is the unfiltered All Status count, excluding archived records.
 - Each screen: own folder, reusable, props for changing data, no hardcoded business logic, mock data for preview only.
 
-## Reports directory
-
-- `/reports` is a standalone FinDelivery report directory with five destinations: P&L, Balance sheet, Cash flow, AR ageing, and Report workspace.
-- The user approved directory-only scope: show honest "Not connected" states and availability details, without financial KPIs, fabricated periods, client mock data, or a simulated report builder.
-- Keep Reports separate from Projects, Tasks, and Timesheets. Do not change their screens, state, storage, or workflows to implement report connections unless the user explicitly expands the scope.
-- FinDelivery remains the intended financial source. Actual report links/data, company/entity access, supported periods, and source versions need a separately scoped connection; do not derive financial results from PMS task or project progress.
-
 ## Gotchas
 
 - Next.js first compile can exceed the workflow health-check window; if a restart "fails" right after dependency changes, check logs — the server is often fine, just restart again.
