@@ -1,4 +1,4 @@
-- [Next.js 14 artifact notes](next14-artifact-notes.md) — Next 14 in vite-shell; React 18 + Tailwind 3 pinned; dev-server timeout quirk; AppShell + screen pattern.
+- [Next.js 14 artifact notes](next14-artifact-notes.md) — Next 14 in vite-shell; React 18 + Tailwind 3 pins; dev-server and browser-check gotchas.
 - [Radix menu scroll lock](radix-menu-scroll-lock.md) — disable modal scroll locking for app-shell filters so fixed headers do not shift when menus open.
 - [Expo Google Fonts useFonts quirk](expo-google-fonts-usefonts.md) — import useFonts from expo-font, not from freshly added @expo-google-fonts/* packages, or React duplicates and hooks crash.
 - [Workspace package repair](workspace-package-repair.md) — preserve pnpm metadata; environment package installs can rewrite root manifests and break artifact links.

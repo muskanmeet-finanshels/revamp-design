@@ -302,13 +302,13 @@ test('Tasks CSV preserves reversed Task sort order across pages', async ({ page 
   await expect.poll(async () => (await visibleTasks(page)).map(row => row.task))
     .not.toEqual(ascendingFirstPage);
   const expected: string[][] = [];
-  for (;;) {
+  // With 10k tasks, verify the visible page boundary without navigating hundreds
+  // of pages; the actual downloaded file below verifies the complete sort.
+  for (let index = 0; index < 2; index++) {
     expected.push(...(await visibleTasks(page)).map(({ task, projects }) => [task, projects]));
-    const next = page.getByRole('button', { name: 'Next', exact: true });
-    if (await next.isDisabled()) break;
-    await next.click();
+    if (index === 0) await page.getByRole('button', { name: 'Next', exact: true }).click();
   }
-  expect(expected).toHaveLength(allCount);
+  expect(expected).toHaveLength(40);
   expect(expected.map(row => row[0])).toEqual(
     expected.map(row => row[0]).sort((a, b) => b.localeCompare(a)),
   );
@@ -319,7 +319,9 @@ test('Tasks CSV preserves reversed Task sort order across pages', async ({ page 
   await dialog.getByRole('checkbox', { name: 'Projects', exact: true }).check();
   const rows = await downloadRows(page, allCount);
   expect(rows[0]).toEqual(['Task', 'Projects']);
-  expect(rows.slice(1)).toEqual(expected);
+  expect(rows.slice(1, expected.length + 1)).toEqual(expected);
+  const allNames = rows.slice(1).map(row => row[0]);
+  expect(allNames).toEqual([...allNames].sort((a, b) => b.localeCompare(a)));
 });
 
 test('Tasks CSV contains the filtered results across pages with independent columns and live comments/tags', async ({ page }) => {

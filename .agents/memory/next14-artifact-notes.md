@@ -23,6 +23,13 @@ Do not run two Next development instances against the same build cache during br
 
 **How to apply:** Prefer testing against the existing managed server, or isolate the test server's cache. If the managed workflow is already stopped but an orphaned server still owns its port, clear that orphan before running a separate test server, then restart the managed workflow after the checks.
 
+## Browser-check captures
+Treat Playwright's output directory as disposable for each invocation, not as durable storage for review or delivery images.
+
+**Why:** Even an invocation that selected no tests cleared captures from the previous run before visual review could read them.
+
+**How to apply:** Keep review captures outside the configured test output directory, or copy them out before another invocation. Use a separate output directory for targeted follow-up checks.
+
 ## Static export
 - `output: 'export'` in `next.config.mjs` — build copies `out/` → `dist/public`.
 - `images: { unoptimized: true }` required with static export.
