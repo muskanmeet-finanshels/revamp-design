@@ -505,8 +505,9 @@ export function ProjectsScreen() {
 
   const matchesProjectFilters = (
     p: Project, statusFilter: StatusOption, ignoreStatusTab = false, af: FilterState = appliedFilters,
+    ignoreSearch = false,
   ): boolean => {
-    const q = search.toLowerCase();
+    const q = ignoreSearch ? '' : search.toLowerCase();
 
     /* status tab */
     const statusMatch = ignoreStatusTab || matchesStatusTab(p, statusFilter);
@@ -650,7 +651,7 @@ export function ProjectsScreen() {
 
   const filtered = sortProjects(displayProjects.filter(p => matchesProjectFilters(p, status)));
   const downloadRows = downloadProjects && (downloadFilters
-    ? sortProjects(displayProjects.filter(p => matchesProjectFilters(p, status, false, downloadFilters)))
+    ? sortProjects(displayProjects.filter(p => matchesProjectFilters(p, 'All', false, downloadFilters, true)))
     : downloadProjects);
 
   const PAGE_SIZE = pageSize;
@@ -1355,6 +1356,8 @@ export function ProjectsScreen() {
       {downloadProjects && (
         <ProjectDownloadDialog
           count={downloadRows?.length ?? 0}
+          totalCount={displayProjects.length}
+          currentFilters={appliedFilters}
           defaultColumns={[
             'project',
             ...columnOrder.filter((key): key is Exclude<ProjectColumnKey, 'resume'> => key !== 'resume' && visibleColumns.has(key)),

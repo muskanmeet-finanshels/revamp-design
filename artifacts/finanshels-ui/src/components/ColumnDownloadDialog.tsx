@@ -11,6 +11,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip';
 interface Props<Key extends string> {
   item: 'project' | 'task';
   count: number;
+  totalCount?: number;
   columns: Array<{ key: Key; label: string }>;
   defaultColumns: Key[];
   onClose: () => void;
@@ -20,7 +21,7 @@ interface Props<Key extends string> {
 }
 
 export function ColumnDownloadDialog<Key extends string>({
-  item, count, columns, defaultColumns, onClose, onConfirm, scopeDescription, children,
+  item, count, totalCount, columns, defaultColumns, onClose, onConfirm, scopeDescription, children,
 }: Props<Key>) {
   // Mounted afresh for each download; changes here never alter table visibility.
   const [selectedColumns, setSelectedColumns] = useState<Key[]>(() => {
@@ -80,7 +81,10 @@ export function ColumnDownloadDialog<Key extends string>({
             Download {item === 'project' ? 'Projects' : 'Tasks'}
           </DialogTitle>
           <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
-            {count} {count === 1 ? item : plural} {scopeDescription ?? 'matching your current tab, search and filters across all pages.'}{' '}
+            {totalCount === undefined
+              ? `${count} ${count === 1 ? item : plural}`
+              : `Showing ${count} of ${totalCount} ${totalCount === 1 ? item : plural}`}{' '}
+            {scopeDescription ?? 'matching your current tab, search and filters across all pages.'}{' '}
             Choose and arrange the CSV columns. This won’t change your table view.
           </DialogDescription>
         </DialogHeader>
