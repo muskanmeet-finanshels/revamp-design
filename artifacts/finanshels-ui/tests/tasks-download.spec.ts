@@ -40,6 +40,51 @@ test.describe('Tasks column order persistence', () => {
   });
 });
 
+test('Tasks CSV defaults to the visible table columns in their customized order, excluding table-only controls', async ({ page }) => {
+  // Keep both drag endpoints visible to avoid horizontal auto-scrolling during the drop.
+  await page.setViewportSize({ width: 1800, height: 900 });
+  await page.goto('/tasks');
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+  const allCount = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
+  expect(allCount).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: 'Select columns' }).click();
+  const columns = page.getByRole('dialog');
+  await columns.getByRole('button', { name: 'Status', exact: true }).click();
+  await columns.getByRole('button', { name: 'Frequency', exact: true }).click();
+  await page.getByRole('button', { name: 'Select columns' }).click();
+  const headers = page.locator('thead th');
+  await headers.filter({ hasText: 'Due Date' }).dragTo(headers.filter({ hasText: 'Project' }));
+  const tableHeaders = await headers.allTextContents();
+  expect(tableHeaders.map(header => header.trim()).slice(1, 4)).toEqual(['Task', 'Due Date', 'Project']);
+  expect(tableHeaders.map(header => header.trim())).not.toContain('Status');
+  expect(tableHeaders.map(header => header.trim())).toContain('Frequency');
+  expect(tableHeaders.map(header => header.trim())).toContain('Timer');
+
+  const expectedColumns = [
+    'Task', 'Due Date', 'Projects', 'Assignee', 'Reassignment Note',
+    'Time Spent (seconds)', 'Comments', 'Tags', 'Frequency',
+  ];
+  const dialog = await openDownload(page, allCount);
+  // Do not clear, toggle, or reorder anything in the export dialog: its defaults are under test.
+  const checked = dialog.getByRole('checkbox', { checked: true });
+  await expect(checked).toHaveCount(expectedColumns.length);
+  for (const [index, label] of expectedColumns.entries()) {
+    await expect(checked.nth(index)).toHaveAccessibleName(label);
+    await expect(dialog.getByRole('checkbox', { name: label, exact: true })).toBeChecked();
+  }
+  for (const label of ['Status', 'Adhoc', 'Created Date', 'Last Updated', 'Priority']) {
+    await expect(dialog.getByRole('checkbox', { name: label, exact: true })).not.toBeChecked();
+  }
+  for (const label of ['Timer', 'Action', 'Select all tasks']) {
+    await expect(dialog.getByRole('checkbox', { name: label, exact: true })).toHaveCount(0);
+  }
+
+  const rows = await downloadRows(page, allCount);
+  expect(rows[0]).toEqual(expectedColumns);
+  await expect(headers).toHaveText(tableHeaders);
+});
+
 test('Tasks CSV exports hidden column values in dialog order without changing the reordered table', async ({ page }) => {
   // Keep both drag endpoints in view so horizontal auto-scrolling cannot change the drop target.
   await page.setViewportSize({ width: 1800, height: 900 });
