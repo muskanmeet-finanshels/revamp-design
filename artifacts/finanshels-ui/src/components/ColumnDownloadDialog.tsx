@@ -79,15 +79,10 @@ export function ColumnDownloadDialog<Key extends string>({
           <DialogTitle ref={titleRef} tabIndex={-1} className="text-[16px] font-semibold text-gray-900 outline-none">
             Download {item === 'project' ? 'Projects' : 'Tasks'}
           </DialogTitle>
-          <div className="flex items-center gap-1.5">
-            <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
-              {count} {count === 1 ? item : plural}
-              <span className="sr-only">{' '}{scopeDescription ?? 'matching your current tab, search and filters across all pages.'}</span>
-            </DialogDescription>
-            <InfoTooltip label="About this download">
-              {item === 'project' ? 'Projects' : 'Tasks'} {scopeDescription ?? 'matching your current tab, search and filters across all pages.'}
-            </InfoTooltip>
-          </div>
+          <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
+            {count} {count === 1 ? item : plural} {scopeDescription ?? 'matching your current tab, search and filters across all pages.'}{' '}
+            Choose and arrange the CSV columns. This won’t change your table view.
+          </DialogDescription>
         </DialogHeader>
         {children}
         <div className="mt-2">
