@@ -63,6 +63,9 @@ test('Projects CSV respects filters across pages, export columns, and archived t
   const allCount = Number((await allTab.innerText()).match(/\d+/)?.[0]);
   expect(allCount).toBeGreaterThan(10);
   let dialog = await openDownload(page, allCount);
+  await expect(dialog.getByRole('combobox', { name: 'Saved filter', exact: true })).toContainText('Current view');
+  await dialog.getByRole('button', { name: 'About saved filters', exact: true }).hover();
+  await expect(page.getByRole('tooltip').filter({ hasText: 'No saved filters yet.' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
   await dialog.getByRole('checkbox', { name: 'Status', exact: true }).check();
   const allRows = await downloadRows(page, allCount);
@@ -117,4 +120,81 @@ test('Projects CSV respects filters across pages, export columns, and archived t
   expect(archivedRows[0]).toEqual(['Status']);
   expect(archivedRows.slice(1).every(row => row[0] === 'Archived')).toBe(true);
   expect(downloads).toBe(3);
+});
+
+test('Projects download applies a saved filter without changing the list filters', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('finanshels-projects-filters', JSON.stringify([
+      {
+        id: 'nexora-current', name: 'Nexora current projects', createdAt: 1,
+        filters: { clients: ['Nexora'], projectStatuses: ['Current'] },
+      },
+      {
+        id: 'no-results', name: 'High revenue projects', createdAt: 2,
+        filters: { revenueCondition: 'Greater Than', revenueValue: '999999999' },
+      },
+      {
+        id: 'audit-tag', name: 'Audit tagged projects', createdAt: 3,
+        filters: { tags: ['Audit'] },
+      },
+    ]));
+  });
+  await page.goto('/projects?view=list');
+  await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'List View' }).click();
+  await page.getByRole('button', { name: 'Filters' }).click();
+  await page.getByRole('button', { name: 'All Client Name', exact: true }).click();
+  await page.getByRole('button', { name: 'Finovo', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply Filter' }).click();
+
+  const allTab = page.getByRole('tab', { name: /All Status/ });
+  const listCount = Number((await allTab.innerText()).match(/\d+/)?.[0]);
+  expect(listCount).toBeGreaterThan(0);
+  const listRows = await page.locator('tbody tr').allTextContents();
+  const tableHeaders = await page.locator('thead th').allTextContents();
+  const dialog = await openDownload(page, listCount);
+  const savedFilter = dialog.getByRole('combobox', { name: 'Saved filter', exact: true });
+  await savedFilter.click();
+  await expect(page.getByRole('option', { name: 'Nexora current projects', exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('saved-filter-menu.png') });
+  await page.getByRole('option', { name: 'Nexora current projects', exact: true }).click();
+  await expect(dialog).toContainText('matching “Nexora current projects”');
+  await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Client', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Status', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Project', exact: true }).check();
+  const downloadButton = dialog.getByRole('button', { name: /^Download \d+ projects?$/ });
+  const exportCount = Number((await downloadButton.innerText()).match(/\d+/)?.[0]);
+  expect(exportCount).toBeGreaterThan(0);
+  const rows = await downloadRows(page, exportCount);
+  expect(rows[0]).toEqual(['Client', 'Status', 'Project']);
+  expect(rows.slice(1).every(row => row[0] === 'Nexora' && row[1] === 'Current' && row[2].startsWith('Nexora- '))).toBe(true);
+  expect(await page.locator('tbody tr').allTextContents()).toEqual(listRows);
+  expect(await page.locator('thead th').allTextContents()).toEqual(tableHeaders);
+  expect(Number((await allTab.innerText()).match(/\d+/)?.[0])).toBe(listCount);
+
+  // A fresh download starts from the current view, not the prior export filter.
+  await openDownload(page, listCount);
+  await expect(savedFilter).toContainText('Current view');
+  await savedFilter.click();
+  await page.getByRole('option', { name: 'High revenue projects', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Download 0 projects', exact: true })).toBeDisabled();
+  await savedFilter.click();
+  await page.getByRole('option', { name: 'Current view', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: `Download ${listCount} projects`, exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await page.locator('tbody tr').allTextContents()).toEqual(listRows);
+
+  await openDownload(page, listCount);
+  await savedFilter.click();
+  await page.getByRole('option', { name: 'Audit tagged projects', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Tags', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Project', exact: true }).check();
+  const taggedCount = Number((await downloadButton.innerText()).match(/\d+/)?.[0]);
+  expect(taggedCount).toBeGreaterThan(0);
+  const taggedRows = await downloadRows(page, taggedCount);
+  expect(taggedRows[0]).toEqual(['Tags', 'Project']);
+  expect(taggedRows.slice(1).every(row => row[0].split(', ').includes('Audit'))).toBe(true);
+  expect(await page.locator('tbody tr').allTextContents()).toEqual(listRows);
 });

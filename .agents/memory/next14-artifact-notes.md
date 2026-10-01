@@ -16,6 +16,13 @@ This artifact runs Next.js 14 inside a shell originally scaffolded as a react-vi
 - Browser checks that wait on the `/projects` route can spend over two minutes in the first compilation (including retries for external font requests); allow a longer server-readiness window or prewarm the route rather than treating a cold-start timeout as a UI failure.
 - `allowedDevOrigins` key does not exist in Next.js 14.2.x `experimental` — do not add it.
 
+### Concurrent development servers
+Do not run two Next development instances against the same build cache during browser checks.
+
+**Why:** The managed app server and Playwright's separate server shared the development cache; a full hot reload closed an open download dialog during an otherwise valid check.
+
+**How to apply:** Prefer testing against the existing managed server, or isolate the test server's cache. If the managed workflow is already stopped but an orphaned server still owns its port, clear that orphan before running a separate test server, then restart the managed workflow after the checks.
+
 ## Static export
 - `output: 'export'` in `next.config.mjs` — build copies `out/` → `dist/public`.
 - `images: { unoptimized: true }` required with static export.

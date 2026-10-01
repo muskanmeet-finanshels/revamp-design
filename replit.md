@@ -43,6 +43,7 @@ Frontend implementation system for converting provided UI wireframes/designs int
 - Use Next.js 14 — explicitly rejected Vite.
 - Do NOT invent screens, dashboards, layouts, or examples — only build screens from user-provided references.
 - Match provided designs as closely as possible (spacing, typography, colors, borders, responsive behavior).
+- Show informational helper text through an "i" icon with a hover tooltip instead of inline explanatory paragraphs.
 - Each screen: own folder, reusable, props for changing data, no hardcoded business logic, mock data for preview only.
 
 ## Gotchas

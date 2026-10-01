@@ -975,7 +975,7 @@ const LABEL_TO_DEPT_ID: Record<string, string> = {
   IT:         'dept-6', // Technology dept covers IT
 };
 
-const GENERATED_PROJECTS: Project[] = Array.from({ length: 88 }, (_, index) => {
+const GENERATED_PROJECTS: Project[] = Array.from({ length: 10_000 - SEED_PROJECTS.length }, (_, index) => {
   const number = index + 53;
   const clients = [
     { name: 'Nexora', color: '#334756' },

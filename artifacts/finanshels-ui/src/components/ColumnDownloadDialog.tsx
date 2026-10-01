@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState, type DragEvent } from 'react';
+import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Download, GripVertical } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 interface Props<Key extends string> {
   item: 'project' | 'task';
@@ -14,10 +15,12 @@ interface Props<Key extends string> {
   defaultColumns: Key[];
   onClose: () => void;
   onConfirm: (columns: Key[]) => void;
+  scopeDescription?: string;
+  children?: ReactNode;
 }
 
 export function ColumnDownloadDialog<Key extends string>({
-  item, count, columns, defaultColumns, onClose, onConfirm,
+  item, count, columns, defaultColumns, onClose, onConfirm, scopeDescription, children,
 }: Props<Key>) {
   // Mounted afresh for each download; changes here never alter table visibility.
   const [selectedColumns, setSelectedColumns] = useState<Key[]>(() => {
@@ -26,6 +29,7 @@ export function ColumnDownloadDialog<Key extends string>({
   });
   const [dropTarget, setDropTarget] = useState<Key | null>(null);
   const dragKey = useRef<Key | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
   const selected = new Set(selectedColumns);
   const otherColumns = columns.filter(({ key }) => !selected.has(key));
   const plural = item === 'project' ? 'projects' : 'tasks';
@@ -61,24 +65,42 @@ export function ColumnDownloadDialog<Key extends string>({
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[90vh] max-w-[540px] overflow-y-auto rounded-2xl p-6">
+      <DialogContent
+        className="max-h-[90vh] max-w-[540px] overflow-y-auto rounded-2xl p-6"
+        onOpenAutoFocus={event => {
+          event.preventDefault();
+          titleRef.current?.focus();
+        }}
+      >
         <DialogHeader className="gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
             <Download size={20} className="text-brand" />
           </div>
-          <DialogTitle className="text-[16px] font-semibold text-gray-900">
+          <DialogTitle ref={titleRef} tabIndex={-1} className="text-[16px] font-semibold text-gray-900 outline-none">
             Download {item === 'project' ? 'Projects' : 'Tasks'}
           </DialogTitle>
-          <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
-            {count} {count === 1 ? item : plural} matching your current tab, search and filters across all pages.
-            Choose and arrange the CSV columns. This won’t change your table view.
-          </DialogDescription>
+          <div className="flex items-center gap-1.5">
+            <DialogDescription className="text-[13.5px] leading-relaxed text-gray-500">
+              {count} {count === 1 ? item : plural}
+              <span className="sr-only">{' '}{scopeDescription ?? 'matching your current tab, search and filters across all pages.'}</span>
+            </DialogDescription>
+            <InfoTooltip label="About this download">
+              {item === 'project' ? 'Projects' : 'Tasks'} {scopeDescription ?? 'matching your current tab, search and filters across all pages.'}
+            </InfoTooltip>
+          </div>
         </DialogHeader>
+        {children}
         <div className="mt-2">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[12px] font-semibold text-gray-700">
-              CSV columns <span className="font-normal text-gray-500">({selectedColumns.length} selected)</span>
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[12px] font-semibold text-gray-700">
+                CSV columns <span className="font-normal text-gray-500">({selectedColumns.length} selected)</span>
+              </span>
+              <InfoTooltip label="About CSV columns">
+                Choose the columns to include, then drag or use the arrows to arrange their CSV order.
+                This won’t change your table view.
+              </InfoTooltip>
+            </div>
             <div className="flex items-center gap-3 text-[12px] font-medium">
               <button
                 type="button"
@@ -104,7 +126,7 @@ export function ColumnDownloadDialog<Key extends string>({
             {selectedColumns.length > 0 && (
               <div className="mb-2">
                 <p className="px-2 py-1 text-[11px] font-semibold text-gray-500">
-                  Included in CSV · drag or use arrows to reorder
+                  Included in CSV
                 </p>
                 <div className="space-y-0.5">
                   {selectedColumns.map((key, index) => {

@@ -379,6 +379,7 @@ export function ProjectsScreen() {
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [downloadProjects, setDownloadProjects] = useState<Project[] | null>(null);
+  const [downloadFilters, setDownloadFilters] = useState<FilterState | null>(null);
   const [projectTags, setProjectTags] = useState<Record<string, ProjectTagSelection>>({});
   function updateProjectTags(id: string, priority: PriorityValue, severity: SeverityValue) {
     setProjectTags(previous => ({ ...previous, [id]: { priority, severity } }));
@@ -502,7 +503,9 @@ export function ProjectsScreen() {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  const matchesProjectFilters = (p: Project, statusFilter: StatusOption, ignoreStatusTab = false): boolean => {
+  const matchesProjectFilters = (
+    p: Project, statusFilter: StatusOption, ignoreStatusTab = false, af: FilterState = appliedFilters,
+  ): boolean => {
     const q = search.toLowerCase();
 
     /* status tab */
@@ -513,7 +516,6 @@ export function ProjectsScreen() {
       !q || p.title.toLowerCase().includes(q) || p.client.name.toLowerCase().includes(q);
 
     /* drawer filters */
-    const af = appliedFilters;
     const projectStatusMatch = !af.projectStatuses?.length || af.projectStatuses.includes(p.status);
 
     const activeDeptIdSet = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
@@ -552,6 +554,7 @@ export function ProjectsScreen() {
     const revenueMatch = revenueCondition === REVENUE_NO_FILTER
       || (revenueTypeMatch && revenueConditionMatch);
     const clientMatch = af.clients.length === 0     || af.clients.includes(p.client.name);
+    const tagsMatch = af.tags.length === 0 || af.tags.some(tag => p.tags?.includes(tag));
 
     const allMembers  = [...p.teamLeads, ...p.assignees].map(m => m.name);
     const assigneeMatch = af.assignees.length === 0 || af.assignees.some(a => allMembers.includes(a));
@@ -605,7 +608,7 @@ export function ProjectsScreen() {
     })();
 
     return statusMatch && projectStatusMatch && searchMatch &&
-      deptMatch && svcMatch && revenueMatch && clientMatch && assigneeMatch &&
+      deptMatch && svcMatch && revenueMatch && clientMatch && tagsMatch && assigneeMatch &&
       dueDaysMatch && overdueDaysMatch && periodMatch;
   };
 
@@ -617,32 +620,38 @@ export function ProjectsScreen() {
     return counts;
   }, {} as Record<StatusOption, number>);
 
-  const filtered = displayProjects.filter(p => matchesProjectFilters(p, status));
-
-  // Apply sort when active
-  if (appliedSortBy) {
-    const dir = appliedSortOrder === 'asc' ? 1 : -1;
-    filtered.sort((a, b) => {
-      switch (appliedSortBy) {
-        case 'project-name':
-          return dir * a.title.localeCompare(b.title);
-        case 'client-name':
-          return dir * a.client.name.localeCompare(b.client.name);
-        case 'department':
-          return dir * a.serviceType.label.localeCompare(b.serviceType.label);
-        case 'progress':
-          return dir * (a.progress - b.progress);
-        case 'task-count':
-          return dir * (a.tasksTotal - b.tasksTotal);
-        case 'due-date':
-          return dir * (parseDue(a.dueDate) - parseDue(b.dueDate));
-        case 'status':
-          return dir * a.status.localeCompare(b.status);
-        default:
-          return 0;
-      }
-    });
+  // Use the same sort for the table and for a saved-filter download.
+  function sortProjects(projects: Project[]): Project[] {
+    if (appliedSortBy) {
+      const dir = appliedSortOrder === 'asc' ? 1 : -1;
+      projects.sort((a, b) => {
+        switch (appliedSortBy) {
+          case 'project-name':
+            return dir * a.title.localeCompare(b.title);
+          case 'client-name':
+            return dir * a.client.name.localeCompare(b.client.name);
+          case 'department':
+            return dir * a.serviceType.label.localeCompare(b.serviceType.label);
+          case 'progress':
+            return dir * (a.progress - b.progress);
+          case 'task-count':
+            return dir * (a.tasksTotal - b.tasksTotal);
+          case 'due-date':
+            return dir * (parseDue(a.dueDate) - parseDue(b.dueDate));
+          case 'status':
+            return dir * a.status.localeCompare(b.status);
+          default:
+            return 0;
+        }
+      });
+    }
+    return projects;
   }
+
+  const filtered = sortProjects(displayProjects.filter(p => matchesProjectFilters(p, status)));
+  const downloadRows = downloadProjects && (downloadFilters
+    ? sortProjects(displayProjects.filter(p => matchesProjectFilters(p, status, false, downloadFilters)))
+    : downloadProjects);
 
   const PAGE_SIZE = pageSize;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -650,14 +659,14 @@ export function ProjectsScreen() {
   const pageProjects = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function confirmDownloadProjects(columns: ProjectExportColumnKey[]) {
-    if (!downloadProjects?.length || columns.length === 0) return;
+    if (!downloadRows?.length || columns.length === 0) return;
     try {
       downloadCsv(
         'projects.csv',
         columns.map(key => PROJECT_EXPORT_COLUMNS.find(option => option.key === key)!.label),
-        downloadProjects.map(project => columns.map(key => projectExportValue(project, key, projectTags[project.id]))),
+        downloadRows.map(project => columns.map(key => projectExportValue(project, key, projectTags[project.id]))),
       );
-      const count = downloadProjects.length;
+      const count = downloadRows.length;
       setDownloadProjects(null);
       toast.success(`${count} ${count === 1 ? 'project' : 'projects'} downloaded`);
     } catch {
@@ -745,8 +754,10 @@ export function ProjectsScreen() {
               <button
                 type="button"
                 aria-label="Download data"
-                onClick={() => setDownloadProjects([...filtered])}
-                disabled={filtered.length === 0}
+                onClick={() => {
+                  setDownloadFilters(null);
+                  setDownloadProjects([...filtered]);
+                }}
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Download size={14} />
@@ -1343,13 +1354,14 @@ export function ProjectsScreen() {
 
       {downloadProjects && (
         <ProjectDownloadDialog
-          count={downloadProjects.length}
+          count={downloadRows?.length ?? 0}
           defaultColumns={[
             'project',
             ...columnOrder.filter((key): key is Exclude<ProjectColumnKey, 'resume'> => key !== 'resume' && visibleColumns.has(key)),
           ]}
           onClose={() => setDownloadProjects(null)}
           onConfirm={confirmDownloadProjects}
+          onFilterChange={setDownloadFilters}
         />
       )}
 
