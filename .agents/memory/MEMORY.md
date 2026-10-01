@@ -15,3 +15,4 @@
 - [Task category meaning](task-category-meaning.md) — Task Category means the seven urgency/status buckets, not a separate stored taxonomy.
 - [Orphaned artifact server](orphaned-artifact-server.md) — a finished workflow can leave a child holding its port; diagnose EADDRINUSE before changing routes.
 - [Wide table drag checks](wide-table-drag-checks.md) — keep both header drag endpoints in view to avoid auto-scroll landing on a different column.
+- [Narrow viewport overlay checks](narrow-viewport-overlays.md) — verify floating panels with scrollbar-bearing narrow viewports, not only mobile emulation.

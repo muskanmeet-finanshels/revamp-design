@@ -67,6 +67,7 @@ export function TimerWidget() {
           onClick={() => setMinimised(false)}
           title="Restore timer"
           aria-label="Restore timer"
+          data-pms-floating-timer
           className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-white border border-gray-200 shadow-lg hover:scale-105 active:scale-95 transition-transform"
         >
           <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-20 animate-ping" />
@@ -84,6 +85,7 @@ export function TimerWidget() {
         role="status"
         aria-live="polite"
         aria-label={`Timer running for ${taskName}: ${elapsed}`}
+        data-pms-floating-timer
         className="fixed bottom-6 right-6 z-50 flex w-[240px] flex-col gap-3 rounded-2xl bg-white p-4 shadow-[0_4px_24px_rgba(0,0,0,0.10)] border border-gray-200"
       >
         {/* Header row */}

@@ -7,6 +7,7 @@ import { OrgProvider } from '@/contexts/OrgContext';
 import { EmployeeGroupsProvider } from '@/contexts/EmployeeGroupsContext';
 import { AccessControlProvider } from '@/contexts/AccessControlContext';
 import { TimerWidget } from '@/components/TimerWidget';
+import { PmsChatDemo } from '@/components/pms-chat/PmsChatDemo';
 
 import './globals.css';
 
@@ -42,6 +43,7 @@ export default function RootLayout({
               <TimerProvider>
                 {children}
                 <TimerWidget />
+                <PmsChatDemo />
                 <Toaster position="bottom-right" richColors />
               </TimerProvider>
             </EmployeeGroupsProvider>
