@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
   LayoutGrid, Users2, ShieldCheck, Briefcase,
   ClipboardList, HelpCircle, Settings,
-  FolderKanban, CheckSquare, Inbox, Timer, Shield, KeyRound,
+  FolderKanban, CheckSquare, Inbox, Timer, Shield, KeyRound, FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +34,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { kind: 'leaf', label: 'Timesheets', href: '/timesheets', icon: <Timer size={16} /> },
+  { kind: 'leaf', label: 'Reports', href: '/reports', icon: <FileText size={16} /> },
   { kind: 'leaf', label: 'Audit Trail', href: '/audit-trail', icon: <ClipboardList size={16} /> },
   {
     kind: 'group', label: 'Admin', icon: <Shield size={16} />,
