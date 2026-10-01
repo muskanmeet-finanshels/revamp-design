@@ -1,6 +1,45 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
+test.describe('Tasks column order persistence', () => {
+  // A fresh context keeps this test independent of downloads or any saved storage state.
+  // Do not clear storage in an init script: it would also erase the order on reload.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('Tasks keeps the complete reordered header sequence after reload', async ({ page }) => {
+    // Both drag endpoints must stay visible to avoid horizontal auto-scrolling.
+    await page.setViewportSize({ width: 1800, height: 900 });
+    await page.goto('/tasks');
+    await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+    const headers = page.locator('thead th');
+    // Wait for local storage hydration/persistence before interacting with the table.
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh_tasks_column_order')))
+      .not.toBeNull();
+    const initialHeaders = await headers.allTextContents();
+    const projectIndex = initialHeaders.findIndex(header => header.trim() === 'Project');
+    const dueDateIndex = initialHeaders.findIndex(header => header.trim() === 'Due Date');
+    expect(projectIndex).toBeGreaterThan(0);
+    expect(dueDateIndex).toBeGreaterThan(projectIndex);
+    const expectedHeaders = [...initialHeaders];
+    const [dueDateHeader] = expectedHeaders.splice(dueDateIndex, 1);
+    expectedHeaders.splice(projectIndex, 0, dueDateHeader);
+
+    await headers.filter({ hasText: /^Due Date$/ })
+      .dragTo(headers.filter({ hasText: /^Project$/ }));
+    await expect(headers).toHaveText(expectedHeaders);
+    expect(expectedHeaders).not.toEqual(initialHeaders);
+    // Verify the drag was saved before reloading; the browser retains this context's storage.
+    await expect.poll(() => page.evaluate(() => {
+      const order = JSON.parse(localStorage.getItem('fh_tasks_column_order') ?? '[]') as string[];
+      return order.slice(0, 2);
+    })).toEqual(['dueDate', 'project']);
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+    await expect(headers).toHaveText(expectedHeaders);
+  });
+});
+
 test('Tasks CSV exports hidden column values in dialog order without changing the reordered table', async ({ page }) => {
   // Keep both drag endpoints in view so horizontal auto-scrolling cannot change the drop target.
   await page.setViewportSize({ width: 1800, height: 900 });
