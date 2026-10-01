@@ -1356,7 +1356,7 @@ export function ProjectsScreen() {
       {downloadProjects && (
         <ProjectDownloadDialog
           count={downloadRows?.length ?? 0}
-          totalCount={displayProjects.length}
+          totalCount={displayProjects.filter(project => matchesStatusTab(project, 'All')).length}
           currentFilters={appliedFilters}
           defaultColumns={[
             'project',

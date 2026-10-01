@@ -63,6 +63,7 @@ test('Projects CSV respects filters across pages, export columns, and archived t
   const allCount = Number((await allTab.innerText()).match(/\d+/)?.[0]);
   expect(allCount).toBeGreaterThan(10);
   let dialog = await openDownload(page, allCount);
+  await expect(dialog).toContainText(`Showing ${allCount} of ${allCount} projects`);
   await expect(dialog.getByRole('combobox', { name: 'Saved filter', exact: true })).toContainText('Current view');
   await dialog.getByRole('button', { name: 'About saved filters', exact: true }).hover();
   await expect(page.getByRole('tooltip').filter({ hasText: 'No saved filters yet.' })).toBeVisible();
@@ -145,6 +146,7 @@ test('Projects download applies saved filters across All Status independently of
   });
   await page.goto('/projects?view=list');
   await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
+  const totalAllStatusCount = Number((await page.getByRole('tab', { name: /All Status/ }).innerText()).match(/\d+/)?.[0]);
   await page.getByRole('button', { name: 'List View' }).click();
   await page.getByRole('button', { name: 'Filters' }).click();
   await page.getByRole('button', { name: 'All Client Name', exact: true }).click();
@@ -162,7 +164,7 @@ test('Projects download applies saved filters across All Status independently of
   const savedFilter = dialog.getByRole('combobox', { name: 'Saved filter', exact: true });
   await expect(savedFilter).toContainText('Current view — Finovo portfolio');
   await expect(savedFilter.getByText('Default', { exact: true })).toBeVisible();
-  await expect(dialog).toContainText(`Showing ${listCount} of 10000 projects`);
+  await expect(dialog).toContainText(`Showing ${listCount} of ${totalAllStatusCount} projects`);
   await savedFilter.click();
   await expect(page.getByRole('option', { name: 'Nexora current projects', exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('saved-filter-menu.png') });
@@ -200,8 +202,9 @@ test('Projects download applies saved filters across All Status independently of
   await savedFilter.click();
   await page.getByRole('option', { name: 'All Status (no filters)', exact: true }).click();
   const allStatusCount = Number((await downloadButton.innerText()).match(/\d+/)?.[0]);
+  expect(allStatusCount).toBe(totalAllStatusCount);
   expect(allStatusCount).toBeGreaterThan(listCount);
-  await expect(dialog).toContainText(`Showing ${allStatusCount} of 10000 projects`);
+  await expect(dialog).toContainText(`Showing ${allStatusCount} of ${allStatusCount} projects`);
   await expect(dialog).toContainText('across All Status, without filters.');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 

@@ -45,7 +45,7 @@ Frontend implementation system for converting provided UI wireframes/designs int
 - Match provided designs as closely as possible (spacing, typography, colors, borders, responsive behavior).
 - Show informational helper text through an "i" icon with a hover tooltip, except keep download-dialog header descriptions as visible text.
 - Downloads start with the table's selected columns and order; allow drag-and-drop reordering in the modal without changing the table.
-- Projects downloads initially show the applied view filters. Changing the export filter applies it independently across All Status, ignoring the view's tab and search; describe the result as "Showing X of Y".
+- Projects downloads initially show the applied view filters. Changing the export filter applies it independently across All Status, ignoring the view's tab and search; describe the result as "Showing X of Y", where Y is the unfiltered All Status count, excluding archived projects.
 - Each screen: own folder, reusable, props for changing data, no hardcoded business logic, mock data for preview only.
 
 ## Gotchas
