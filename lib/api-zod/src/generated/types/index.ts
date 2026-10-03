@@ -14,5 +14,7 @@ export * from './pmsAssistantCitation';
 export * from './pmsAssistantCitationKind';
 export * from './pmsAssistantClaim';
 export * from './pmsAssistantClaimBasis';
+export * from './pmsAssistantPersonalization';
+export * from './pmsAssistantQueryIntent';
 export * from './pmsAssistantQuestionInput';
 export * from './pmsAssistantStatus';

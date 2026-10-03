@@ -23,33 +23,57 @@ export function PmsChatDemo() {
   const [openSrc, setOpenSrc] = useState<Record<string, boolean>>({});
   const [announce, setAnnounce] = useState('');
   const [timerHeight, setTimerHeight] = useState(240);
-  const [mode, setMode] = useState<'demo' | 'live'>('demo');
+  const [mode, setMode] = useState<'demo' | 'live'>('live');
   const [liveReady, setLiveReady] = useState(false);
+  const [contextKey, setContextKey] = useState<string | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const [liveReset, setLiveReset] = useState(0);
-  const modeChosen = useRef(false);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setLiveReady(false); setContextKey(null); return; }
     let disposed = false;
-    const controller = new AbortController();
+    let controller: AbortController | null = null;
+    let seq = 0;
     async function refresh() {
+      controller?.abort();
+      controller = new AbortController();
+      const turn = ++seq;
       try {
         const status = await assistantStatus(controller.signal);
-        if (disposed) return;
+        if (disposed || turn !== seq) return;
         setLiveReady(status.ready);
-        if (status.ready && !modeChosen.current) setMode('live');
+        setContextKey(status.ready && status.personalization ? status.personalization.key : null);
       } catch {
-        if (!disposed) setLiveReady(false);
+        if (disposed || turn !== seq || controller?.signal.aborted) return;
+        setLiveReady(false);
+        setContextKey(null);
       }
     }
+    // Learning is off until a fresh status arrives after blur.
+    const onBlur = () => { seq++; controller?.abort(); setLiveReady(false); setContextKey(null); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onBlur();
+      else void refresh();
+    };
     void refresh();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 5000);
     window.addEventListener('focus', refresh);
-    return () => { disposed = true; controller.abort(); window.removeEventListener('focus', refresh); };
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true; controller?.abort(); window.clearInterval(timer);
+      window.removeEventListener('focus', refresh); window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [open]);
+
+  useEffect(() => {
+    if (open) panelRef.current?.querySelector<HTMLTextAreaElement>('textarea[data-composer]')?.focus();
+  }, [mode, open]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -117,6 +141,7 @@ export function PmsChatDemo() {
       )}
       {open && (
         <section
+          ref={panelRef}
           role="region"
           id="pms-assistant-panel"
            aria-label="PMS assistant chat"
@@ -129,7 +154,7 @@ export function PmsChatDemo() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-[14px] font-semibold text-[#082032]">PMS AI Assistant</h2>
-                 <span className="rounded-full bg-[#FEF0E7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C1520E]">{mode === 'demo' ? 'Demo' : 'Live'}</span>
+                 <span className="rounded-full bg-[#FEF0E7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C1520E]">{mode === 'demo' ? 'Demo' : 'Portfolio'}</span>
               </div>
                <p className="truncate text-[11px] text-gray-500">{mode === 'demo' ? 'Fictional data, no live AI' : liveReady ? 'Authorized sources · read-only' : 'Live sources unavailable'}</p>
             </div>
@@ -139,19 +164,18 @@ export function PmsChatDemo() {
 
           <div className="shrink-0 border-b border-gray-100 px-4 py-2">
             <div className="flex gap-2" aria-label="Assistant answer source">
-              {(['demo', 'live'] as const).map((value) => (
+              {(['live', 'demo'] as const).map((value) => (
                 <button key={value} type="button" aria-pressed={mode === value} onClick={() => {
-                  modeChosen.current = true;
                   setMode(value);
                   setShowHandover(false);
                 }} className={`rounded-full px-3 py-1 text-[11.5px] ${mode === value ? 'bg-[#082032] text-white' : 'bg-gray-100 text-gray-600'}`}>
-                  {value === 'demo' ? 'Fictional demo' : 'Authorized records'}
+                  {value === 'demo' ? 'Fictional demo' : 'Authorized portfolio'}
                 </button>
               ))}
             </div>
-            {!liveReady && <p className="mt-1.5 text-[11px] text-gray-500">Live answers need trusted data and server access controls.</p>}
+            {mode === 'live' && !liveReady && <p className="mt-1.5 text-[11px] text-gray-500">Live records are unavailable. Answers need a verified session.</p>}
           </div>
-          {mode === 'live' ? <SourceBackedChat key={liveReset} ready={liveReady} /> : <>
+          {mode === 'live' ? <SourceBackedChat key={`${liveReset}:${contextKey ?? 'none'}`} ready={liveReady} contextKey={contextKey} /> : <>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-label="Chat transcript">
             <p className="text-center text-[11px] text-gray-400">{SCENARIO}</p>
             {messages.map((m) => (
@@ -210,6 +234,7 @@ export function PmsChatDemo() {
             </div>
             <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-white p-1.5 focus-within:ring-2 focus-within:ring-[#F16611]">
               <textarea
+                data-composer
                 ref={inputRef}
                 value={input}
                 rows={1}

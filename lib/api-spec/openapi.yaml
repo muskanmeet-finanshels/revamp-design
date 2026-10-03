@@ -91,14 +91,30 @@ components:
           type: boolean
         reason:
           type: string
+        personalization:
+          $ref: "#/components/schemas/PmsAssistantPersonalization"
       required: [ready, reason]
+    PmsAssistantPersonalization:
+      type: object
+      additionalProperties: false
+      description: Server-derived browser preference namespace, never an authorization credential.
+      properties:
+        key:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        timeZone:
+          type: string
+      required: [key, timeZone]
+    PmsAssistantQueryIntent:
+      type: string
+      enum: [my_today, overdue, pending, blockers, general]
     PmsAssistantAnswer:
       type: object
       additionalProperties: false
       properties:
         status:
           type: string
-          enum: [answered, unavailable]
+          enum: [answered, empty, clarification, unavailable]
         answer:
           type: string
         citations:
@@ -109,6 +125,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PmsAssistantClaim"
+        intent:
+          $ref: "#/components/schemas/PmsAssistantQueryIntent"
+        personalizationKey:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
       required: [status, answer, citations, claims]
     PmsAssistantCitation:
       type: object

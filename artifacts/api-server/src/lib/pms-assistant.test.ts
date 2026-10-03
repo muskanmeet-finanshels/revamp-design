@@ -9,6 +9,44 @@ import {
   type PmsAssistantTrustedAdapter,
 } from "./pms-assistant";
 import { createPmsAssistantRouter } from "../routes/pms-assistant";
+import { describeQuery, matchesQueryTask } from "./pms-assistant-query";
+
+test("portfolio query scope distinguishes requests from personal assignment", () => {
+  const at = new Date("2026-10-03T20:00:00Z");
+  const today = describeQuery("What is my today's work?", "Asia/Kolkata", at);
+  assert.equal(today.scope, "portfolio");
+  assert.equal(today.assignee, "self");
+  assert.equal(today.intent, "my_today");
+  assert.equal(today.today, "2026-10-04");
+  assert.equal(describeQuery("Show me overdue tasks", "Asia/Kolkata", at).assignee, "authorized");
+  assert.equal(describeQuery("What work is pending across my clients?", "Asia/Kolkata", at).assignee, "authorized");
+  assert.equal(describeQuery("What blockers are recorded?", "UTC", at).scope, "portfolio");
+  assert.deepEqual(describeQuery("Show overdue tasks for client Northwind", "UTC", at).target, { kind: "client", name: "Northwind" });
+  assert.deepEqual(describeQuery('What pending work does client "Northwind" have?', "UTC", at).target, { kind: "client", name: "Northwind" });
+  assert.ok(describeQuery("What pending work does client Northwind have?", "UTC", at).clarification);
+  assert.match(describeQuery("Why is this project blocked?", "UTC", at).clarification!, /Which client/);
+  assert.ok(describeQuery("my tasks today", "not-a-timezone", at).clarification);
+  assert.ok(describeQuery("overdue tasks today", "UTC", at).clarification);
+});
+
+test("date queries use account timezone and exclude completed/archived/other assignees", () => {
+  const at = new Date("2026-10-03T20:00:00Z");
+  const today = describeQuery("What is my today's work?", "Asia/Kolkata", at);
+  const overdue = describeQuery("Show me overdue tasks", "Asia/Kolkata", at);
+  const task = { status: "Pending", assigneeSubjectId: "actor", dueDate: "2026-10-04" };
+  assert.equal(matchesQueryTask(task, today, "actor"), true);
+  assert.equal(matchesQueryTask(task, overdue, "actor"), false);
+  assert.equal(matchesQueryTask({ ...task, dueDate: "2026-10-03" }, overdue, "actor"), true);
+  assert.equal(matchesQueryTask({ ...task, dueDate: "2026-10-03" }, today, "actor"), false);
+  assert.equal(matchesQueryTask({ ...task, dueDate: "2026-10-03T21:00:00Z" }, today, "actor"), true);
+  assert.equal(matchesQueryTask({ ...task, assigneeSubjectId: "someone-else" }, today, "actor"), false);
+  for (const status of ["Completed", "Archived", "done"]) {
+    assert.equal(matchesQueryTask({ ...task, status }, today, "actor"), false);
+  }
+  assert.equal(matchesQueryTask({ ...task, dueDate: null }, today, "actor"), false);
+  assert.equal(matchesQueryTask({ ...task, dueDate: "2026-02-30" }, overdue, "actor"), false);
+  assert.equal(matchesQueryTask({ ...task, dueDate: "2026-10-04T00:00:00" }, today, "actor"), false);
+});
 
 const environment = {
   AI_INTEGRATIONS_OPENAI_BASE_URL: "https://openai-proxy.example/v1",
@@ -37,6 +75,8 @@ const accessibleRecords: PmsAssistantEvidence[] = [
     excerpt: "Prepare the ledger before review.",
     clientId: "client-1",
     projectId: "project-1",
+    status: "Pending",
+    assigneeSubjectId: "server-auth-user-1",
   },
 ];
 
@@ -234,6 +274,94 @@ test("missing server-auth identity denies retrieval and model access", async () 
   assert.equal(result.status, "unavailable");
   assert.equal(retrieved, false);
   assert.equal(generated, false);
+});
+
+test("trusted identities get opaque preference namespaces isolated by user and permission revision", async () => {
+  const identity = { ...trustedIdentity, timeZone: "Asia/Kolkata", authorizationRevision: "scope-a" };
+  const statusFor = (current: PmsAssistantIdentity) =>
+    createPmsAssistantService({ adapter: adapterFor(accessibleRecords, current), environment }).getStatus({} as Request);
+  const first = await statusFor(identity);
+  assert.match(first.personalization!.key, /^[a-f0-9]{64}$/);
+  assert.equal(first.personalization?.timeZone, "Asia/Kolkata");
+  assert.equal((await statusFor(trustedIdentity)).personalization, undefined);
+  assert.notEqual((await statusFor({ ...identity, subjectId: "another-user" })).personalization?.key, first.personalization?.key);
+  assert.notEqual((await statusFor({ ...identity, authorizationRevision: "scope-b" })).personalization?.key, first.personalization?.key);
+});
+
+test("portfolio task requests pass server context and filter across clients without page assumptions", async () => {
+  const records: PmsAssistantEvidence[] = [
+    ...accessibleRecords,
+    { kind: "client", id: "client-2", title: "Contoso", excerpt: "Contoso client.", clientId: "client-2" },
+    { kind: "project", id: "project-2", title: "Second close", excerpt: "Second close.", clientId: "client-2" },
+    { kind: "task", id: "task-2", title: "Review", excerpt: "Review is pending.", clientId: "client-2", projectId: "project-2", status: "Pending", assigneeSubjectId: "another-assignee" },
+    { kind: "task", id: "task-done", title: "Done", excerpt: "Done.", clientId: "client-2", projectId: "project-2", status: "Completed" },
+  ];
+  let seen: string[] = [];
+  const adapter = adapterFor(records);
+  adapter.retrieveAccessibleEvidence = async (_identity, _question, context) => {
+    assert.equal(context?.scope, "portfolio");
+    assert.equal(context?.assignee, "authorized");
+    return { records, complete: true, matchingTaskCount: 2 };
+  };
+  const service = createPmsAssistantService({ adapter, environment, generate: async ({ evidence }) => {
+    seen = evidence.filter((record) => record.kind === "task").map((record) => record.id);
+    return encodedAnswer();
+  } });
+  const reply = await service.answer({} as Request, "What work is pending across my clients?");
+  assert.equal(reply.status, "answered");
+  assert.equal(reply.intent, "pending");
+  assert.deepEqual(seen, ["task-1", "task-2"]);
+});
+
+test("verified empty results are distinct from missing evidence and failures", async () => {
+  const identity = { ...trustedIdentity, timeZone: "Asia/Kolkata", authorizationRevision: "scope-a" };
+  const adapter = adapterFor([], identity);
+  adapter.retrieveAccessibleEvidence = async () => ({ records: [], complete: true, matchingTaskCount: 0 });
+  const service = createPmsAssistantService({ adapter, environment });
+  const reply = await service.answer({} as Request, "Show me overdue tasks");
+  assert.equal(reply.status, "empty");
+  assert.equal(reply.intent, "overdue");
+  assert.equal(reply.personalizationKey, (await service.getStatus({} as Request)).personalization?.key);
+  for (const result of [[], { records: [], complete: false, matchingTaskCount: 0 }, { records: [], complete: true, matchingTaskCount: 8 }]) {
+    adapter.retrieveAccessibleEvidence = async () => result;
+    assert.equal((await service.answer({} as Request, "Show me overdue tasks")).status, "unavailable");
+  }
+});
+
+test("ambiguous context and missing account timezone ask clarification without retrieval", async () => {
+  let retrieved = false;
+  const service = createPmsAssistantService({ adapter: adapterFor([], trustedIdentity, () => { retrieved = true; }), environment });
+  for (const question of ["Why is this project blocked?", "What is my today's work?"]) {
+    const result = await service.answer({} as Request, question);
+    assert.equal(result.status, "clarification");
+    assert.deepEqual(result.citations, []);
+  }
+  assert.equal(retrieved, false);
+});
+
+test("identity or permission changes during an answer discard evidence and learning", async () => {
+  let identity: PmsAssistantIdentity | null = { ...trustedIdentity, authorizationRevision: "scope-a" };
+  const adapter = adapterFor();
+  adapter.getAuthenticatedIdentity = () => identity;
+  const service = createPmsAssistantService({ adapter, environment, generate: async () => {
+    identity = { ...trustedIdentity, authorizationRevision: "scope-b" };
+    return encodedAnswer();
+  } });
+  const result = await service.answer({} as Request, "What needs preparation?");
+  assert.equal(result.status, "unavailable");
+  assert.deepEqual(result.citations, []);
+  assert.equal(result.personalizationKey, undefined);
+});
+
+test("explicit client queries never include another client's task records", async () => {
+  const adapter = adapterFor(accessibleRecords);
+  const service = createPmsAssistantService({ adapter, environment, generate: async ({ evidence, context }) => {
+    assert.equal(context.scope, "explicit");
+    assert.equal(evidence.every((record) => record.clientId === "client-1"), true);
+    return encodedAnswer();
+  } });
+  assert.equal((await service.answer({} as Request, "Show pending tasks for client Northwind")).status, "answered");
+  assert.equal((await service.answer({} as Request, "Show pending tasks for client Unknown")).status, "clarification");
 });
 
 test("foreign relationship mismatches are removed before model context", async () => {

@@ -21,9 +21,16 @@ export const HealthCheckResponse = zod.object({
  * Reports readiness for the authenticated server identity, trusted PMS adapter, and OpenAI proxy.
  * @summary Check PMS assistant availability
  */
+export const getPmsAssistantStatusResponsePersonalizationKeyRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
 export const GetPmsAssistantStatusResponse = zod.object({
   "ready": zod.boolean(),
-  "reason": zod.string()
+  "reason": zod.string(),
+  "personalization": zod.object({
+  "key": zod.string().regex(getPmsAssistantStatusResponsePersonalizationKeyRegExp),
+  "timeZone": zod.string()
+}).optional().describe('Server-derived browser preference namespace, never an authorization credential.')
 })
 
 
@@ -40,10 +47,11 @@ export const CreatePmsAssistantAnswerBody = zod.object({
 })
 
 
+export const createPmsAssistantAnswerResponsePersonalizationKeyRegExp = new RegExp('^[a-f0-9]{64}$');
 
 
 export const CreatePmsAssistantAnswerResponse = zod.object({
-  "status": zod.enum(['answered', 'unavailable']),
+  "status": zod.enum(['answered', 'empty', 'clarification', 'unavailable']),
   "answer": zod.string(),
   "citations": zod.array(zod.object({
   "kind": zod.enum(['client', 'project', 'task']),
@@ -55,7 +63,9 @@ export const CreatePmsAssistantAnswerResponse = zod.object({
   "text": zod.string(),
   "basis": zod.enum(['recorded', 'inference']),
   "citationIds": zod.array(zod.string()).min(1)
-}))
+})),
+  "intent": zod.enum(['my_today', 'overdue', 'pending', 'blockers', 'general']).optional(),
+  "personalizationKey": zod.string().regex(createPmsAssistantAnswerResponsePersonalizationKeyRegExp).optional()
 })
 
 

@@ -8,10 +8,14 @@
 import type { PmsAssistantAnswerStatus } from './pmsAssistantAnswerStatus';
 import type { PmsAssistantCitation } from './pmsAssistantCitation';
 import type { PmsAssistantClaim } from './pmsAssistantClaim';
+import type { PmsAssistantQueryIntent } from './pmsAssistantQueryIntent';
 
 export interface PmsAssistantAnswer {
   status: PmsAssistantAnswerStatus;
   answer: string;
   citations: PmsAssistantCitation[];
   claims: PmsAssistantClaim[];
+  intent?: PmsAssistantQueryIntent;
+  /** @pattern ^[a-f0-9]{64}$ */
+  personalizationKey?: string;
 }

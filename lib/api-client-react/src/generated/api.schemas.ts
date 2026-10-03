@@ -17,16 +17,39 @@ export interface PmsAssistantQuestionInput {
   question: string;
 }
 
+/**
+ * Server-derived browser preference namespace, never an authorization credential.
+ */
+export interface PmsAssistantPersonalization {
+  /** @pattern ^[a-f0-9]{64}$ */
+  key: string;
+  timeZone: string;
+}
+
 export interface PmsAssistantStatus {
   ready: boolean;
   reason: string;
+  personalization?: PmsAssistantPersonalization;
 }
+
+export type PmsAssistantQueryIntent = typeof PmsAssistantQueryIntent[keyof typeof PmsAssistantQueryIntent];
+
+
+export const PmsAssistantQueryIntent = {
+  my_today: 'my_today',
+  overdue: 'overdue',
+  pending: 'pending',
+  blockers: 'blockers',
+  general: 'general',
+} as const;
 
 export type PmsAssistantAnswerStatus = typeof PmsAssistantAnswerStatus[keyof typeof PmsAssistantAnswerStatus];
 
 
 export const PmsAssistantAnswerStatus = {
   answered: 'answered',
+  empty: 'empty',
+  clarification: 'clarification',
   unavailable: 'unavailable',
 } as const;
 
@@ -66,6 +89,9 @@ export interface PmsAssistantAnswer {
   answer: string;
   citations: PmsAssistantCitation[];
   claims: PmsAssistantClaim[];
+  intent?: PmsAssistantQueryIntent;
+  /** @pattern ^[a-f0-9]{64}$ */
+  personalizationKey?: string;
 }
 
 export interface ApiError {

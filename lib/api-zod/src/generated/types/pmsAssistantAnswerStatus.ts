@@ -11,5 +11,7 @@ export type PmsAssistantAnswerStatus = typeof PmsAssistantAnswerStatus[keyof typ
 
 export const PmsAssistantAnswerStatus = {
   answered: 'answered',
+  empty: 'empty',
+  clarification: 'clarification',
   unavailable: 'unavailable',
 } as const;
