@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import timerRouter from "./timer";
+import pmsAssistantRouter from "./pms-assistant";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.get("/", (_req, res) => {
 
 router.use(healthRouter);
 router.use(timerRouter);
+router.use(pmsAssistantRouter);
 
 export default router;

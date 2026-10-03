@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Minus, RotateCcw, Send, ChevronDown, FileText, Save } from 'lucide-react';
 import { useTimer } from '@/contexts/TimerContext';
+import { assistantStatus } from './assistant-api';
+import { SourceBackedChat } from './SourceBackedChat';
 import {
   GREETING, QUICK_PROMPTS, DRAFT_TEXT, SCENARIO, TASKS, demoReply, buildHandover, mid,
   type DemoMessage,
@@ -21,10 +23,33 @@ export function PmsChatDemo() {
   const [openSrc, setOpenSrc] = useState<Record<string, boolean>>({});
   const [announce, setAnnounce] = useState('');
   const [timerHeight, setTimerHeight] = useState(240);
+  const [mode, setMode] = useState<'demo' | 'live'>('demo');
+  const [liveReady, setLiveReady] = useState(false);
+  const [liveReset, setLiveReset] = useState(0);
+  const modeChosen = useRef(false);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let disposed = false;
+    const controller = new AbortController();
+    async function refresh() {
+      try {
+        const status = await assistantStatus(controller.signal);
+        if (disposed) return;
+        setLiveReady(status.ready);
+        if (status.ready && !modeChosen.current) setMode('live');
+      } catch {
+        if (!disposed) setLiveReady(false);
+      }
+    }
+    void refresh();
+    window.addEventListener('focus', refresh);
+    return () => { disposed = true; controller.abort(); window.removeEventListener('focus', refresh); };
+  }, [open]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -55,6 +80,7 @@ export function PmsChatDemo() {
   }
 
   function reset() {
+    setLiveReset((value) => value + 1);
     setMessages(initial());
     setDraft(DRAFT_TEXT);
     setSavedDraft(null);
@@ -80,7 +106,7 @@ export function PmsChatDemo() {
           ref={launcherRef}
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Open PMS assistant demo chat"
+           aria-label="Open PMS assistant chat"
           aria-expanded={false}
           aria-controls="pms-assistant-panel"
           style={{ bottom }}
@@ -93,7 +119,7 @@ export function PmsChatDemo() {
         <section
           role="region"
           id="pms-assistant-panel"
-          aria-label="PMS assistant demo chat"
+           aria-label="PMS assistant chat"
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
           style={{ bottom, maxHeight: `calc(100dvh - ${bottom + 24}px)` }}
           className="fixed right-3 z-40 flex h-[640px] w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.16)] sm:right-6 sm:w-[400px]"
@@ -103,14 +129,29 @@ export function PmsChatDemo() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-[14px] font-semibold text-[#082032]">PMS AI Assistant</h2>
-                <span className="rounded-full bg-[#FEF0E7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C1520E]">Demo</span>
+                 <span className="rounded-full bg-[#FEF0E7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C1520E]">{mode === 'demo' ? 'Demo' : 'Live'}</span>
               </div>
-              <p className="truncate text-[11px] text-gray-500">Fictional data, no live AI</p>
+               <p className="truncate text-[11px] text-gray-500">{mode === 'demo' ? 'Fictional data, no live AI' : liveReady ? 'Authorized sources · read-only' : 'Live sources unavailable'}</p>
             </div>
             <button type="button" onClick={reset} aria-label="Reset conversation" title="Reset conversation" className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"><RotateCcw size={15} /></button>
             <button type="button" onClick={() => setOpen(false)} aria-label="Minimise chat" title="Minimise chat (Esc)" className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"><Minus size={16} /></button>
           </header>
 
+          <div className="shrink-0 border-b border-gray-100 px-4 py-2">
+            <div className="flex gap-2" aria-label="Assistant answer source">
+              {(['demo', 'live'] as const).map((value) => (
+                <button key={value} type="button" aria-pressed={mode === value} onClick={() => {
+                  modeChosen.current = true;
+                  setMode(value);
+                  setShowHandover(false);
+                }} className={`rounded-full px-3 py-1 text-[11.5px] ${mode === value ? 'bg-[#082032] text-white' : 'bg-gray-100 text-gray-600'}`}>
+                  {value === 'demo' ? 'Fictional demo' : 'Authorized records'}
+                </button>
+              ))}
+            </div>
+            {!liveReady && <p className="mt-1.5 text-[11px] text-gray-500">Live answers need trusted data and server access controls.</p>}
+          </div>
+          {mode === 'live' ? <SourceBackedChat key={liveReset} ready={liveReady} /> : <>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-label="Chat transcript">
             <p className="text-center text-[11px] text-gray-400">{SCENARIO}</p>
             {messages.map((m) => (
@@ -182,6 +223,7 @@ export function PmsChatDemo() {
             </form>
             <p className="mt-1.5 text-center text-[10px] text-gray-400">{TASKS.length} fictional tasks. Demo replies are scripted.</p>
           </div>
+          </>}
         </section>
       )}
     </>

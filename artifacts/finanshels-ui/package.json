@@ -6,6 +6,7 @@
     "dev": "next dev -p $PORT -H 0.0.0.0",
     "build": "next build && rm -rf dist/public && mkdir -p dist && cp -r out dist/public",
     "test:admin-storage": "node --test --experimental-strip-types src/contexts/employee-groups-storage.test.ts",
+    "test:pms-assistant": "node --test --experimental-strip-types src/components/pms-chat/assistant-api.test.ts",
     "test:role-inheritance": "node --test --experimental-strip-types src/screens/roles/role-inheritance.test.ts",
     "test:project-task-filters": "node --test --experimental-strip-types src/screens/projects/project-task-filters.test.ts",
     "test:projects-download": "playwright test -c playwright.config.ts projects-download.spec.ts",

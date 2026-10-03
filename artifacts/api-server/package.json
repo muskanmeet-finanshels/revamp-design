@@ -7,7 +7,8 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:pms-assistant": "node --input-type=module -e 'import { build } from \"esbuild\"; await build({ entryPoints: [\"src/lib/pms-assistant.test.ts\"], bundle: true, platform: \"node\", format: \"cjs\", outfile: \"dist/pms-assistant.test.cjs\" });' && node --test dist/pms-assistant.test.cjs"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

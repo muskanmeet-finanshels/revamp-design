@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: pms-assistant
+    description: Read-only, evidence-grounded PMS assistant
 paths:
   /healthz:
     get:
@@ -24,6 +26,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /pms-assistant/status:
+    get:
+      operationId: getPmsAssistantStatus
+      tags: [pms-assistant]
+      summary: Check PMS assistant availability
+      description: Reports readiness for the authenticated server identity, trusted PMS adapter, and OpenAI proxy.
+      responses:
+        "200":
+          description: Assistant availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PmsAssistantStatus"
+  /pms-assistant/answers:
+    post:
+      operationId: createPmsAssistantAnswer
+      tags: [pms-assistant]
+      summary: Ask an evidence-grounded PMS question
+      description: Answers using only records the authenticated server identity can access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PmsAssistantQuestionInput"
+      responses:
+        "200":
+          description: Answer or explicit unavailable result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PmsAssistantAnswer"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +73,77 @@ components:
           type: string
       required:
         - status
+    PmsAssistantQuestionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required:
+        - question
+    PmsAssistantStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        ready:
+          type: boolean
+        reason:
+          type: string
+      required: [ready, reason]
+    PmsAssistantAnswer:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [answered, unavailable]
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PmsAssistantCitation"
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/PmsAssistantClaim"
+      required: [status, answer, citations, claims]
+    PmsAssistantCitation:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [client, project, task]
+        id:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+      required: [kind, id, title, excerpt]
+    PmsAssistantClaim:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+        basis:
+          type: string
+          enum: [recorded, inference]
+        citationIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+      required: [text, basis, citationIds]
+    ApiError:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+      required: [error]
 
