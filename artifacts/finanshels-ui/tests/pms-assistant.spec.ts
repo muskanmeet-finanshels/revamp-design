@@ -434,6 +434,105 @@ test('a late trusted status cannot restore an older namespace or export after a 
   expect(fixture.api.questions).toEqual([oldQuestion, currentQuestion]);
 });
 
+for (const failure of ['HTTP error', 'transport', 'unreadable JSON'] as const) {
+  test(`a late ${failure} status failure cannot clear recovered evidence or disable its current-only export`, async ({ page }) => {
+    const fixture = await assistantFixture(page);
+    await fixture.open(SESSION_A);
+    const exports = await trackTranscriptDownloads(page);
+    const options = panel(page).getByRole('button', { name: 'Chat options', exact: true });
+    const downloadItem = panel(page).getByRole('menuitem', { name: 'Download transcript', exact: true });
+    const resetSuggestions = panel(page).getByRole('button', { name: 'Reset suggestions', exact: true });
+    const oldQuestion = 'Test-only old session before failed status';
+    const oldExcerpt = 'Test-only old source before failed status';
+    const oldDraft = 'Test-only old unsent draft before failed status';
+    const currentQuestion = 'Test-only recovered session question';
+    const currentExcerpt = 'Test-only recovered session source';
+    const currentDraft = 'Test-only recovered unsent draft';
+    fixture.api.response = answer(SESSION_A, 'pending', 'answered', oldExcerpt);
+    await sendText(page, oldQuestion);
+    await expectResponse(page, 'Intercepted pending answered response');
+    const oldPrefs = await storedPrefs(page, SESSION_A);
+    await composer(page).fill(oldDraft);
+
+    // Let ONLY the next intercepted status fetch survive cancellation. Otherwise
+    // refresh aborts it before B is verified, so releasing holdStatus would never
+    // exercise an old failure reaching the catch branch after recovery.
+    await page.evaluate(() => {
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (new URL(url, window.location.href).pathname === '/api/pms-assistant/status') {
+          window.fetch = realFetch;
+          return realFetch(input, { ...init, signal: undefined });
+        }
+        return realFetch(input, init);
+      };
+    });
+    fixture.api.statusCode = failure === 'HTTP error' ? 503 : 200;
+    fixture.api.statusFailure = failure === 'HTTP error' ? null : failure;
+    const held = fixture.holdStatus();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await held.requested;
+    await fixture.refresh(verifiedStatus(SESSION_B));
+    await expect(resetSuggestions).toBeEnabled();
+    await expect(transcript(page)).not.toContainText(oldQuestion);
+    await expect(transcript(page)).not.toContainText(oldExcerpt);
+    await expect(composer(page)).toHaveValue('');
+    await expect(chips(page)).toHaveText(DEFAULTS);
+
+    fixture.api.response = answer(SESSION_B, 'blockers', 'answered', currentExcerpt);
+    await sendText(page, currentQuestion);
+    await expectResponse(page, 'Intercepted blockers answered response');
+    await transcript(page).getByRole('button', { name: 'Source task:test-record: Intercepted record', exact: true }).click();
+    await expect(transcript(page).getByText(currentExcerpt, { exact: true })).toBeVisible();
+    const currentPrefs = await storedPrefs(page, SESSION_B);
+    await composer(page).fill(currentDraft);
+    await options.click();
+    await expect(downloadItem).toBeEnabled();
+
+    // Register settlement before release; transport errors have no response.
+    const settled = failure === 'transport'
+      ? page.waitForEvent('requestfailed', (request) => new URL(request.url()).pathname === '/api/pms-assistant/status')
+      : page.waitForResponse('**/api/pms-assistant/status').then(async (response) => {
+        expect(response.status()).toBe(failure === 'HTTP error' ? 503 : 200);
+        expect(await response.finished()).toBeNull();
+      });
+    await held.release();
+    await settled;
+    // Let the failed fetch/JSON continuation and any queued React update finish
+    // before asserting that the current evidence and retained menu stayed valid.
+    await page.evaluate(() => new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(resetSuggestions).toBeEnabled();
+    await expect(chips(page).first()).toHaveText(DEFAULTS[3]);
+    await expectResponse(page, 'Intercepted blockers answered response');
+    await expect(transcript(page)).toContainText(currentQuestion);
+    await expect(transcript(page).getByText(currentExcerpt, { exact: true })).toBeVisible();
+    await expect(transcript(page)).not.toContainText(oldQuestion);
+    await expect(transcript(page)).not.toContainText(oldExcerpt);
+    await expect(composer(page)).toHaveValue(currentDraft);
+    expect(await storedPrefs(page, SESSION_A)).toEqual(oldPrefs);
+    expect(await storedPrefs(page, SESSION_B)).toEqual(currentPrefs);
+    await expect(downloadItem).toBeEnabled();
+    await exports.expectNone();
+
+    const downloading = page.waitForEvent('download');
+    await downloadItem.click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^pms-assistant-transcript-.*\.txt$/);
+    const text = await readFile((await download.path())!, 'utf8');
+    expect(text.split('\n').filter((line) => line.startsWith('You: '))).toEqual([`You: ${currentQuestion}`]);
+    expect(text).toContain('Intercepted blockers answered response');
+    expect(text).toContain(currentExcerpt);
+    for (const excluded of [oldQuestion, oldExcerpt, oldDraft, currentDraft,
+      'Intercepted pending', SESSION_A, SESSION_B, PERMISSION_A, PREF_PREFIX]) {
+      expect(text).not.toContain(excluded);
+    }
+    await exports.expectOne();
+    expect(fixture.api.questions).toEqual([oldQuestion, currentQuestion]);
+  });
+}
+
 for (const failure of ['http', 'invalid key', 'invalid status', 'not ready'] as const) {
   test(`verified status ${failure} failure clears authorization and restores neutral defaults`, async ({ page }) => {
     const fixture = await assistantFixture(page);
