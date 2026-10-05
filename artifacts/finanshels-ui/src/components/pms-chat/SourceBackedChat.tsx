@@ -96,7 +96,7 @@ export function SourceBackedChat({ ready, contextKey }: { ready: boolean; contex
     <>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-label="Live assistant transcript">
         <p className="rounded-xl bg-gray-50 p-3 text-[12px] text-gray-600">
-          Hi, ask me about your work across all the clients you are authorized to see. Each answer identifies its sources; inferences are labeled, not recorded causes.
+          Hi, I’m your application-wide PMS assistant. Ask about work across all the clients you are authorized to see. No client or project is selected by default; name one in your question only when you want to narrow the scope. Each answer identifies its sources; inferences are labeled, not recorded causes.
           {!ready && <span className="mt-1 block text-gray-500">Live records are not connected yet. No fictional data will be used to answer your question.</span>}
           {' '}Read-only: no tasks are changed and nothing is sent to clients.
         </p>

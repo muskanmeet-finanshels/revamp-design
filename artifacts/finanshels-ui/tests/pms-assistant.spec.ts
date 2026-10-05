@@ -4,23 +4,21 @@ import {
   PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, transcript, verifiedStatus,
 } from './assistant-fixture';
 
-test('neutral portfolio is default; fictional demo is opt-in; focus and Escape return to launcher', async ({ page }) => {
+test('application-wide assistant has no default client or fictional demo; focus and Escape return to launcher', async ({ page }) => {
   const fixture = await assistantFixture(page);
   await fixture.open();
-  await expect(panel(page).getByRole('button', { name: 'Authorized portfolio', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel(page)).toContainText('Application-wide scope');
+  await expect(panel(page).getByRole('button', { name: 'Fictional demo', exact: true })).toHaveCount(0);
   await expect(composer(page)).toBeFocused();
   await expect(chips(page)).toHaveText(DEFAULTS);
   await expect(transcript(page)).toContainText('all the clients you are authorized to see');
   await expect(transcript(page)).not.toContainText('Nexora');
+  await expect(transcript(page)).toContainText('No client or project is selected by default');
   await expect(transcript(page)).toContainText('No fictional data');
   await sendText(page, 'Show me overdue tasks');
   await expectResponse(page, 'Test-only unavailable response');
   await expect(chips(page)).toHaveText(DEFAULTS);
-  await panel(page).getByRole('button', { name: 'Fictional demo', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
-  await expect(panel(page)).toContainText('Fictional data, no live AI');
-  await expect(page.getByRole('log', { name: 'Chat transcript', exact: true })).toContainText('Nexora');
-  await page.getByRole('textbox', { name: 'Message', exact: true }).press('Escape');
+  await composer(page).press('Escape');
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Open PMS assistant chat' })).toBeFocused();
   expect(fixture.api.questions).toEqual(['Show me overdue tasks']);
