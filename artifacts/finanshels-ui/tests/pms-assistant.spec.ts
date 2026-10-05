@@ -11,6 +11,48 @@ async function resetConversation(page: Page) {
   await panel(page).getByRole('menuitem', { name: 'Reset conversation', exact: true }).click();
 }
 
+test('the circular chevron sits below the open chat and minimises it', async ({ page }) => {
+  const fixture = await assistantFixture(page);
+  await fixture.open();
+  const toggle = page.getByRole('button', { name: 'Minimise PMS assistant chat', exact: true });
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.mouse.move(0, 0);
+  await expect.poll(async () => {
+    const chatBounds = (await panel(page).boundingBox())!;
+    const toggleBounds = (await toggle.boundingBox())!;
+    return toggleBounds.y - (chatBounds.y + chatBounds.height);
+  }).toBeCloseTo(16, 0);
+  await toggle.click();
+  await expect(panel(page)).toHaveCount(0);
+  const launcher = page.getByRole('button', { name: 'Open PMS assistant chat', exact: true });
+  await expect(launcher).toBeFocused();
+  await expect(launcher).toHaveAttribute('aria-expanded', 'false');
+  await launcher.click();
+  await expect(panel(page)).toBeVisible();
+  await expect(toggle).toBeVisible();
+});
+
+test('opening the assistant does not wait for a slow session check or scroll the page', async ({ page }) => {
+  const fixture = await assistantFixture(page);
+  const status = fixture.holdStatus();
+  await fixture.open();
+  await status.requested;
+  await expect(panel(page)).toBeVisible();
+  await expect(composer(page)).toBeFocused();
+  await expect(chips(page)).toHaveText(DEFAULTS);
+  await page.addStyleTag({ content: 'body { min-height: 2000px !important; }' });
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await panel(page).getByRole('button', { name: 'Minimise chat', exact: true }).click();
+  await expect(panel(page)).toHaveCount(0);
+  const scrollY = await page.evaluate(() => window.scrollY);
+  await page.getByRole('button', { name: 'Open PMS assistant chat', exact: true }).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(composer(page)).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
+  await status.release();
+});
+
 test('messenger menu resizes without losing drafts and downloads only the current transcript', async ({ page }) => {
   const fixture = await assistantFixture(page);
   await fixture.open(SESSION_A);

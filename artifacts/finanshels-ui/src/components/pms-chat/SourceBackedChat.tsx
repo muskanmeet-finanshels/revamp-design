@@ -44,7 +44,7 @@ export function SourceBackedChat({ ready, contextKey, transcriptRef }: { ready: 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const pending = useRef<AbortController | null>(null);
   const sequence = useRef(0);
-  const end = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   useEffect(() => {
@@ -53,7 +53,16 @@ export function SourceBackedChat({ ready, contextKey, transcriptRef }: { ready: 
     return () => { transcriptRef.current = null; };
   }, [transcriptRef]);
 
-  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [messages, busy]);
+  useEffect(() => {
+    // No scrolling/layout work on opening an empty chat. New turns scroll only
+    // the transcript, never the surrounding application or preview iframe.
+    if (!messages.length && !busy) return;
+    const frame = window.requestAnimationFrame(() => {
+      const log = logRef.current;
+      if (log) log.scrollTop = log.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, busy]);
   useEffect(() => {
     // Do not keep authorized excerpts visible across tab/session switches.
     const clear = () => {
@@ -120,7 +129,7 @@ export function SourceBackedChat({ ready, contextKey, transcriptRef }: { ready: 
 
   return (
     <>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-label="Live assistant transcript">
+      <div ref={logRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-label="Live assistant transcript">
         <p className="rounded-2xl bg-[#F5F6F7] p-3.5 text-[12px] leading-relaxed text-gray-600">
           Hi, I’m your application-wide PMS assistant. Ask about work across all the clients you are authorized to see. No client or project is selected by default; name one in your question only when you want to narrow the scope. Each answer identifies its sources; inferences are labeled, not recorded causes.
           {!ready && <span className="mt-1 block text-gray-500">Live records are not connected yet. No fictional data will be used to answer your question.</span>}
@@ -161,10 +170,9 @@ export function SourceBackedChat({ ready, contextKey, transcriptRef }: { ready: 
           </div>
         ))}
         {busy && <p role="status" className="text-[12px] text-gray-500">Checking authorized records…</p>}
-        <div ref={end} />
       </div>
       <div className="shrink-0 px-3 pb-3 pt-2">
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="pms-chat-suggestions mb-2 flex flex-wrap gap-1.5">
           {chipPrompts(prefs).map((prompt) => (
             <button key={prompt} data-testid="chip-intent" type="button" disabled={busy} onClick={() => void send(prompt)} className="rounded-full border border-gray-200 px-2.5 py-1 text-[11.5px] text-gray-700 transition-colors hover:border-[#F16611]/50 hover:bg-[#FEF0E7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F16611] disabled:opacity-40 motion-reduce:transition-none">{prompt}</button>
           ))}
@@ -175,7 +183,7 @@ export function SourceBackedChat({ ready, contextKey, transcriptRef }: { ready: 
           }} className="max-h-24 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-2 text-[13px] focus:outline-none" />
           <button type="submit" disabled={busy || !input.trim()} aria-label="Send live question" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B0B0C] text-white transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F16611] disabled:opacity-40 disabled:hover:scale-100 motion-reduce:transition-none"><Send size={15} /></button>
         </form>
-        <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-400">
+        <div className="pms-chat-preference-note mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-400">
           <span>{canLearn ? 'Suggestions learn from question types only.' : 'Suggestions are defaults until your session is verified.'}</span>
           <button type="button" disabled={!canLearn} title={canLearn ? 'Reset suggestions' : 'Available when your session is verified'} onClick={() => setPrefs(resetPrefs(browserStorage(), contextKey))} className="shrink-0 underline disabled:no-underline disabled:opacity-50">Reset suggestions</button>
         </div>

@@ -40,11 +40,10 @@ export async function expectUsableAssistant(page: Page, timerActive: boolean) {
     return {
       scrollbar: window.innerWidth > root.getBoundingClientRect().right,
       panelInsideViewport: inside(bounds),
-      // Measured height should leave the intended 16px separation, not a
-      // stale expanded/minimized offset that happens not to overlap.
+      // Leave space for the 56px chevron plus 16px gaps above and below it.
        measuredTimerGap: timerActive
-         ? !!timerBounds && Math.abs(timerBounds.top - bounds.bottom - 16) <= 1
-         : !timerBounds && Math.abs(window.innerHeight - bounds.bottom - 24) <= 1,
+         ? !!timerBounds && Math.abs(timerBounds.top - bounds.bottom - 88) <= 1
+         : !timerBounds && Math.abs(window.innerHeight - bounds.bottom - 96) <= 1,
       controlsInsidePanel: controls.every((control) => {
         if (!control) return false;
         const rect = control.getBoundingClientRect();

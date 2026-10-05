@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Minus, Maximize2, Minimize2, RotateCcw, MoreHorizontal, Download } from 'lucide-react';
+import { MessageCircle, ChevronDown, Minus, Maximize2, Minimize2, RotateCcw, MoreHorizontal, Download } from 'lucide-react';
 import { useTimer } from '@/contexts/TimerContext';
 import { assistantStatus } from './assistant-api';
 import { SourceBackedChat } from './SourceBackedChat';
@@ -111,9 +111,14 @@ export function PmsChatDemo() {
   }, [open]);
 
   useEffect(() => {
-    if (open) panelRef.current?.querySelector<HTMLTextAreaElement>('textarea[data-composer]')?.focus();
-    else if (wasOpen.current) launcherRef.current?.focus();
+    // Paint the panel before focusing; focusing must not scroll the Projects page.
+    const shouldRestore = wasOpen.current;
     wasOpen.current = open;
+    const frame = window.requestAnimationFrame(() => {
+      if (open) panelRef.current?.querySelector<HTMLTextAreaElement>('textarea[data-composer]')?.focus({ preventScroll: true });
+      else if (shouldRestore) launcherRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
   useEffect(() => {
@@ -138,24 +143,23 @@ export function PmsChatDemo() {
 
   // Measure the timer instead of assuming a height: long task names can wrap.
   const bottom = active ? timerHeight + 40 : 24;
+  const panelBottom = bottom + 72; // 56px toggle button plus a 16px gap.
 
   return (
     <>
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
-      {!open && (
         <button
           ref={launcherRef}
           type="button"
-          onClick={() => setOpen(true)}
-           aria-label="Open PMS assistant chat"
-          aria-expanded={false}
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? 'Minimise PMS assistant chat' : 'Open PMS assistant chat'}
+          aria-expanded={open}
           aria-controls="pms-assistant-panel"
           style={{ bottom }}
           className="fixed right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#0B0B0C] text-white shadow-[0_6px_24px_rgba(8,32,50,0.28)] transition duration-200 hover:scale-105 hover:shadow-[0_8px_28px_rgba(8,32,50,0.36)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F16611] active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100"
         >
-          <MessageCircle size={22} aria-hidden="true" />
+          {open ? <ChevronDown size={22} aria-hidden="true" /> : <MessageCircle size={22} aria-hidden="true" />}
         </button>
-      )}
       {open && (
         <section
           ref={panelRef}
@@ -173,9 +177,11 @@ export function PmsChatDemo() {
             } else setOpen(false);
           }}
           style={{
-            bottom,
-            height: expanded ? `calc(100dvh - ${bottom + 24}px)` : 640,
-            maxHeight: `calc(100dvh - ${bottom + 24}px)`,
+            bottom: panelBottom,
+            containerType: 'size',
+            containerName: 'pms-assistant',
+            height: expanded ? `calc(100dvh - ${panelBottom + 24}px)` : 640,
+            maxHeight: `calc(100dvh - ${panelBottom + 24}px)`,
           }}
           className={`fixed right-3 z-40 flex w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-[#E7E9EC] bg-white shadow-[0_12px_48px_rgba(8,32,50,0.18)] transition-[width] duration-200 ease-out motion-reduce:transition-none sm:right-6 sm:max-w-[calc(100%-3rem)] ${expanded ? 'sm:w-[720px]' : 'sm:w-[400px]'}`}
         >
@@ -228,7 +234,7 @@ export function PmsChatDemo() {
 
           <div className="shrink-0 border-y border-gray-100 bg-[#FAFAFB] px-4 py-2">
             <p className="text-[11.5px] text-gray-600">Application-wide scope · All accessible clients and projects</p>
-            {!liveReady && <p className="mt-1.5 text-[11px] text-gray-500">Live records are unavailable. Answers need a verified session.</p>}
+            {!liveReady && <p className="pms-chat-unavailable-note mt-1.5 text-[11px] text-gray-500">Live records are unavailable. Answers need a verified session.</p>}
           </div>
           <SourceBackedChat transcriptRef={transcriptRef} key={`${liveReset}:${contextKey ?? 'none'}`} ready={liveReady} contextKey={contextKey} />
         </section>

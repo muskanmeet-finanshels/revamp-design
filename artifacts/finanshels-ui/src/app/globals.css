@@ -106,3 +106,30 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Keep the composer accessible when the timer and chat toggle reduce height. */
+@container pms-assistant (max-height: 420px) {
+  #pms-assistant-panel > header {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .pms-chat-suggestions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .pms-chat-suggestions > button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .pms-chat-unavailable-note,
+  .pms-chat-preference-note > span {
+    display: none;
+  }
+
+  .pms-chat-preference-note {
+    justify-content: flex-end;
+  }
+}

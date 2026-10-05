@@ -503,11 +503,27 @@ export function ProjectsScreen() {
     return isNaN(d.getTime()) ? null : d;
   }
 
+  // Shared setup belongs outside the per-project predicate. On the default
+  // screen there are no drawer filters, so don't parse dates/build member lists
+  // thousands of times while the page and floating assistant are initializing.
+  const activeDeptIdSet = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
+  const searchQuery = search.toLowerCase();
+  const appliedRevenueCondition = appliedFilters.revenueCondition
+    || (Array.isArray(appliedFilters.revenueRanges) ? appliedFilters.revenueRanges[0] : undefined)
+    || REVENUE_NO_FILTER;
+  const hasAppliedDrawerFilters = !!(
+    appliedFilters.projectStatuses?.length || appliedFilters.departments.length
+    || appliedFilters.services.length || appliedRevenueCondition !== REVENUE_NO_FILTER
+    || appliedFilters.clients.length || appliedFilters.tags.length || appliedFilters.assignees.length
+    || appliedFilters.dueDays.length || appliedFilters.overdueDays.length
+    || appliedFilters.dueDatePresets.length || appliedFilters.periodFrom || appliedFilters.periodTo
+  );
+
   const matchesProjectFilters = (
     p: Project, statusFilter: StatusOption, ignoreStatusTab = false, af: FilterState = appliedFilters,
     ignoreSearch = false,
   ): boolean => {
-    const q = ignoreSearch ? '' : search.toLowerCase();
+    const q = ignoreSearch ? '' : searchQuery;
 
     /* status tab */
     const statusMatch = ignoreStatusTab || matchesStatusTab(p, statusFilter);
@@ -515,11 +531,12 @@ export function ProjectsScreen() {
     /* search */
     const searchMatch =
       !q || p.title.toLowerCase().includes(q) || p.client.name.toLowerCase().includes(q);
+    if (!statusMatch || !searchMatch) return false;
+    if (af === appliedFilters && !hasAppliedDrawerFilters) return true;
 
     /* drawer filters */
     const projectStatusMatch = !af.projectStatuses?.length || af.projectStatuses.includes(p.status);
 
-    const activeDeptIdSet = new Set(orgDepts.filter(d => d.status === 'Active').map(d => d.id));
     const selectedDeptIds = af.departments.filter(id => activeDeptIdSet.has(id));
     const deptMatch   = af.departments.length === 0
       || (selectedDeptIds.length > 0 && selectedDeptIds.includes(p.serviceType.departmentId));
