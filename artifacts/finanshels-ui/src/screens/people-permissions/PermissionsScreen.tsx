@@ -21,7 +21,6 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Empty } from '@/components/ui/empty';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 
 /* ── Helpers ── */
@@ -684,26 +683,26 @@ export function PermissionsScreen() {
         <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
       ) : (
         <div>
-          <div className="-mx-6 lg:-mx-8">
-            <Tabs
+          <div className="border-b border-gray-200 pb-4">
+            <label htmlFor="permission-role" className="mb-2 block text-[12px] font-medium text-gray-700">
+              Role
+            </label>
+            <Select
               value={selectedRole?.id ?? ''}
               onValueChange={roleId => {
                 setSelectedRoleId(roleId);
                 setEditingRoleId(null);
               }}
             >
-              <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent p-0 px-6 lg:px-8 flex-nowrap overflow-x-auto scrollbar-none">
+              <SelectTrigger id="permission-role" className="h-10 w-full min-w-0 rounded-xl border-gray-200 bg-white text-[13px] sm:max-w-sm">
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] rounded-xl border border-gray-100 bg-white shadow-xl">
                 {roles.map(role => (
-                  <TabsTrigger
+                  <SelectItem
                     key={role.id}
                     value={role.id}
-                    className={cn(
-                      'relative shrink-0 rounded-none border-b-2 px-3.5 pb-3 pt-1 text-[13px] font-medium transition-colors focus-visible:ring-0 focus-visible:ring-offset-0',
-                      'data-[state=active]:bg-transparent data-[state=active]:shadow-none',
-                      role.id === selectedRole?.id
-                        ? 'border-brand text-brand'
-                        : 'border-transparent text-gray-500 hover:text-gray-700',
-                    )}
+                    className="cursor-pointer rounded-lg py-2.5 text-[13px]"
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {role.name}
@@ -717,10 +716,10 @@ export function PermissionsScreen() {
                     >
                       {role.userCount}
                     </span>
-                  </TabsTrigger>
+                  </SelectItem>
                 ))}
-              </TabsList>
-            </Tabs>
+              </SelectContent>
+            </Select>
           </div>
 
           {selectedRole && (
