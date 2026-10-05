@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from '@playwright/test';
+import { expect, type Download, type Page, type Route } from '@playwright/test';
 import type { PmsAssistantAnswer } from '../src/components/pms-chat/assistant-api';
 
 // Opaque test-only server namespaces, not users/roles supplied by the browser.
@@ -21,11 +21,11 @@ export function verifiedStatus(key: string) {
   return { ready: true, reason: 'ready', personalization: { key, timeZone: 'UTC' } };
 }
 
-export function answer(key: string, intent: PmsAssistantAnswer['intent'], status: PmsAssistantAnswer['status'] = 'answered'): PmsAssistantAnswer {
+export function answer(key: string, intent: PmsAssistantAnswer['intent'], status: PmsAssistantAnswer['status'] = 'answered', excerpt = 'Test-only source excerpt'): PmsAssistantAnswer {
   const text = `Intercepted ${intent} ${status} response`;
   return {
     status, answer: text, intent, personalizationKey: key,
-    citations: status === 'answered' ? [{ kind: 'task', id: 'test-record', title: 'Intercepted record', excerpt: 'Test-only source excerpt' }] : [],
+    citations: status === 'answered' ? [{ kind: 'task', id: 'test-record', title: 'Intercepted record', excerpt }] : [],
     claims: status === 'answered' ? [{ text, basis: 'recorded', citationIds: ['task:test-record'] }] : [],
   };
 }
@@ -167,4 +167,34 @@ export async function storedPrefs(page: Page, key: string) {
     const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : null;
   }, PREF_PREFIX + key);
+}
+
+export async function trackTranscriptDownloads(page: Page) {
+  const downloads: Download[] = [];
+  page.on('download', (download) => downloads.push(download));
+  // Observe Blob creation synchronously too: a negative download-event check
+  // alone can pass before the browser has delivered the event. Keep the real
+  // implementation so successful exports still produce genuine browser files.
+  await page.evaluate(() => {
+    const createObjectURL = URL.createObjectURL.bind(URL);
+    document.documentElement.dataset.assistantDownloadBlobs = '0';
+    URL.createObjectURL = (object) => {
+      if (object instanceof Blob && object.type.startsWith('text/plain')) {
+        const root = document.documentElement;
+        root.dataset.assistantDownloadBlobs = String(Number(root.dataset.assistantDownloadBlobs) + 1);
+      }
+      return createObjectURL(object);
+    };
+  });
+  return {
+    downloads,
+    async expectNone() {
+      await expect(page.locator('html')).toHaveAttribute('data-assistant-download-blobs', '0');
+      expect(downloads).toHaveLength(0);
+    },
+    async expectOne() {
+      await expect(page.locator('html')).toHaveAttribute('data-assistant-download-blobs', '1');
+      expect(downloads).toHaveLength(1);
+    },
+  };
 }

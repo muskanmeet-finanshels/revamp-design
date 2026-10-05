@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import {
   answer, assistantFixture, chips, composer, DEFAULTS, expectResponse, panel,
-  PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, transcript, verifiedStatus,
+  PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, trackTranscriptDownloads, transcript, verifiedStatus,
 } from './assistant-fixture';
 import { expectUsableAssistant, expectUsableAssistantAboveTimer, expectUsableLauncher, floatingTimer, forceScrollbar } from './assistant-timer-layout';
 
@@ -55,6 +55,103 @@ test('messenger menu resizes without losing drafts and downloads only the curren
   await options.click();
   await expect(chat.getByRole('menuitem', { name: 'Download transcript', exact: true })).toBeDisabled();
 });
+
+for (const change of ['identity', 'permission', 'authorization lost', 'blur', 'hidden'] as const) {
+  test(`${change} invalidates an already-open download menu and exports only the current conversation`, async ({ page }) => {
+    const fixture = await assistantFixture(page);
+    await fixture.open(SESSION_A);
+    const exports = await trackTranscriptDownloads(page);
+    const options = panel(page).getByRole('button', { name: 'Chat options', exact: true });
+    const downloadItem = panel(page).getByRole('menuitem', { name: 'Download transcript', exact: true });
+    const nextKey = change === 'permission' ? PERMISSION_A
+      : change === 'identity' || change === 'authorization lost' ? SESSION_B : SESSION_A;
+    const oldQuestion = 'Test-only old conversation question';
+    const oldExcerpt = 'Test-only old authorized source excerpt';
+    const lateQuestion = 'Test-only delayed old conversation question';
+    const lateExcerpt = 'Test-only delayed old authorized source excerpt';
+    const draft = 'Test-only unsent old conversation draft';
+
+    fixture.api.response = answer(SESSION_A, 'blockers', 'answered', oldExcerpt);
+    await sendText(page, oldQuestion);
+    await expectResponse(page, 'Intercepted blockers answered response');
+    fixture.api.response = answer(SESSION_A, 'overdue', 'answered', lateExcerpt);
+    const held = fixture.holdAnswer();
+    await sendText(page, lateQuestion);
+    await expect.poll(() => fixture.api.questions.length).toBe(2);
+    await expect(transcript(page)).toContainText('Checking authorized records…');
+    await composer(page).fill(draft);
+    await options.click();
+    await expect(downloadItem).toBeEnabled();
+    const aborted = page.waitForEvent('requestfailed', (request) => request.url().endsWith('/answers'));
+
+    if (change === 'blur' || change === 'hidden') {
+      // Click the already-enabled button in the SAME browser task as the
+      // invalidation, before React can rerender or replace the child. This must
+      // fail if clearing only queues setMessages([]) but retains the export ref.
+      await downloadItem.evaluate((button, event) => {
+        if (event === 'hidden') {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+          document.dispatchEvent(new Event('visibilitychange'));
+        } else {
+          window.dispatchEvent(new Event('blur'));
+        }
+        (button as HTMLButtonElement).click();
+      }, change);
+    } else {
+      await fixture.refresh(change === 'authorization lost'
+        ? { ready: false, reason: 'adapters_unavailable' }
+        : verifiedStatus(nextKey));
+      await expect(transcript(page)).not.toContainText(oldQuestion);
+      // The menu was opened while old evidence existed. Its enabled state must
+      // not let its retained click callback download the cleared conversation.
+      await expect(downloadItem).toBeEnabled();
+      await downloadItem.click();
+    }
+    await aborted;
+    await held.release();
+    await expect(transcript(page)).not.toContainText(oldQuestion);
+    await expect(transcript(page)).not.toContainText(lateQuestion);
+    await expect(transcript(page)).not.toContainText('Intercepted');
+    await expect(composer(page)).toHaveValue('');
+    await exports.expectNone();
+
+    await options.click();
+    await expect(downloadItem).toBeDisabled();
+    await exports.expectNone();
+    await page.keyboard.press('Escape');
+    if (change === 'hidden') {
+      await page.evaluate(() => {
+        // Restore the browser's real visibility getter for later polling.
+        delete (document as unknown as { visibilityState?: string }).visibilityState;
+      });
+    }
+    await fixture.refresh(verifiedStatus(nextKey));
+    await expect(panel(page).getByRole('button', { name: 'Reset suggestions', exact: true })).toBeEnabled();
+    const currentQuestion = 'Test-only current conversation question';
+    const currentExcerpt = 'Test-only current authorized source excerpt';
+    fixture.api.response = answer(nextKey, 'pending', 'answered', currentExcerpt);
+    await sendText(page, currentQuestion);
+    await expectResponse(page, 'Intercepted pending answered response');
+    await composer(page).fill('Test-only current unsent draft');
+    await options.click();
+    await expect(downloadItem).toBeEnabled();
+    const downloading = page.waitForEvent('download');
+    await downloadItem.click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^pms-assistant-transcript-.*\.txt$/);
+    const text = await readFile((await download.path())!, 'utf8');
+    expect(text.split('\n').filter((line) => line.startsWith('You: '))).toEqual([`You: ${currentQuestion}`]);
+    expect(text).toContain('Intercepted pending answered response');
+    expect(text).toContain(currentExcerpt);
+    for (const excluded of [oldQuestion, oldExcerpt, lateQuestion, lateExcerpt, draft,
+      'Intercepted blockers', 'Intercepted overdue', 'Test-only current unsent draft',
+      SESSION_A, SESSION_B, PERMISSION_A]) {
+      expect(text).not.toContain(excluded);
+    }
+    await exports.expectOne();
+    expect(fixture.api.questions).toEqual([oldQuestion, lateQuestion, currentQuestion]);
+  });
+}
 
 test('application-wide assistant has no default client or fictional demo; focus and Escape return to launcher', async ({ page }) => {
   const fixture = await assistantFixture(page);
