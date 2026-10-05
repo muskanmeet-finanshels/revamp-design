@@ -56,7 +56,7 @@ test('messenger menu resizes without losing drafts and downloads only the curren
   await expect(chat.getByRole('menuitem', { name: 'Download transcript', exact: true })).toBeDisabled();
 });
 
-for (const change of ['identity', 'permission', 'authorization lost', 'blur', 'hidden'] as const) {
+for (const change of ['identity', 'permission', 'authorization lost', 'status HTTP error', 'invalid status key', 'invalid status data', 'blur', 'hidden'] as const) {
   test(`${change} invalidates an already-open download menu and exports only the current conversation`, async ({ page }) => {
     const fixture = await assistantFixture(page);
     await fixture.open(SESSION_A);
@@ -98,9 +98,16 @@ for (const change of ['identity', 'permission', 'authorization lost', 'blur', 'h
         (button as HTMLButtonElement).click();
       }, change);
     } else {
-      await fixture.refresh(change === 'authorization lost'
-        ? { ready: false, reason: 'adapters_unavailable' }
-        : verifiedStatus(nextKey));
+      const status = change === 'authorization lost' ? { ready: false, reason: 'adapters_unavailable' }
+        : change === 'invalid status key' ? verifiedStatus('not-a-server-key')
+        : change === 'invalid status data' ? { ready: 'true', reason: 'ready' }
+        : verifiedStatus(nextKey);
+      await fixture.refresh(status, change === 'status HTTP error' ? 503 : 200);
+      if (change === 'authorization lost' || change === 'status HTTP error'
+        || change === 'invalid status key' || change === 'invalid status data') {
+        await expect(panel(page).getByRole('button', { name: 'Reset suggestions', exact: true })).toBeDisabled();
+        await expect(chips(page)).toHaveText(DEFAULTS);
+      }
       await expect(transcript(page)).not.toContainText(oldQuestion);
       // The menu was opened while old evidence existed. Its enabled state must
       // not let its retained click callback download the cleared conversation.
@@ -318,23 +325,65 @@ for (const event of ['hidden', 'blur', 'reset', 'close'] as const) {
   });
 }
 
-test('a late trusted status cannot restore an older namespace after a newer session refresh', async ({ page }) => {
+test('a late trusted status cannot restore an older namespace or export after a newer session refresh', async ({ page }) => {
   const fixture = await assistantFixture(page);
   await fixture.open(SESSION_A);
+  const exports = await trackTranscriptDownloads(page);
+  const options = panel(page).getByRole('button', { name: 'Chat options', exact: true });
+  const downloadItem = panel(page).getByRole('menuitem', { name: 'Download transcript', exact: true });
+  const oldQuestion = 'Test-only old session before stale status';
+  const oldExcerpt = 'Test-only old session source before stale status';
+  const oldDraft = 'Test-only unsent draft before stale status';
+  fixture.api.response = answer(SESSION_A, 'pending', 'answered', oldExcerpt);
+  await sendText(page, oldQuestion);
+  await expectResponse(page, 'Intercepted pending answered response');
+  const oldPrefs = await storedPrefs(page, SESSION_A);
+  await composer(page).fill(oldDraft);
+  await options.click();
+  await expect(downloadItem).toBeEnabled();
   const held = fixture.holdStatus();
-  const requested = page.waitForRequest('**/api/pms-assistant/status');
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await requested;
+  await held.requested;
   const aborted = page.waitForEvent('requestfailed', (request) => request.url().endsWith('/status'));
   await fixture.refresh(verifiedStatus(SESSION_B));
   await aborted;
+  await expect(transcript(page)).not.toContainText(oldQuestion);
+  await expect(chips(page)).toHaveText(DEFAULTS);
+  await expect(composer(page)).toHaveValue('');
+  // Release the captured A status only after B has cleared the transcript.
+  // Neither that response nor the menu's retained callback may revive A data.
   await held.release();
-  fixture.api.response = answer(SESSION_B, 'blockers', 'empty');
-  await sendText(page, 'new session after stale status');
-  await expectResponse(page, 'Intercepted blockers empty response');
+  await expect(downloadItem).toBeEnabled();
+  await downloadItem.click();
+  await exports.expectNone();
+  await options.click();
+  await expect(downloadItem).toBeDisabled();
+  await page.keyboard.press('Escape');
+  const currentQuestion = 'new session after stale status';
+  const currentExcerpt = 'Test-only current session source after stale status';
+  fixture.api.response = answer(SESSION_B, 'blockers', 'answered', currentExcerpt);
+  await sendText(page, currentQuestion);
+  await expectResponse(page, 'Intercepted blockers answered response');
   await expect(chips(page).first()).toHaveText(DEFAULTS[3]);
-  expect(await storedPrefs(page, SESSION_A)).toBeNull();
+  expect(await storedPrefs(page, SESSION_A)).toEqual(oldPrefs);
   expect(await storedPrefs(page, SESSION_B)).toEqual({ blockers: { n: 1, t: expect.any(Number) } });
+  await composer(page).fill('Test-only current unsent draft');
+  await options.click();
+  await expect(downloadItem).toBeEnabled();
+  const downloading = page.waitForEvent('download');
+  await downloadItem.click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^pms-assistant-transcript-.*\.txt$/);
+  const text = await readFile((await download.path())!, 'utf8');
+  expect(text.split('\n').filter((line) => line.startsWith('You: '))).toEqual([`You: ${currentQuestion}`]);
+  expect(text).toContain('Intercepted blockers answered response');
+  expect(text).toContain(currentExcerpt);
+  for (const excluded of [oldQuestion, oldExcerpt, oldDraft, 'Intercepted pending',
+    'Test-only current unsent draft', SESSION_A, SESSION_B, PERMISSION_A]) {
+    expect(text).not.toContain(excluded);
+  }
+  await exports.expectOne();
+  expect(fixture.api.questions).toEqual([oldQuestion, currentQuestion]);
 });
 
 for (const failure of ['http', 'invalid key', 'invalid status', 'not ready'] as const) {

@@ -74,15 +74,20 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
     answerCode: 200,
     questions: [] as string[],
   };
-  type Deferred = { gate: Promise<void>; release: () => void; done: Promise<void>; finish: () => void };
+  type Deferred = {
+    gate: Promise<void>; release: () => void; done: Promise<void>; finish: () => void;
+    requested: Promise<void>; capture: () => void;
+  };
   let held: Deferred | undefined;
   let heldStatus: Deferred | undefined;
   function deferred(): Deferred {
     let release!: () => void;
     let finish!: () => void;
+    let capture!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const done = new Promise<void>((resolve) => { finish = resolve; });
-    return { gate, release, done, finish };
+    const requested = new Promise<void>((resolve) => { capture = resolve; });
+    return { gate, release, done, finish, requested, capture };
   }
   await page.route('**/api/pms-assistant/**', async (route: Route) => {
     const path = new URL(route.request().url()).pathname;
@@ -92,6 +97,9 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
       const code = api.statusCode;
       const pending = heldStatus;
       heldStatus = undefined;
+      // Signal only after snapshotting the old status/code. A request event
+      // alone can fire before the route captures them for a later race release.
+      pending?.capture();
       if (pending) await pending.gate;
       try {
         await route.fulfill({ status: code, json: status });
@@ -147,7 +155,10 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
     holdStatus() {
       const pending = deferred();
       heldStatus = pending;
-      return { async release() { pending.release(); await pending.done; } };
+      return {
+        requested: pending.requested,
+        async release() { pending.release(); await pending.done; },
+      };
     },
   };
 }
