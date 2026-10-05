@@ -17,4 +17,5 @@
 - [Wide table drag checks](wide-table-drag-checks.md) — keep both header drag endpoints in view to avoid auto-scroll landing on a different column.
 - [Narrow viewport overlay checks](narrow-viewport-overlays.md) — verify floating panels with scrollbar-bearing narrow viewports, not only mobile emulation.
 - [Internal assistant scope](internal-assistant-scope.md) — query answers span the authorized portfolio; habit suggestions must not make the fictional walkthrough the default.
+- [Assistant transcript lifetime](assistant-transcript-lifetime.md) — exported chat data must clear with session-bound transcripts, including synchronous invalidation of imperative snapshots.
 - [Compound workflow control](compound-workflow-control.md) — validated TOML wrappers may not be addressable by runtime workflow tools; control managed artifact services directly.

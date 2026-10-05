@@ -29,7 +29,7 @@ export async function expectUsableAssistant(page: Page, timerActive: boolean) {
     const timerBounds = document.querySelector('[data-pms-floating-timer]')?.getBoundingClientRect();
     const controls = [
       node.querySelector('header'),
-      node.querySelector('[aria-label="Reset conversation"]'),
+      node.querySelector('[aria-label="Chat options"]'),
       node.querySelector('[aria-label="Minimise chat"]'),
       node.querySelector('textarea[data-composer]'),
       node.querySelector('[aria-label="Send live question"]'),
@@ -67,9 +67,14 @@ export async function expectUsableAssistant(page: Page, timerActive: boolean) {
   });
   await composer(page).click();
   await expect(composer(page)).toBeFocused();
-  for (const name of ['Reset conversation', 'Minimise chat', 'Send live question']) {
+  for (const name of ['Chat options', 'Minimise chat', 'Send live question']) {
     await chat.getByRole('button', { name, exact: true }).click({ trial: true });
   }
+  await chat.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await chat.getByRole('menuitem', { name: 'Reset conversation', exact: true }).click({ trial: true });
+  await chat.getByRole('menuitem', { name: /^(Expand|Collapse) window$/ }).click({ trial: true });
+  await page.keyboard.press('Escape');
+  await composer(page).focus();
 }
 
 export async function expectUsableLauncher(page: Page, timerActive: boolean) {

@@ -1,9 +1,60 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import {
   answer, assistantFixture, chips, composer, DEFAULTS, expectResponse, panel,
   PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, transcript, verifiedStatus,
 } from './assistant-fixture';
 import { expectUsableAssistant, expectUsableAssistantAboveTimer, expectUsableLauncher, floatingTimer, forceScrollbar } from './assistant-timer-layout';
+
+async function resetConversation(page: Page) {
+  await panel(page).getByRole('button', { name: 'Chat options', exact: true }).click();
+  await panel(page).getByRole('menuitem', { name: 'Reset conversation', exact: true }).click();
+}
+
+test('messenger menu resizes without losing drafts and downloads only the current transcript', async ({ page }) => {
+  const fixture = await assistantFixture(page);
+  await fixture.open(SESSION_A);
+  const chat = panel(page);
+  const options = chat.getByRole('button', { name: 'Chat options', exact: true });
+  await options.click();
+  await expect(chat.getByRole('menuitem', { name: 'Download transcript', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(options).toBeFocused();
+  await expect(chat).toBeVisible();
+
+  fixture.api.response = answer(SESSION_A, 'overdue');
+  await sendText(page, 'Show me overdue tasks');
+  await expectResponse(page, 'Intercepted overdue answered response');
+  await composer(page).fill('Keep my unsent draft');
+  const compactWidth = (await chat.boundingBox())!.width;
+  await options.click();
+  await chat.getByRole('menuitem', { name: 'Expand window', exact: true }).click();
+  await expect.poll(async () => (await chat.boundingBox())!.width).toBeGreaterThan(compactWidth + 200);
+  await expect(composer(page)).toHaveValue('Keep my unsent draft');
+  await expectResponse(page, 'Intercepted overdue answered response');
+
+  await options.click();
+  const downloading = page.waitForEvent('download');
+  await chat.getByRole('menuitem', { name: 'Download transcript', exact: true }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^pms-assistant-transcript-.*\.txt$/);
+  const text = await readFile((await download.path())!, 'utf8');
+  expect(text).toContain('You: Show me overdue tasks');
+  expect(text).toContain('Intercepted overdue answered response');
+  expect(text).toContain('Test-only source excerpt');
+  expect(text).not.toContain('Keep my unsent draft');
+  expect(text).not.toContain(SESSION_A);
+
+  await options.click();
+  await chat.getByRole('menuitem', { name: 'Collapse window', exact: true }).click();
+  await expect.poll(async () => (await chat.boundingBox())!.width).toBe(compactWidth);
+  await expect(composer(page)).toHaveValue('Keep my unsent draft');
+  await resetConversation(page);
+  await expect(composer(page)).toHaveValue('');
+  await expect(composer(page)).toBeFocused();
+  await options.click();
+  await expect(chat.getByRole('menuitem', { name: 'Download transcript', exact: true })).toBeDisabled();
+});
 
 test('application-wide assistant has no default client or fictional demo; focus and Escape return to launcher', async ({ page }) => {
   const fixture = await assistantFixture(page);
@@ -45,7 +96,7 @@ test('chips and free text share submission; answered/verified-empty intents rank
   expect(preferences).toEqual({
     blockers: { n: 1, t: expect.any(Number) }, pending: { n: 1, t: expect.any(Number) },
   });
-  await panel(page).getByRole('button', { name: 'Reset conversation', exact: true }).click();
+  await resetConversation(page);
   await expect(transcript(page)).not.toContainText('Intercepted');
   await expect(chips(page).first()).toHaveText(DEFAULTS[2]);
   expect(await storedPrefs(page, SESSION_A)).toEqual(preferences);
@@ -142,8 +193,10 @@ for (const event of ['hidden', 'blur', 'reset', 'close'] as const) {
       });
     } else if (event === 'blur') {
       await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    } else if (event === 'reset') {
+      await resetConversation(page);
     } else {
-      await panel(page).getByRole('button', { name: event === 'reset' ? 'Reset conversation' : 'Minimise chat', exact: true }).click();
+      await panel(page).getByRole('button', { name: 'Minimise chat', exact: true }).click();
     }
     await aborted;
     await held.release();
@@ -235,7 +288,7 @@ for (const storage of ['denied', 'corrupt', 'oversized', 'expired'] as const) {
     await sendText(page, 'private text must never be stored');
     await expectResponse(page, 'Intercepted pending empty response');
     await expect(chips(page).first()).toHaveText(DEFAULTS[2]);
-    await panel(page).getByRole('button', { name: 'Reset conversation', exact: true }).click();
+    await resetConversation(page);
     await expect(chips(page).first()).toHaveText(storage === 'denied' ? DEFAULTS[0] : DEFAULTS[2]);
     await panel(page).getByRole('button', { name: 'Reset suggestions', exact: true }).click();
     await expect(chips(page)).toHaveText(DEFAULTS);
@@ -271,6 +324,27 @@ for (const width of [390, 680]) {
 }
 
 for (const width of [390, 680]) {
+  test(`expanded messenger stays usable when a timer starts and stops at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const fixture = await assistantFixture(page);
+    await fixture.open();
+    await forceScrollbar(page);
+    await panel(page).getByRole('button', { name: 'Chat options', exact: true }).click();
+    await panel(page).getByRole('menuitem', { name: 'Expand window', exact: true }).click();
+    const running = {
+      taskId: 'test-only-expanded-chat-timer',
+      taskName: 'Test-only task: reconcile quarterly client accounts and prepare the supporting financial documentation',
+      projectName: 'Test Client- Expanded Assistant',
+      startedAt: Date.now() - 60_000, totalPausedMs: 0, pausedAt: null,
+    };
+    for (const state of [null, running, null]) {
+      await fixture.timer.setState(state);
+      await expectUsableAssistant(page, state !== null);
+      await expect(composer(page)).toHaveValue('Test-only timer layout question');
+    }
+    expect(fixture.timer.writes).toEqual([]);
+  });
+
   test(`timer activation and removal preserve open assistant and reclaim space at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
     const fixture = await assistantFixture(page);
@@ -306,7 +380,7 @@ for (const width of [390, 680]) {
         // Use the composer and header in all three states, not just the end.
         await chat.getByRole('button', { name: 'Send live question', exact: true }).click();
         await expectResponse(page, 'Test-only unavailable response');
-        await chat.getByRole('button', { name: 'Reset conversation', exact: true }).click();
+        await resetConversation(page);
         await expect(transcript(page)).not.toContainText('Test-only timer layout question');
         await expect(composer(page)).toHaveValue('');
         await expect(composer(page)).toBeFocused();
@@ -392,7 +466,7 @@ for (const width of [390, 680]) {
     await panel(page).getByRole('button', { name: 'Send live question', exact: true }).click();
     await expectResponse(page, 'Test-only unavailable response');
     expect(fixture.api.questions).toEqual(['Test-only timer layout question']);
-    await panel(page).getByRole('button', { name: 'Reset conversation', exact: true }).click();
+    await resetConversation(page);
     await expect(transcript(page)).not.toContainText('Test-only timer layout question');
     await panel(page).getByRole('button', { name: 'Minimise chat', exact: true }).click();
     await expect(panel(page)).toHaveCount(0);
