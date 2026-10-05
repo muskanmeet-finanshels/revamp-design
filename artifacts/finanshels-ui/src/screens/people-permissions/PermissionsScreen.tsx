@@ -668,7 +668,8 @@ export function PermissionsScreen() {
         <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-gray-500">
           Set role actions, record access scopes, and optional business-attribute filters.
         </p>
-        <div className="mt-4 w-full sm:max-w-sm">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="w-full sm:max-w-sm">
           <SearchInput
             value={permissionSearch}
             onChange={setPermissionSearch}
@@ -676,17 +677,9 @@ export function PermissionsScreen() {
             aria-label="Search modules"
             className="w-full"
           />
-        </div>
-      </div>
-
-      {roles.length === 0 ? (
-        <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
-      ) : (
-        <div>
-          <div className="border-b border-gray-200 pb-4">
-            <label htmlFor="permission-role" className="mb-2 block text-[12px] font-medium text-gray-700">
-              Role
-            </label>
+          </div>
+          {roles.length > 0 && (
+          <div className="ml-auto w-full sm:w-64">
             <Select
               value={selectedRole?.id ?? ''}
               onValueChange={roleId => {
@@ -694,7 +687,7 @@ export function PermissionsScreen() {
                 setEditingRoleId(null);
               }}
             >
-              <SelectTrigger id="permission-role" className="h-10 w-full min-w-0 rounded-xl border-gray-200 bg-white text-[13px] sm:max-w-sm">
+               <SelectTrigger id="permission-role" aria-label="Select role" className="h-10 w-full min-w-0 rounded-xl border-gray-200 bg-white text-[13px]">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent className="w-[var(--radix-select-trigger-width)] rounded-xl border border-gray-100 bg-white shadow-xl">
@@ -708,20 +701,18 @@ export function PermissionsScreen() {
                       {role.name}
                       {role.isProtected && <Lock size={11} />}
                     </span>
-                    <span
-                      className={cn(
-                        'ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                        role.id === selectedRole?.id ? 'text-brand' : 'text-orange-500',
-                      )}
-                    >
-                      {role.userCount}
-                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
+          )}
+        </div>
+      </div>
+      {roles.length === 0 ? (
+        <Empty icon={SearchX} title="No roles found" description="Create a role before configuring permissions." />
+      ) : (
+        <div>
           {selectedRole && (
             <div className="mt-4">
               <div className="flex flex-wrap items-center justify-between gap-4 px-1 py-1">
