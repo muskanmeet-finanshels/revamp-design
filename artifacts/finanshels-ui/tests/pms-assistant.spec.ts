@@ -3,7 +3,7 @@ import {
   answer, assistantFixture, chips, composer, DEFAULTS, expectResponse, panel,
   PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, transcript, verifiedStatus,
 } from './assistant-fixture';
-import { expectUsableAssistantAboveTimer, floatingTimer, forceScrollbar } from './assistant-timer-layout';
+import { expectUsableAssistant, expectUsableAssistantAboveTimer, expectUsableLauncher, floatingTimer, forceScrollbar } from './assistant-timer-layout';
 
 test('application-wide assistant has no default client or fictional demo; focus and Escape return to launcher', async ({ page }) => {
   const fixture = await assistantFixture(page);
@@ -267,6 +267,80 @@ for (const width of [390, 680]) {
     await expect(composer(page)).toBeFocused();
     await composer(page).press('Escape');
     await expect(page.getByRole('button', { name: 'Open PMS assistant chat' })).toBeFocused();
+  });
+}
+
+for (const width of [390, 680]) {
+  test(`timer activation and removal preserve open assistant and reclaim space at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const fixture = await assistantFixture(page);
+    await fixture.open();
+    await forceScrollbar(page);
+    const running = {
+      taskId: 'test-only-transition-timer',
+      taskName: 'Test-only task: reconcile quarterly accounts and prepare supporting documentation for the financial review',
+      projectName: 'Test Client- Timer Transitions',
+      startedAt: Date.now() - 60_000, totalPausedMs: 0, pausedAt: null,
+    };
+    const chat = panel(page);
+    const baseline = await chat.boundingBox();
+    expect(baseline).not.toBeNull();
+    // Holding this DOM node proves timer polling never closes/reopens the chat.
+    const originalPanel = await chat.elementHandle();
+    try {
+      for (const state of [null, running, null]) {
+        await fixture.timer.setState(state);
+        await expectUsableAssistant(page, state !== null);
+        expect(await originalPanel!.evaluate((node) =>
+          node.isConnected && node === document.getElementById('pms-assistant-panel'))).toBe(true);
+        if (state) {
+          await expect(floatingTimer(page).getByText(running.taskName, { exact: true })).toBeVisible();
+          expect((await chat.boundingBox())!.height).toBeLessThan(baseline!.height);
+        } else {
+          await expect.poll(async () => {
+            const bounds = (await chat.boundingBox())!;
+            return Math.abs(bounds.height - baseline!.height) <= 1
+              && Math.abs(bounds.y - baseline!.y) <= 1;
+          }).toBe(true);
+        }
+        // Use the composer and header in all three states, not just the end.
+        await chat.getByRole('button', { name: 'Send live question', exact: true }).click();
+        await expectResponse(page, 'Test-only unavailable response');
+        await chat.getByRole('button', { name: 'Reset conversation', exact: true }).click();
+        await expect(transcript(page)).not.toContainText('Test-only timer layout question');
+        await expect(composer(page)).toHaveValue('');
+        await expect(composer(page)).toBeFocused();
+      }
+      expect(fixture.api.questions).toEqual(Array(3).fill('Test-only timer layout question'));
+      expect(fixture.timer.snapshots.map((state) => state?.taskId ?? null).filter((id, index, ids) =>
+        index === 0 || id !== ids[index - 1])).toEqual([null, running.taskId, null]);
+      expect(fixture.timer.writes).toEqual([]);
+    } finally {
+      await originalPanel?.dispose();
+    }
+  });
+
+  test(`launcher moves above an activated timer and reclaims space after removal at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const fixture = await assistantFixture(page);
+    await fixture.open();
+    await forceScrollbar(page);
+    await panel(page).getByRole('button', { name: 'Minimise chat', exact: true }).click();
+    const running = {
+      taskId: 'test-only-launcher-timer', taskName: 'Test-only launcher task',
+      projectName: 'Test Client- Timer Transitions',
+      startedAt: Date.now() - 60_000, totalPausedMs: 0, pausedAt: null,
+    };
+    for (const state of [null, running, null]) {
+      await fixture.timer.setState(state);
+      await expectUsableLauncher(page, state !== null);
+    }
+    // The reclaimed launcher must still open a usable chat.
+    await page.getByRole('button', { name: 'Open PMS assistant chat', exact: true }).click();
+    await expectUsableAssistant(page, false);
+    expect(fixture.timer.snapshots.map((state) => state?.taskId ?? null).filter((id, index, ids) =>
+      index === 0 || id !== ids[index - 1])).toEqual([null, running.taskId, null]);
+    expect(fixture.timer.writes).toEqual([]);
   });
 }
 

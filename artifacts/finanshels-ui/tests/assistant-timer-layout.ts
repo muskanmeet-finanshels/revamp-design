@@ -8,20 +8,25 @@ export async function forceScrollbar(page: Page) {
 }
 
 export async function expectUsableAssistantAboveTimer(page: Page) {
+  await expectUsableAssistant(page, true);
+}
+
+export async function expectUsableAssistant(page: Page, timerActive: boolean) {
   const chat = panel(page);
   const timer = floatingTimer(page);
-  await expect(timer).toBeVisible();
+  if (timerActive) await expect(timer).toBeVisible();
+  else await expect(timer).toHaveCount(0);
   await expect(chat).toBeVisible();
   // Enable Send before hit-testing; disabled controls intentionally ignore
   // pointer events. Probe the interior, not transparent rounded corners.
   await composer(page).fill('Test-only timer layout question');
   // Poll actual geometry, not a sleep or the panel's CSS bottom value. This
   // waits for ResizeObserver, React layout, and timer hover transitions.
-  await expect.poll(() => chat.evaluate((node) => {
+  await expect.poll(() => chat.evaluate((node, timerActive) => {
     const root = document.documentElement;
     const usableRight = Math.min(root.clientWidth, root.getBoundingClientRect().right);
     const bounds = node.getBoundingClientRect();
-    const timerBounds = document.querySelector('[data-pms-floating-timer]')!.getBoundingClientRect();
+    const timerBounds = document.querySelector('[data-pms-floating-timer]')?.getBoundingClientRect();
     const controls = [
       node.querySelector('header'),
       node.querySelector('[aria-label="Reset conversation"]'),
@@ -37,7 +42,9 @@ export async function expectUsableAssistantAboveTimer(page: Page) {
       panelInsideViewport: inside(bounds),
       // Measured height should leave the intended 16px separation, not a
       // stale expanded/minimized offset that happens not to overlap.
-      measuredTimerGap: Math.abs(timerBounds.top - bounds.bottom - 16) <= 1,
+       measuredTimerGap: timerActive
+         ? !!timerBounds && Math.abs(timerBounds.top - bounds.bottom - 16) <= 1
+         : !timerBounds && Math.abs(window.innerHeight - bounds.bottom - 24) <= 1,
       controlsInsidePanel: controls.every((control) => {
         if (!control) return false;
         const rect = control.getBoundingClientRect();
@@ -51,7 +58,7 @@ export async function expectUsableAssistantAboveTimer(page: Page) {
           .every(([x, y]) => control.contains(document.elementFromPoint(x, y)));
       }),
     };
-  })).toEqual({
+  }, timerActive)).toEqual({
     scrollbar: true,
     panelInsideViewport: true,
     measuredTimerGap: true,
@@ -63,4 +70,26 @@ export async function expectUsableAssistantAboveTimer(page: Page) {
   for (const name of ['Reset conversation', 'Minimise chat', 'Send live question']) {
     await chat.getByRole('button', { name, exact: true }).click({ trial: true });
   }
+}
+
+export async function expectUsableLauncher(page: Page, timerActive: boolean) {
+  const launcher = page.getByRole('button', { name: 'Open PMS assistant chat', exact: true });
+  await expect(panel(page)).toHaveCount(0);
+  if (timerActive) await expect(floatingTimer(page)).toBeVisible();
+  else await expect(floatingTimer(page)).toHaveCount(0);
+  await expect(launcher).toBeVisible();
+  // Hover grows this button. Move away before comparing its settled bounds.
+  await page.mouse.move(0, 0);
+  await expect.poll(() => launcher.evaluate((node, active) => {
+    const root = document.documentElement;
+    const r = node.getBoundingClientRect();
+    const timerBounds = document.querySelector('[data-pms-floating-timer]')?.getBoundingClientRect();
+    return r.left >= 0 && r.top >= 0
+      && r.right <= Math.min(root.clientWidth, root.getBoundingClientRect().right)
+      && r.bottom <= window.innerHeight
+      && (active ? !!timerBounds && Math.abs(timerBounds.top - r.bottom - 16) <= 1
+        : !timerBounds && Math.abs(window.innerHeight - r.bottom - 24) <= 1)
+      && node.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  }, timerActive)).toBe(true);
+  await launcher.click({ trial: true });
 }

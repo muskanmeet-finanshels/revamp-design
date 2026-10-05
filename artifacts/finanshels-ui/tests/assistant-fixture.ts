@@ -40,10 +40,22 @@ export interface TestTimerSnapshot {
 }
 
 export async function assistantFixture(page: Page, timerState: TestTimerSnapshot | null = null) {
-  const timer = { state: timerState, reads: 0, writes: [] as string[] };
+  const timer = {
+    state: timerState, reads: 0, writes: [] as string[],
+    snapshots: [] as (TestTimerSnapshot | null)[],
+    async setState(state: TestTimerSnapshot | null) {
+      // Let the provider's real polling consume the change, without a timer
+      // mutation or a test-only fetch that would bypass the React update.
+      const response = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === '/api/timer'
+        && response.request().method() === 'GET');
+      timer.state = state;
+      await response;
+    },
+  };
   // Install before navigation: even the initial hydration and later polls must
   // never read live timer records. Unexpected mutations are blocked, not forwarded.
-  await page.route('**/api/timer', async (route) => {
+  await page.route(/\/api\/timer(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
     const method = route.request().method();
     if (method !== 'GET') {
       timer.writes.push(method);
@@ -51,7 +63,9 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
       return;
     }
     timer.reads++;
-    await route.fulfill({ status: 200, json: timer.state });
+    const snapshot = timer.state;
+    timer.snapshots.push(snapshot);
+    await route.fulfill({ status: 200, json: snapshot });
   });
   const api = {
     status: { ready: false, reason: 'adapters_unavailable' } as unknown,
