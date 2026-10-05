@@ -30,7 +30,29 @@ export function answer(key: string, intent: PmsAssistantAnswer['intent'], status
   };
 }
 
-export async function assistantFixture(page: Page) {
+export interface TestTimerSnapshot {
+  taskId: string;
+  taskName: string;
+  projectName: string;
+  startedAt: number;
+  totalPausedMs: number;
+  pausedAt: number | null;
+}
+
+export async function assistantFixture(page: Page, timerState: TestTimerSnapshot | null = null) {
+  const timer = { state: timerState, reads: 0, writes: [] as string[] };
+  // Install before navigation: even the initial hydration and later polls must
+  // never read live timer records. Unexpected mutations are blocked, not forwarded.
+  await page.route('**/api/timer', async (route) => {
+    const method = route.request().method();
+    if (method !== 'GET') {
+      timer.writes.push(method);
+      await route.abort('blockedbyclient');
+      return;
+    }
+    timer.reads++;
+    await route.fulfill({ status: 200, json: timer.state });
+  });
   const api = {
     status: { ready: false, reason: 'adapters_unavailable' } as unknown,
     statusCode: 200,
@@ -83,6 +105,7 @@ export async function assistantFixture(page: Page) {
   });
   return {
     api,
+    timer,
     async open(key?: string) {
       if (key) api.status = verifiedStatus(key);
       // This request starts in the provider's client effect. Waiting for it

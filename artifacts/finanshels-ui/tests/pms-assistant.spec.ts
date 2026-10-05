@@ -3,6 +3,7 @@ import {
   answer, assistantFixture, chips, composer, DEFAULTS, expectResponse, panel,
   PERMISSION_A, PREF_PREFIX, sendText, SESSION_A, SESSION_B, storedPrefs, transcript, verifiedStatus,
 } from './assistant-fixture';
+import { expectUsableAssistantAboveTimer, floatingTimer, forceScrollbar } from './assistant-timer-layout';
 
 test('application-wide assistant has no default client or fictional demo; focus and Escape return to launcher', async ({ page }) => {
   const fixture = await assistantFixture(page);
@@ -266,5 +267,64 @@ for (const width of [390, 680]) {
     await expect(composer(page)).toBeFocused();
     await composer(page).press('Escape');
     await expect(page.getByRole('button', { name: 'Open PMS assistant chat' })).toBeFocused();
+  });
+}
+
+for (const width of [390, 680]) {
+  test(`running timer preserves usable assistant controls through name, minimize and resize transitions from ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const fixture = await assistantFixture(page, {
+      taskId: 'test-only-layout-timer',
+      taskName: 'Test-only short task',
+      projectName: 'Test Client- Layout Regression',
+      startedAt: Date.now() - 60_000,
+      totalPausedMs: 0,
+      pausedAt: null,
+    });
+    await fixture.open();
+    await forceScrollbar(page);
+    await expect(floatingTimer(page)).toHaveAttribute('role', 'status');
+    await expectUsableAssistantAboveTimer(page);
+    const shortHeight = await floatingTimer(page).evaluate((node) => node.getBoundingClientRect().height);
+    // The polling response changes only the name while the same running timer
+    // remains mounted. This exercises measured-height updates independently of
+    // the active/minimised effect dependencies.
+    const longName = 'Test-only task: reconcile the quarterly client accounts, investigate outstanding invoice discrepancies, and prepare detailed supporting documentation for the financial review meeting';
+    fixture.timer.state = { ...fixture.timer.state!, taskName: longName };
+    await expect(floatingTimer(page).getByText(longName, { exact: true })).toBeVisible();
+    await expect.poll(() => floatingTimer(page).evaluate((node) => node.getBoundingClientRect().height))
+      .toBeGreaterThan(shortHeight + 48);
+    await expectUsableAssistantAboveTimer(page);
+
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      await expectUsableAssistantAboveTimer(page);
+    }
+    await floatingTimer(page).getByRole('button', { name: 'Minimise timer widget', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Restore timer', exact: true })).toBeVisible();
+    await expectUsableAssistantAboveTimer(page);
+    await expect.poll(() => floatingTimer(page).evaluate((node) => node.getBoundingClientRect().height)).toBeLessThan(shortHeight);
+    await page.setViewportSize({ width: 680, height: 640 });
+    await expectUsableAssistantAboveTimer(page);
+
+    await page.getByRole('button', { name: 'Restore timer', exact: true }).click();
+    await expect(floatingTimer(page).getByText(longName, { exact: true })).toBeVisible();
+    await expectUsableAssistantAboveTimer(page);
+    await page.setViewportSize({ width, height: 720 });
+    await expectUsableAssistantAboveTimer(page);
+
+    // Actually use composer and header controls too; visibility alone does not
+    // establish that the higher-z-index timer leaves them actionable.
+    await panel(page).getByRole('button', { name: 'Send live question', exact: true }).click();
+    await expectResponse(page, 'Test-only unavailable response');
+    expect(fixture.api.questions).toEqual(['Test-only timer layout question']);
+    await panel(page).getByRole('button', { name: 'Reset conversation', exact: true }).click();
+    await expect(transcript(page)).not.toContainText('Test-only timer layout question');
+    await panel(page).getByRole('button', { name: 'Minimise chat', exact: true }).click();
+    await expect(panel(page)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open PMS assistant chat', exact: true }).click();
+    await expectUsableAssistantAboveTimer(page);
+    expect(fixture.timer.reads).toBeGreaterThanOrEqual(2);
+    expect(fixture.timer.writes).toEqual([]);
   });
 }
