@@ -1,0 +1,133 @@
+import { expect, type Page, type Route } from '@playwright/test';
+import type { PmsAssistantAnswer } from '../src/components/pms-chat/assistant-api';
+
+// Opaque test-only server namespaces, not users/roles supplied by the browser.
+export const SESSION_A = 'a'.repeat(64);
+export const SESSION_B = 'b'.repeat(64);
+export const PERMISSION_A = 'c'.repeat(64);
+export const PREF_PREFIX = 'pms-assistant-intent-prefs:v1:';
+export const DEFAULTS = [
+  "What is my today's work?",
+  'Show me overdue tasks',
+  'What work is pending across my clients?',
+  'What blockers are recorded?',
+];
+export const panel = (page: Page) => page.getByRole('region', { name: 'PMS assistant chat' });
+export const transcript = (page: Page) => page.getByRole('log', { name: 'Live assistant transcript' });
+export const chips = (page: Page) => panel(page).getByTestId('chip-intent');
+export const composer = (page: Page) => page.getByRole('textbox', { name: 'Ask about authorized records' });
+
+export function verifiedStatus(key: string) {
+  return { ready: true, reason: 'ready', personalization: { key, timeZone: 'UTC' } };
+}
+
+export function answer(key: string, intent: PmsAssistantAnswer['intent'], status: PmsAssistantAnswer['status'] = 'answered'): PmsAssistantAnswer {
+  const text = `Intercepted ${intent} ${status} response`;
+  return {
+    status, answer: text, intent, personalizationKey: key,
+    citations: status === 'answered' ? [{ kind: 'task', id: 'test-record', title: 'Intercepted record', excerpt: 'Test-only source excerpt' }] : [],
+    claims: status === 'answered' ? [{ text, basis: 'recorded', citationIds: ['task:test-record'] }] : [],
+  };
+}
+
+export async function assistantFixture(page: Page) {
+  const api = {
+    status: { ready: false, reason: 'adapters_unavailable' } as unknown,
+    statusCode: 200,
+    response: { status: 'unavailable', answer: 'Test-only unavailable response', citations: [], claims: [] } as unknown,
+    answerCode: 200,
+    questions: [] as string[],
+  };
+  type Deferred = { gate: Promise<void>; release: () => void; done: Promise<void>; finish: () => void };
+  let held: Deferred | undefined;
+  let heldStatus: Deferred | undefined;
+  function deferred(): Deferred {
+    let release!: () => void;
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const done = new Promise<void>((resolve) => { finish = resolve; });
+    return { gate, release, done, finish };
+  }
+  await page.route('**/api/pms-assistant/**', async (route: Route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/status')) {
+      expect(route.request().method()).toBe('GET');
+      const status = api.status;
+      const code = api.statusCode;
+      const pending = heldStatus;
+      heldStatus = undefined;
+      if (pending) await pending.gate;
+      try {
+        await route.fulfill({ status: code, json: status });
+      } finally {
+        pending?.finish();
+      }
+      return;
+    }
+    expect(path).toBe('/api/pms-assistant/answers');
+    expect(route.request().method()).toBe('POST');
+    const body = route.request().postDataJSON();
+    // Both input paths must send question ONLY: no browser identity or authority.
+    expect(body).toEqual({ question: expect.any(String) });
+    api.questions.push(body.question);
+    const response = api.response;
+    const code = api.answerCode;
+    const deferred = held;
+    held = undefined;
+    if (deferred) await deferred.gate;
+    try {
+      await route.fulfill({ status: code, json: response });
+    } finally {
+      deferred?.finish();
+    }
+  });
+  return {
+    api,
+    async open(key?: string) {
+      if (key) api.status = verifiedStatus(key);
+      // This request starts in the provider's client effect. Waiting for it
+      // prevents clicking the server-rendered launcher before hydration.
+      const hydrated = page.waitForRequest('**/api/timer');
+      await page.goto('/projects', { waitUntil: 'domcontentloaded' });
+      await hydrated;
+      await page.getByRole('button', { name: 'Open PMS assistant chat' }).click();
+      await expect(panel(page)).toBeVisible();
+      await expect(panel(page).getByRole('button', { name: 'Reset suggestions', exact: true }))
+        [key ? 'toBeEnabled' : 'toBeDisabled']();
+    },
+    async refresh(status: unknown = api.status, code = 200) {
+      api.status = status;
+      api.statusCode = code;
+      const response = page.waitForResponse('**/api/pms-assistant/status');
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await response;
+    },
+    holdAnswer() {
+      const pending = deferred();
+      held = pending;
+      return { async release() { pending.release(); await pending.done; } };
+    },
+    holdStatus() {
+      const pending = deferred();
+      heldStatus = pending;
+      return { async release() { pending.release(); await pending.done; } };
+    },
+  };
+}
+
+export async function sendText(page: Page, question: string) {
+  await composer(page).fill(question);
+  await composer(page).press('Enter');
+}
+
+export async function expectResponse(page: Page, text: string) {
+  await expect(transcript(page).getByText(text, { exact: true })).toBeVisible();
+  await expect(transcript(page).getByText('Checking authorized records…')).toHaveCount(0);
+}
+
+export async function storedPrefs(page: Page, key: string) {
+  return page.evaluate((storageKey) => {
+    const raw = localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : null;
+  }, PREF_PREFIX + key);
+}
