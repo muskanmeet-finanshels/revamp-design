@@ -98,7 +98,7 @@ test('messenger menu resizes without losing drafts and downloads only the curren
   await expect(chat.getByRole('menuitem', { name: 'Download transcript', exact: true })).toBeDisabled();
 });
 
-for (const change of ['identity', 'permission', 'authorization lost', 'status HTTP error', 'invalid status key', 'invalid status data', 'blur', 'hidden'] as const) {
+for (const change of ['identity', 'permission', 'authorization lost', 'status HTTP error', 'status transport failure', 'status unreadable JSON', 'invalid status key', 'invalid status data', 'blur', 'hidden'] as const) {
   test(`${change} invalidates an already-open download menu and exports only the current conversation`, async ({ page }) => {
     const fixture = await assistantFixture(page);
     await fixture.open(SESSION_A);
@@ -116,6 +116,8 @@ for (const change of ['identity', 'permission', 'authorization lost', 'status HT
     fixture.api.response = answer(SESSION_A, 'blockers', 'answered', oldExcerpt);
     await sendText(page, oldQuestion);
     await expectResponse(page, 'Intercepted blockers answered response');
+    await transcript(page).getByRole('button', { name: 'Source task:test-record: Intercepted record', exact: true }).click();
+    await expect(transcript(page).getByText(oldExcerpt, { exact: true })).toBeVisible();
     fixture.api.response = answer(SESSION_A, 'overdue', 'answered', lateExcerpt);
     const held = fixture.holdAnswer();
     await sendText(page, lateQuestion);
@@ -144,8 +146,11 @@ for (const change of ['identity', 'permission', 'authorization lost', 'status HT
         : change === 'invalid status key' ? verifiedStatus('not-a-server-key')
         : change === 'invalid status data' ? { ready: 'true', reason: 'ready' }
         : verifiedStatus(nextKey);
-      await fixture.refresh(status, change === 'status HTTP error' ? 503 : 200);
+      await fixture.refresh(status, change === 'status HTTP error' ? 503 : 200,
+        change === 'status transport failure' ? 'transport'
+          : change === 'status unreadable JSON' ? 'unreadable JSON' : null);
       if (change === 'authorization lost' || change === 'status HTTP error'
+        || change === 'status transport failure' || change === 'status unreadable JSON'
         || change === 'invalid status key' || change === 'invalid status data') {
         await expect(panel(page).getByRole('button', { name: 'Reset suggestions', exact: true })).toBeDisabled();
         await expect(chips(page)).toHaveText(DEFAULTS);
@@ -159,6 +164,7 @@ for (const change of ['identity', 'permission', 'authorization lost', 'status HT
     await aborted;
     await held.release();
     await expect(transcript(page)).not.toContainText(oldQuestion);
+    await expect(transcript(page)).not.toContainText(oldExcerpt);
     await expect(transcript(page)).not.toContainText(lateQuestion);
     await expect(transcript(page)).not.toContainText('Intercepted');
     await expect(composer(page)).toHaveValue('');

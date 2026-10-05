@@ -21,6 +21,8 @@ export function verifiedStatus(key: string) {
   return { ready: true, reason: 'ready', personalization: { key, timeZone: 'UTC' } };
 }
 
+type StatusFailure = 'transport' | 'unreadable JSON' | null;
+
 export function answer(key: string, intent: PmsAssistantAnswer['intent'], status: PmsAssistantAnswer['status'] = 'answered', excerpt = 'Test-only source excerpt'): PmsAssistantAnswer {
   const text = `Intercepted ${intent} ${status} response`;
   return {
@@ -70,6 +72,7 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
   const api = {
     status: { ready: false, reason: 'adapters_unavailable' } as unknown,
     statusCode: 200,
+    statusFailure: null as StatusFailure,
     response: { status: 'unavailable', answer: 'Test-only unavailable response', citations: [], claims: [] } as unknown,
     answerCode: 200,
     questions: [] as string[],
@@ -95,14 +98,22 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
       expect(route.request().method()).toBe('GET');
       const status = api.status;
       const code = api.statusCode;
+      const failure = api.statusFailure;
       const pending = heldStatus;
       heldStatus = undefined;
-      // Signal only after snapshotting the old status/code. A request event
+      // Signal only after snapshotting the old status/code/failure. A request event
       // alone can fire before the route captures them for a later race release.
       pending?.capture();
       if (pending) await pending.gate;
       try {
-        await route.fulfill({ status: code, json: status });
+        if (failure === 'transport') {
+          await route.abort('connectionfailed');
+        } else if (failure === 'unreadable JSON') {
+          // Successful HTTP response, but response.json() must reject.
+          await route.fulfill({ status: code, contentType: 'application/json', body: '{"ready":' });
+        } else {
+          await route.fulfill({ status: code, json: status });
+        }
       } finally {
         pending?.finish();
       }
@@ -140,12 +151,17 @@ export async function assistantFixture(page: Page, timerState: TestTimerSnapshot
       await expect(panel(page).getByRole('button', { name: 'Reset suggestions', exact: true }))
         [key ? 'toBeEnabled' : 'toBeDisabled']();
     },
-    async refresh(status: unknown = api.status, code = 200) {
+    async refresh(status: unknown = api.status, code = 200, failure: StatusFailure = null) {
       api.status = status;
       api.statusCode = code;
-      const response = page.waitForResponse('**/api/pms-assistant/status');
+      api.statusFailure = failure;
+      // Aborted requests never emit a response. Listen before triggering focus
+      // so the transport failure cannot race past the fixture's waiter.
+      const settled = failure === 'transport'
+        ? page.waitForEvent('requestfailed', (request) => new URL(request.url()).pathname === '/api/pms-assistant/status')
+        : page.waitForResponse('**/api/pms-assistant/status');
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-      await response;
+      await settled;
     },
     holdAnswer() {
       const pending = deferred();
